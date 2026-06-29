@@ -1,0 +1,14 @@
+[project]
+name = "filefold"
+version = "0.1.0"
+description = "File parsing package for finite element analysis models"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+filefold = "filefold:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
