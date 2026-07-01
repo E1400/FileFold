@@ -6,6 +6,7 @@ from rich.tree import Tree
 
 from filefold.core.block import Block
 from filefold.core.parser import parse
+from filefold.core.splitter import split as split_blocks
 
 app = typer.Typer(help="FileFold — Abaqus .inp file organizer", no_args_is_help=True)
 console = Console()
@@ -41,3 +42,21 @@ def inspect(file: Path = typer.Argument(..., help="Path to the .inp file")) -> N
         _add_block(tree, block)
 
     console.print(tree)
+
+
+@app.command()
+def split(
+    file: Path = typer.Argument(..., help="Path to the .inp file"),
+    output_dir: Path = typer.Argument(..., help="Directory to write split files into"),
+) -> None:
+    """Split an Abaqus .inp file into categorized part files."""
+    if not file.exists():
+        console.print(f"[red]File not found:[/red] {file}")
+        raise typer.Exit(1)
+
+    blocks = parse(file)
+    written = split_blocks(blocks, file, output_dir)
+
+    console.print(f"\n[bold green]Split complete[/bold green] — {len(written)} files written to [cyan]{output_dir}[/cyan]\n")
+    for path in written:
+        console.print(f"  [dim]{path.relative_to(output_dir)}[/dim]")
