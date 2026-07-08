@@ -15,12 +15,14 @@ class Category(str, Enum):
 
 # Normalized keyword (uppercase, no leading asterisk) -> Category
 KEYWORD_CATEGORIES: dict[str, Category] = {
-    # MESH — geometry and topology
+    # MESH — geometry and topology (including part containers from CAE-format files)
     "NODE": Category.MESH,
     "ELEMENT": Category.MESH,
     "NSET": Category.MESH,
     "ELSET": Category.MESH,
     "SURFACE": Category.MESH,
+    "PART": Category.MESH,
+    "END PART": Category.MESH,
 
     # SECTION — property assignment linking elements to materials
     "SOLID SECTION": Category.SECTION,
@@ -92,10 +94,14 @@ KEYWORD_CATEGORIES: dict[str, Category] = {
     "PRINT": Category.OUTPUT,
     "RESTART": Category.OUTPUT,
 
-    # MODEL — model-level metadata and control directives
+    # MODEL — model-level metadata, control directives, and assembly structure
     "HEADING": Category.MODEL,
     "PREPRINT": Category.MODEL,
     "INCLUDE": Category.MODEL,
+    "ASSEMBLY": Category.MODEL,
+    "END ASSEMBLY": Category.MODEL,
+    "INSTANCE": Category.MODEL,
+    "END INSTANCE": Category.MODEL,
 }
 
 

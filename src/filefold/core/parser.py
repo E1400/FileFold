@@ -49,10 +49,21 @@ def parse(path: Path) -> list[Block]:
                 current.raw_lines.append(tok.text)
                 current.line_end = tok.line_no
             elif stack:
-                # Right after a container keyword and before its first child
-                # (e.g. the step-title data line that follows *STEP)
-                stack[-1].raw_lines.append(tok.text)
-                stack[-1].line_end = tok.line_no
+                container = stack[-1]
+                if not container.children:
+                    # Before first child — safe to attach to container's own lines
+                    # (e.g. the step-title data line right after *STEP)
+                    container.raw_lines.append(tok.text)
+                    container.line_end = tok.line_no
+                else:
+                    # After a child container was closed (e.g. after *END INSTANCE).
+                    # Attach to the deepest last child so emit() outputs it in the
+                    # correct position — after the closed child, not before it.
+                    last = container.children[-1]
+                    while last.children:
+                        last = last.children[-1]
+                    last.raw_lines.append(tok.text)
+                    last.line_end = tok.line_no
             else:
                 orphans.append(tok.text)
             continue
