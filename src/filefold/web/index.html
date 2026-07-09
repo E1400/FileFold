@@ -911,7 +911,7 @@ function renderDetail(data) {
       <td>${f.category ? catChip(f.category) : "—"}</td>
       <td>${statusBadge}</td>
       <td>
-        <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View</button>
+        <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
       </td>
     </tr>`;
   }).join("");
