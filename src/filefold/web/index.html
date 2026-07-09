@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FileFold</title>
+<style>
+/* ── Reset ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+button, input, select, textarea { font: inherit; }
+
+/* ── Tokens ─────────────────────────────────────────────── */
+:root {
+  --bg:        #0C0F14;
+  --surface:   #161B22;
+  --surface2:  #1F2937;
+  --border:    #30363D;
+  --text:      #E6EDF3;
+  --muted:     #7D8590;
+  --accent:    #58A6FF;
+  --warn:      #E3B341;
+  --success:   #3FB950;
+  --danger:    #F85149;
+
+  --cat-mesh:     #58A6FF;
+  --cat-material: #F0883E;
+  --cat-step:     #BC8CFF;
+  --cat-loads:    #56D364;
+  --cat-contact:  #FF7B72;
+  --cat-output:   #79C0FF;
+  --cat-model:    #E3B341;
+  --cat-section:  #D2A8FF;
+  --cat-unknown:  #7D8590;
+
+  --radius:   6px;
+  --sidebar:  220px;
+  --mono:     "JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:       #F0F4F8;
+    --surface:  #FFFFFF;
+    --surface2: #EBF0F7;
+    --border:   #CBD2DA;
+    --text:     #1A1F2B;
+    --muted:    #6B7280;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C0F14; --surface: #161B22; --surface2: #1F2937;
+  --border: #30363D; --text: #E6EDF3; --muted: #7D8590;
+}
+:root[data-theme="light"] {
+  --bg: #F0F4F8; --surface: #FFFFFF; --surface2: #EBF0F7;
+  --border: #CBD2DA; --text: #1A1F2B; --muted: #6B7280;
+}
+
+/* ── Base ───────────────────────────────────────────────── */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar);
+  min-width: var(--sidebar);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-header {
+  padding: 16px 14px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-mark {
+  font-family: var(--mono);
+  font-size: 18px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+.logo-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.sidebar-section {
+  padding: 6px 14px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ws-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background .1s;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-item:hover { background: var(--surface2); color: var(--text); }
+.ws-item.active { background: var(--surface2); color: var(--accent); }
+.ws-item .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.ws-item.active .dot { background: var(--accent); }
+.sidebar-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Main ───────────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.topbar h1 { font-size: 15px; font-weight: 600; flex: 1; }
+.content { padding: 28px 32px; flex: 1; }
+
+/* ── Buttons ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity .15s, background .15s;
+  text-decoration: none;
+}
+.btn:hover { opacity: .85; }
+.btn-primary { background: var(--accent); color: #000; border-color: var(--accent); }
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-ghost:hover { background: var(--surface2); }
+.btn-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+.btn-danger:hover { background: var(--danger); color: #fff; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── Cards ──────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.workspace-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color .15s, transform .1s;
+}
+.workspace-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.workspace-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.workspace-card p { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* ── Drop zone ──────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  color: var(--muted);
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--text);
+}
+.drop-zone .icon { font-size: 28px; margin-bottom: 8px; }
+.drop-zone p { font-size: 13px; }
+.drop-zone .hint { font-size: 11px; margin-top: 4px; color: var(--muted); }
+
+/* ── Block inspector tree ───────────────────────────────── */
+.inspector-tree {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow-x: auto;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.tree-node { padding: 0 12px; }
+.tree-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  cursor: pointer;
+  border-radius: 3px;
+  user-select: none;
+}
+.tree-node-header:hover { background: var(--surface2); }
+.tree-toggle { width: 14px; text-align: center; color: var(--muted); flex-shrink: 0; }
+.tree-kw { font-weight: 700; }
+.tree-cat {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.tree-lines { color: var(--muted); font-size: 10px; }
+.tree-children { padding-left: 14px; display: none; }
+.tree-children.open { display: block; }
+
+/* ── Split config ───────────────────────────────────────── */
+.split-grid {
+  display: grid;
+  gap: 8px;
+}
+.split-row {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+}
+.split-row.selected { border-color: var(--accent); }
+.split-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+input[type="text"] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 100%;
+}
+input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+/* ── File table ─────────────────────────────────────────── */
+.file-table { width: 100%; border-collapse: collapse; }
+.file-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.file-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  vertical-align: middle;
+}
+.file-table tr:last-child td { border-bottom: none; }
+.file-table tr:hover td { background: var(--surface2); }
+.file-table .filename { font-family: var(--mono); font-size: 12px; }
+
+/* ── Status badges ──────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-ok      { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+.badge-warn    { background: color-mix(in srgb, var(--warn) 15%, transparent);    color: var(--warn); }
+.badge-danger  { background: color-mix(in srgb, var(--danger) 15%, transparent);  color: var(--danger); }
+.badge-muted   { background: var(--surface2); color: var(--muted); }
+.badge-accent  { background: color-mix(in srgb, var(--accent) 15%, transparent);  color: var(--accent); }
+
+/* ── Reimport sections ──────────────────────────────────── */
+.reimport-section { margin-bottom: 20px; }
+.reimport-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reimport-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+.reimport-row.pending { border-color: var(--warn); }
+.reimport-row.safe    { border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+.reimport-row .fname  { font-family: var(--mono); font-size: 12px; flex: 1; }
+
+/* ── Dividers & layout helpers ──────────────────────────── */
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.spacer { flex: 1; }
+hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.text-muted { color: var(--muted); }
+.text-sm { font-size: 12px; }
+.mono { font-family: var(--mono); }
+
+/* ── Views (shown/hidden) ───────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Toast ──────────────────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 999;
+}
+.toast {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+  min-width: 240px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  animation: slide-in .2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toast.ok     { border-left: 3px solid var(--success); }
+.toast.warn   { border-left: 3px solid var(--warn); }
+.toast.error  { border-left: 3px solid var(--danger); }
+@keyframes slide-in { from { transform: translateX(20px); opacity: 0; } }
+
+/* ── Spinner ────────────────────────────────────────────── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Workspace name input on new-workspace ──────────────── */
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; font-weight: 500; color: var(--muted); }
+.field input[type="text"] { font-size: 13px; padding: 8px 10px; }
+
+/* ── Empty state ────────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+.empty .icon { font-size: 40px; margin-bottom: 12px; }
+.empty p { font-size: 14px; margin-bottom: 16px; }
+
+/* ── File viewer modal ──────────────────────────────────── */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: min(90vw, 900px);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-header h3 { font-family: var(--mono); font-size: 13px; font-weight: 600; flex: 1; }
+.modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+.modal-body pre {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 16px;
+  margin: 0;
+  white-space: pre;
+  tab-size: 4;
+  color: var(--text);
+}
+.modal-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.modal-editor {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 16px;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+  resize: none;
+  outline: none;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+.modal-editor:focus { outline: none; }
+.unsaved-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  display: none;
+  flex-shrink: 0;
+}
+.unsaved-dot.visible { display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════ SIDEBAR ═══════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="sidebar-header">
+    <span class="logo-mark">FF</span>
+    <span class="logo-text">FileFold</span>
+  </div>
+  <div class="sidebar-body">
+    <div class="sidebar-section">Workspaces</div>
+    <div id="ws-list"></div>
+  </div>
+  <div class="sidebar-footer">
+    <button class="btn btn-primary btn-sm" style="flex:1" onclick="showView('new-workspace')">+ New</button>
+    <button class="btn btn-ghost btn-sm" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">◑</button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════  MAIN  ═══════════════════════════════════ -->
+<main id="main">
+
+  <!-- ── HOME ─────────────────────────────────────────────────────────────── -->
+  <div id="view-home" class="view active">
+    <div class="topbar">
+      <h1>Workspaces</h1>
+      <button class="btn btn-primary btn-sm" onclick="showView('new-workspace')">+ New workspace</button>
+    </div>
+    <div class="content">
+      <div id="home-cards" class="card-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── NEW WORKSPACE ────────────────────────────────────────────────────── -->
+  <div id="view-new-workspace" class="view">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" onclick="showView('home')">← Back</button>
+      <h1>New Workspace</h1>
+    </div>
+    <div class="content">
+      <div class="two-col" style="align-items:start">
+
+        <!-- left: upload + inspector -->
+        <div class="stack">
+          <div>
+            <div class="section-title">1 — Upload model</div>
+            <div id="upload-zone" class="drop-zone" onclick="document.getElementById('upload-input').click()">
+              <div class="icon">📂</div>
+              <p>Drop <code>.inp</code> file here or click to browse</p>
+              <div class="hint">Abaqus input files only</div>
+            </div>
+            <input type="file" id="upload-input" accept=".inp" style="display:none" onchange="handleUpload(this.files[0])">
+          </div>
+
+          <div id="inspector-section" style="display:none">
+            <div class="section-title">Block inspector</div>
+            <div id="inspector-tree" class="inspector-tree"></div>
+          </div>
+        </div>
+
+        <!-- right: config + create -->
+        <div class="stack">
+          <div class="field">
+            <label>Workspace name</label>
+            <input type="text" id="ws-name-input" placeholder="my-model">
+          </div>
+
+          <div id="split-config-section" style="display:none">
+            <div class="section-title">2 — Choose what to extract</div>
+            <div id="split-config" class="split-grid"></div>
+          </div>
+
+          <div id="create-btn-row" style="display:none">
+            <button class="btn btn-primary" style="width:100%" onclick="createWorkspace()">
+              Create workspace
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WORKSPACE DETAIL ─────────────────────────────────────────────────── -->
+  <div id="view-detail" class="view">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" onclick="showView('home')">← Back</button>
+      <h1 id="detail-title">Workspace</h1>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" onclick="exportWorkspace()">⬇ Export ZIP</button>
+      <button class="btn btn-ghost btn-sm" onclick="startReimp()">↑ Re-import</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteWorkspace()">Delete</button>
+    </div>
+    <div class="content">
+      <div id="detail-meta" class="text-muted text-sm" style="margin-bottom:20px"></div>
+      <div class="section-title">Files</div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="file-table">
+          <thead>
+            <tr>
+              <th>Filename</th>
+              <th>Role</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="detail-files"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REIMPORT ─────────────────────────────────────────────────────────── -->
+  <div id="view-reimport" class="view">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" onclick="openWorkspace(state.activeWs)">← Back</button>
+      <h1 id="reimp-title">Re-import</h1>
+    </div>
+    <div class="content">
+
+      <!-- Step 1: upload -->
+      <div id="reimp-upload-section">
+        <div class="section-title">Upload new Abaqus export</div>
+        <div id="reimp-drop" class="drop-zone" onclick="document.getElementById('reimp-input').click()">
+          <div class="icon">📤</div>
+          <p>Drop updated <code>.inp</code> file here or click to browse</p>
+          <div class="hint">The mother file will always be updated. Existing children are updated selectively.</div>
+        </div>
+        <input type="file" id="reimp-input" accept=".inp" style="display:none" onchange="handleReimpUpload(this.files[0])">
+      </div>
+
+      <!-- Step 2: review -->
+      <div id="reimp-preview-section" style="display:none">
+        <div class="two-col" style="align-items:start; gap:28px">
+
+          <!-- left: inspector + new categories -->
+          <div class="stack">
+            <div>
+              <div class="section-title" style="cursor:pointer" onclick="toggleReimpInspector()">
+                Block tree — <span id="reimp-file-label" class="mono"></span>
+                <span id="reimp-insp-toggle" style="float:right;color:var(--muted)">▸ show</span>
+              </div>
+              <div id="reimp-inspector-tree" class="inspector-tree" style="display:none"></div>
+            </div>
+
+            <div id="reimp-new-cats-section" style="display:none">
+              <div class="section-title">Add new sections</div>
+              <p class="text-muted text-sm" style="margin-bottom:10px">
+                These categories exist in the new file but aren't extracted in this workspace yet.
+                Check any you want to add — a new child file will be created.
+              </p>
+              <div id="reimp-new-cats" class="split-grid"></div>
+            </div>
+          </div>
+
+          <!-- right: conflict preview -->
+          <div>
+            <div class="section-title">Existing sections</div>
+            <div id="reimp-results"></div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:24px">
+          <button class="btn btn-ghost" onclick="resetReimp()">← Upload different file</button>
+          <span class="spacer"></span>
+          <button id="reimp-apply-btn" class="btn btn-primary" onclick="applyReimp()">Apply updates</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- File editor modal -->
+<div id="file-modal" class="modal-backdrop" onclick="closeFileModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="unsaved-dot" id="unsaved-dot"></span>
+      <h3 id="modal-filename"></h3>
+      <span class="spacer"></span>
+      <button id="modal-save-btn" class="btn btn-primary btn-sm" onclick="saveFile()" style="display:none">Save</button>
+      <button id="modal-discard-btn" class="btn btn-ghost btn-sm" onclick="discardEdits()" style="display:none">Discard</button>
+      <a id="modal-download" class="btn btn-ghost btn-sm" download>⬇ Download</a>
+      <button class="btn btn-ghost btn-sm" onclick="closeFileModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="modal-loading"><span class="spinner"></span> Loading…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════════════════
+const state = {
+  view: "home",
+  workspaces: [],       // list of workspace names
+  activeWs: null,       // name of open workspace
+  wsData: null,         // full detail response for the open workspace
+  inspectResult: null,  // { filename, blocks }
+  uploadedFile: null,   // File object
+  reimp: {
+    file: null,
+    preview: null,
+    checked: new Set(),    // existing child filenames to update
+    availableNewCats: [],  // cat names present in new file but not in workspace
+  },
+};
+
+const CAT_COLORS = {
+  mesh:     "#58A6FF",
+  material: "#F0883E",
+  step:     "#BC8CFF",
+  loads:    "#56D364",
+  contact:  "#FF7B72",
+  output:   "#79C0FF",
+  model:    "#E3B341",
+  section:  "#D2A8FF",
+  unknown:  "#7D8590",
+};
+
+function catChip(cat) {
+  const c = CAT_COLORS[cat] ?? "#7D8590";
+  return `<span class="chip" style="background:${c}22;color:${c}">${cat}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// API helper
+// ═══════════════════════════════════════════════════════════════════════════════
+async function api(method, path, body) {
+  const opts = { method };
+  if (body instanceof FormData) {
+    opts.body = body;
+  } else if (body !== undefined) {
+    opts.headers = { "Content-Type": "application/json" };
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || `HTTP ${res.status}`);
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) return res.json();
+  if (ct.includes("application/zip")) return res.blob();
+  return res.text();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════════════════════════════════
+function toast(msg, type = "ok") {
+  const icons = { ok: "✓", warn: "⚠", error: "✕" };
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type] ?? ""}</span><span>${msg}</span>`;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Theme toggle
+// ═══════════════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const root = document.documentElement;
+  const cur = root.dataset.theme;
+  if (!cur) {
+    const sys = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    root.dataset.theme = sys === "dark" ? "light" : "dark";
+  } else {
+    root.dataset.theme = cur === "dark" ? "light" : "dark";
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// View router
+// ═══════════════════════════════════════════════════════════════════════════════
+function showView(name) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById(`view-${name}`).classList.add("active");
+  state.view = name;
+
+  document.querySelectorAll(".ws-item").forEach(el => el.classList.remove("active"));
+  if (name === "home" || name === "new-workspace") {
+    state.activeWs = null;
+  }
+  if (name === "home") loadWorkspaces();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Workspaces — list + sidebar
+// ═══════════════════════════════════════════════════════════════════════════════
+async function loadWorkspaces() {
+  try {
+    const data = await api("GET", "/api/workspaces");
+    state.workspaces = data.workspaces ?? [];
+    renderSidebar();
+    renderHome();
+  } catch (e) {
+    toast("Failed to load workspaces: " + e.message, "error");
+  }
+}
+
+function renderSidebar() {
+  const el = document.getElementById("ws-list");
+  if (!state.workspaces.length) {
+    el.innerHTML = `<div class="text-muted text-sm" style="padding:8px 14px">No workspaces yet</div>`;
+    return;
+  }
+  el.innerHTML = state.workspaces.map(name =>
+    `<div class="ws-item ${name === state.activeWs ? "active" : ""}" onclick="openWorkspace('${esc(name)}')">
+       <span class="dot"></span>${esc(name)}
+     </div>`
+  ).join("");
+}
+
+function renderHome() {
+  const el = document.getElementById("home-cards");
+  if (!state.workspaces.length) {
+    el.innerHTML = `
+      <div class="empty" style="grid-column:1/-1">
+        <div class="icon">📁</div>
+        <p>No workspaces yet. Upload an Abaqus <code>.inp</code> file to get started.</p>
+        <button class="btn btn-primary" onclick="showView('new-workspace')">+ New workspace</button>
+      </div>`;
+    return;
+  }
+  el.innerHTML = state.workspaces.map(name =>
+    `<div class="workspace-card" onclick="openWorkspace('${esc(name)}')">
+       <h3>${esc(name)}</h3>
+       <p class="text-muted">Click to open</p>
+       <div class="chip-row">
+         <span class="chip" style="background:var(--surface2);color:var(--muted)">${esc(name)}</span>
+       </div>
+     </div>`
+  ).join("");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Workspace detail
+// ═══════════════════════════════════════════════════════════════════════════════
+async function openWorkspace(name) {
+  state.activeWs = name;
+  renderSidebar();
+  showView("detail");
+  document.getElementById("detail-title").textContent = name;
+  document.getElementById("detail-meta").textContent = "Loading…";
+  document.getElementById("detail-files").innerHTML = "";
+
+  try {
+    const data = await api("GET", `/api/workspaces/${encodeURIComponent(name)}`);
+    state.wsData = data;
+    renderDetail(data);
+  } catch (e) {
+    toast("Failed to load workspace: " + e.message, "error");
+  }
+}
+
+function renderDetail(data) {
+  document.getElementById("detail-meta").innerHTML =
+    `Source: <span class="mono">${esc(data.source_name)}</span> &nbsp;·&nbsp; Updated: ${esc(data.updated_at)}`;
+
+  const tbody = document.getElementById("detail-files");
+  tbody.innerHTML = data.files.map(f => {
+    let statusBadge;
+    if (!f.exists)          statusBadge = `<span class="badge badge-danger">missing</span>`;
+    else if (f.manually_edited) statusBadge = `<span class="badge badge-warn">edited</span>`;
+    else                    statusBadge = `<span class="badge badge-ok">clean</span>`;
+
+    const roleBadge = f.role === "mother"
+      ? `<span class="badge badge-muted">mother</span>`
+      : `<span class="badge badge-accent">child</span>`;
+
+    return `<tr>
+      <td class="filename">${esc(f.filename)}</td>
+      <td>${roleBadge}</td>
+      <td>${f.category ? catChip(f.category) : "—"}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+async function exportWorkspace() {
+  try {
+    const blob = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}/export`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${state.activeWs}.zip`; a.click();
+    URL.revokeObjectURL(url);
+    toast("Export downloaded");
+  } catch (e) {
+    toast("Export failed: " + e.message, "error");
+  }
+}
+
+async function deleteWorkspace() {
+  if (!confirm(`Delete workspace "${state.activeWs}"? This cannot be undone.`)) return;
+  try {
+    await api("DELETE", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+    toast(`Deleted ${state.activeWs}`);
+    state.activeWs = null;
+    await loadWorkspaces();
+    showView("home");
+  } catch (e) {
+    toast("Delete failed: " + e.message, "error");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Upload + Inspect
+// ═══════════════════════════════════════════════════════════════════════════════
+function setupDropZone(zoneId, handler) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag-over"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+  zone.addEventListener("drop", e => {
+    e.preventDefault(); zone.classList.remove("drag-over");
+    const f = e.dataTransfer.files[0];
+    if (f) handler(f);
+  });
+}
+
+async function handleUpload(file) {
+  if (!file) return;
+  state.uploadedFile = file;
+
+  // Default workspace name from filename
+  const base = file.name.replace(/\.inp$/i, "");
+  const nameInput = document.getElementById("ws-name-input");
+  if (!nameInput.value) nameInput.value = base;
+
+  const zone = document.getElementById("upload-zone");
+  zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Parsing ${esc(file.name)}…</p>`;
+
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const data = await api("POST", "/api/inspect", fd);
+    state.inspectResult = data;
+
+    zone.innerHTML = `
+      <div class="icon">✓</div>
+      <p><strong>${esc(file.name)}</strong></p>
+      <div class="hint">${countBlocks(data.blocks)} blocks detected — <a href="#" onclick="document.getElementById('upload-input').click();return false">change file</a></div>`;
+
+    document.getElementById("inspector-section").style.display = "";
+    renderInspector(data.blocks);
+    document.getElementById("split-config-section").style.display = "";
+    renderSplitConfig(data.blocks);
+    document.getElementById("create-btn-row").style.display = "";
+  } catch (e) {
+    zone.innerHTML = `<div class="icon">⚠</div><p>${esc(e.message)}</p>`;
+    toast("Parse error: " + e.message, "error");
+  }
+}
+
+function countBlocks(blocks, n = 0) {
+  for (const b of blocks) { n++; n = countBlocks(b.children, n); }
+  return n;
+}
+
+// ── Block inspector tree ────────────────────────────────────────────────────
+function renderInspector(blocks) {
+  document.getElementById("inspector-tree").innerHTML =
+    blocks.map(b => treeNodeHTML(b, 0)).join("");
+  document.querySelectorAll(".tree-node-header").forEach(h => {
+    h.addEventListener("click", () => {
+      const children = h.nextElementSibling;
+      if (!children) return;
+      const open = children.classList.toggle("open");
+      h.querySelector(".tree-toggle").textContent = open ? "▾" : "▸";
+    });
+  });
+}
+
+function treeNodeHTML(b, depth) {
+  const c = CAT_COLORS[b.category] ?? "#7D8590";
+  const hasChildren = b.children && b.children.length > 0;
+  return `<div class="tree-node">
+    <div class="tree-node-header">
+      <span class="tree-toggle">${hasChildren ? "▸" : " "}</span>
+      <span class="tree-kw" style="color:${c}">*${esc(b.keyword)}</span>
+      <span class="tree-cat" style="background:${c}22;color:${c}">${esc(b.category)}</span>
+      <span class="tree-lines">${b.line_start}–${b.line_end}</span>
+    </div>
+    ${hasChildren ? `<div class="tree-children">${b.children.map(ch => treeNodeHTML(ch, depth+1)).join("")}</div>` : ""}
+  </div>`;
+}
+
+// ── Split config ─────────────────────────────────────────────────────────────
+function renderSplitConfig(blocks) {
+  // Collect unique categories present (excluding UNKNOWN)
+  const cats = new Set();
+  function walk(bs) { bs.forEach(b => { if (b.category !== "unknown") cats.add(b.category); walk(b.children); }); }
+  walk(blocks);
+
+  const el = document.getElementById("split-config");
+  el.innerHTML = [...cats].map(cat => {
+    const c = CAT_COLORS[cat] ?? "#7D8590";
+    const id = `sel-${cat}`;
+    return `<div class="split-row" id="row-${cat}">
+      <label>
+        <input type="checkbox" id="${id}" onchange="toggleSplitRow('${cat}')">
+        <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
+      </label>
+      <input type="text" id="fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
+      <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
+    </div>`;
+  }).join("");
+}
+
+function toggleSplitRow(cat) {
+  const checked = document.getElementById(`sel-${cat}`).checked;
+  const row = document.getElementById(`row-${cat}`);
+  const fnInput = document.getElementById(`fn-${cat}`);
+  row.classList.toggle("selected", checked);
+  fnInput.disabled = !checked;
+  fnInput.style.opacity = checked ? "1" : ".4";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Create workspace
+// ═══════════════════════════════════════════════════════════════════════════════
+async function createWorkspace() {
+  if (!state.uploadedFile) { toast("Upload a file first", "warn"); return; }
+
+  const name = document.getElementById("ws-name-input").value.trim();
+  if (!name) { toast("Enter a workspace name", "warn"); return; }
+
+  // Collect selections
+  const selections = [];
+  if (state.inspectResult) {
+    const cats = new Set();
+    function walk(bs) { bs.forEach(b => { cats.add(b.category); walk(b.children); }); }
+    walk(state.inspectResult.blocks);
+    cats.forEach(cat => {
+      const cb = document.getElementById(`sel-${cat}`);
+      if (cb && cb.checked) {
+        const fn = document.getElementById(`fn-${cat}`).value.trim() || `${cat}.inp`;
+        selections.push({ category: cat, filename: fn });
+      }
+    });
+  }
+
+  const btn = document.querySelector("#create-btn-row button");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Creating…`;
+
+  try {
+    const fd = new FormData();
+    fd.append("file", state.uploadedFile);
+    fd.append("name", name);
+    fd.append("selections", JSON.stringify(selections));
+    await api("POST", "/api/workspaces", fd);
+    toast(`Workspace "${name}" created`, "ok");
+    await loadWorkspaces();
+    openWorkspace(name);
+    resetNewWorkspace();
+  } catch (e) {
+    toast("Failed: " + e.message, "error");
+    btn.disabled = false;
+    btn.textContent = "Create workspace";
+  }
+}
+
+function resetNewWorkspace() {
+  state.uploadedFile = null;
+  state.inspectResult = null;
+  document.getElementById("upload-zone").innerHTML = `
+    <div class="icon">📂</div>
+    <p>Drop <code>.inp</code> file here or click to browse</p>
+    <div class="hint">Abaqus input files only</div>`;
+  document.getElementById("upload-input").value = "";
+  document.getElementById("ws-name-input").value = "";
+  document.getElementById("inspector-section").style.display = "none";
+  document.getElementById("split-config-section").style.display = "none";
+  document.getElementById("create-btn-row").style.display = "none";
+  document.getElementById("inspector-tree").innerHTML = "";
+  document.getElementById("split-config").innerHTML = "";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Reimport
+// ═══════════════════════════════════════════════════════════════════════════════
+function startReimp() {
+  resetReimp();
+  document.getElementById("reimp-title").textContent = `Re-import → ${state.activeWs}`;
+  showView("reimport");
+}
+
+function resetReimp() {
+  state.reimp = { file: null, preview: null, checked: new Set(), availableNewCats: [] };
+  document.getElementById("reimp-upload-section").style.display = "";
+  document.getElementById("reimp-preview-section").style.display = "none";
+  document.getElementById("reimp-input").value = "";
+}
+
+async function handleReimpUpload(file) {
+  if (!file) return;
+  state.reimp.file = file;
+  const zone = document.getElementById("reimp-drop");
+  zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Analysing ${esc(file.name)}…</p>`;
+
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const data = await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/reimport/preview`, fd);
+    state.reimp.preview = data;
+    state.reimp.checked = new Set((data.safe_to_update ?? []).map(s => s.filename));
+
+    document.getElementById("reimp-file-label").textContent = data.filename ?? file.name;
+    renderReimpInspector(data.blocks ?? []);
+    renderReimpNewCats(data.blocks ?? []);
+    renderReimportPreview(data);
+
+    document.getElementById("reimp-upload-section").style.display = "none";
+    document.getElementById("reimp-preview-section").style.display = "";
+  } catch (e) {
+    zone.innerHTML = `<div class="icon">⚠</div><p>${esc(e.message)}</p>`;
+    toast("Preview failed: " + e.message, "error");
+  }
+}
+
+function toggleReimpInspector() {
+  const tree = document.getElementById("reimp-inspector-tree");
+  const tog  = document.getElementById("reimp-insp-toggle");
+  const open = tree.style.display === "none";
+  tree.style.display = open ? "" : "none";
+  tog.textContent = open ? "▾ hide" : "▸ show";
+}
+
+function renderReimpInspector(blocks) {
+  const el = document.getElementById("reimp-inspector-tree");
+  el.innerHTML = blocks.map(b => treeNodeHTML(b, 0)).join("");
+  el.querySelectorAll(".tree-node-header").forEach(h => {
+    h.addEventListener("click", () => {
+      const children = h.nextElementSibling;
+      if (!children) return;
+      const open = children.classList.toggle("open");
+      h.querySelector(".tree-toggle").textContent = open ? "▾" : "▸";
+    });
+  });
+}
+
+function renderReimpNewCats(blocks) {
+  const existingCats = new Set((state.wsData?.selections ?? []).map(s => s.category));
+  const fileCats = new Set();
+  function walkCats(bs) { bs.forEach(b => { if (b.category !== "unknown") fileCats.add(b.category); walkCats(b.children || []); }); }
+  walkCats(blocks);
+
+  const newCats = [...fileCats].filter(c => !existingCats.has(c));
+  state.reimp.availableNewCats = newCats;
+
+  const section = document.getElementById("reimp-new-cats-section");
+  const el = document.getElementById("reimp-new-cats");
+
+  if (!newCats.length) { section.style.display = "none"; return; }
+
+  section.style.display = "";
+  el.innerHTML = newCats.map(cat => {
+    const c = CAT_COLORS[cat] ?? "#7D8590";
+    return `<div class="split-row" id="reimp-row-${cat}">
+      <label>
+        <input type="checkbox" id="reimp-sel-${cat}" onchange="toggleReimpNewCat('${cat}')">
+        <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
+      </label>
+      <input type="text" id="reimp-fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
+      <span class="text-muted text-sm mono">new</span>
+    </div>`;
+  }).join("");
+}
+
+function toggleReimpNewCat(cat) {
+  const checked = document.getElementById(`reimp-sel-${cat}`).checked;
+  const row = document.getElementById(`reimp-row-${cat}`);
+  const fnInput = document.getElementById(`reimp-fn-${cat}`);
+  row.classList.toggle("selected", checked);
+  fnInput.disabled = !checked;
+  fnInput.style.opacity = checked ? "1" : ".4";
+}
+
+function renderReimportPreview(data) {
+  const el = document.getElementById("reimp-results");
+  const safe      = data.safe_to_update ?? [];
+  const attn      = data.needs_attention ?? [];
+  const unchanged = data.unchanged ?? [];
+  let html = "";
+
+  if (!safe.length && !attn.length && !unchanged.length) {
+    html = `<div class="text-muted text-sm" style="padding:12px 0">No existing sections to update. The mother file will still be refreshed.</div>`;
+  }
+
+  if (safe.length) {
+    html += `<div class="reimport-section">
+      <h3><span class="badge badge-ok">Safe to update</span></h3>
+      ${safe.map(s => `
+        <div class="reimport-row safe">
+          <input type="checkbox" checked onchange="toggleReimpCheck('${esc(s.filename)}', this.checked)" style="accent-color:var(--success)">
+          <span class="fname">${esc(s.filename)}</span>
+          ${catChip(s.category)}
+        </div>`).join("")}
+    </div>`;
+  }
+
+  if (attn.length) {
+    html += `<div class="reimport-section">
+      <h3><span class="badge badge-warn">Conflict</span> — changed in new file AND manually edited</h3>
+      <p class="text-muted text-sm" style="margin-bottom:8px">Check to overwrite with new version, uncheck to keep your edits.</p>
+      ${attn.map(s => `
+        <div class="reimport-row pending">
+          <input type="checkbox" onchange="toggleReimpCheck('${esc(s.filename)}', this.checked)" style="accent-color:var(--warn)">
+          <span class="fname">${esc(s.filename)}</span>
+          ${catChip(s.category)}
+          <span class="badge badge-warn">conflict</span>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  if (unchanged.length) {
+    html += `<div class="reimport-section">
+      <h3><span class="badge badge-muted">Unchanged</span></h3>
+      ${unchanged.map(s => `
+        <div class="reimport-row">
+          <span class="fname">${esc(s.filename)}</span>
+          ${catChip(s.category)}
+          <span class="badge badge-muted">no change</span>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function toggleReimpCheck(filename, checked) {
+  if (checked) state.reimp.checked.add(filename);
+  else state.reimp.checked.delete(filename);
+}
+
+async function applyReimp() {
+  if (!state.reimp.file) return;
+  const btn = document.getElementById("reimp-apply-btn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Applying…`;
+
+  // Collect newly selected categories
+  const addedSelections = [];
+  for (const cat of state.reimp.availableNewCats) {
+    const cb = document.getElementById(`reimp-sel-${cat}`);
+    if (cb && cb.checked) {
+      const fn = document.getElementById(`reimp-fn-${cat}`)?.value.trim() || `${cat}.inp`;
+      addedSelections.push({ category: cat, filename: fn });
+    }
+  }
+
+  try {
+    const fd = new FormData();
+    fd.append("file", state.reimp.file);
+    fd.append("filenames", JSON.stringify([...state.reimp.checked]));
+    fd.append("added_selections", JSON.stringify(addedSelections));
+    const result = await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/reimport/apply`, fd);
+    const wsName = result.workspace ?? state.activeWs;
+    toast(`Reimport applied`, "ok");
+    // workspace name in state may have changed if source_name updated
+    state.activeWs = wsName;
+    await loadWorkspaces();
+    openWorkspace(wsName);
+  } catch (e) {
+    toast("Apply failed: " + e.message, "error");
+    btn.disabled = false;
+    btn.textContent = "Apply updates";
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// File editor modal
+// ═══════════════════════════════════════════════════════════════════════════════
+let _modalFile = null;    // filename currently open
+let _modalOrig = null;    // original content (for discard / dirty check)
+
+async function viewFile(filename) {
+  _modalFile = filename;
+  _modalOrig = null;
+
+  const modal   = document.getElementById("file-modal");
+  const body    = document.getElementById("modal-body");
+  const title   = document.getElementById("modal-filename");
+  const dlBtn   = document.getElementById("modal-download");
+  const saveBtn = document.getElementById("modal-save-btn");
+  const discBtn = document.getElementById("modal-discard-btn");
+  const dot     = document.getElementById("unsaved-dot");
+
+  title.textContent = filename;
+  const url = `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(filename)}`;
+  dlBtn.href = url;
+  dlBtn.download = filename;
+  saveBtn.style.display = "none";
+  discBtn.style.display = "none";
+  dot.classList.remove("visible");
+
+  body.innerHTML = `<div class="modal-loading"><span class="spinner"></span> Loading…</div>`;
+  modal.classList.add("open");
+  document.addEventListener("keydown", _modalKey);
+
+  try {
+    const text = await api("GET", url);
+    _modalOrig = text;
+
+    const ta = document.createElement("textarea");
+    ta.className = "modal-editor";
+    ta.value = text;
+    ta.spellcheck = false;
+    ta.addEventListener("input", _onEditorInput);
+    ta.addEventListener("keydown", e => {
+      // Tab inserts spaces instead of jumping focus
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const s = ta.selectionStart, en = ta.selectionEnd;
+        ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(en);
+        ta.selectionStart = ta.selectionEnd = s + 2;
+        _onEditorInput();
+      }
+    });
+
+    body.innerHTML = "";
+    body.appendChild(ta);
+    saveBtn.style.display = "";
+    discBtn.style.display = "";
+  } catch (e) {
+    body.innerHTML = `<div class="modal-loading" style="color:var(--danger)">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+function _onEditorInput() {
+  const ta  = document.querySelector(".modal-editor");
+  const dot = document.getElementById("unsaved-dot");
+  if (!ta) return;
+  const dirty = ta.value !== _modalOrig;
+  dot.classList.toggle("visible", dirty);
+}
+
+async function saveFile() {
+  const ta  = document.querySelector(".modal-editor");
+  const btn = document.getElementById("modal-save-btn");
+  if (!ta || !_modalFile) return;
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>`;
+
+  try {
+    await fetch(
+      `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(_modalFile)}`,
+      { method: "PUT", body: ta.value, headers: { "Content-Type": "text/plain" } }
+    );
+    _modalOrig = ta.value;
+    document.getElementById("unsaved-dot").classList.remove("visible");
+    toast(`Saved ${_modalFile}`, "ok");
+    // Refresh the detail table so the "edited" badge updates
+    if (state.wsData) {
+      const data = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+      state.wsData = data;
+      renderDetail(data);
+    }
+  } catch (e) {
+    toast("Save failed: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save";
+  }
+}
+
+function discardEdits() {
+  const ta = document.querySelector(".modal-editor");
+  if (!ta || _modalOrig === null) return;
+  if (ta.value !== _modalOrig && !confirm("Discard unsaved changes?")) return;
+  ta.value = _modalOrig;
+  document.getElementById("unsaved-dot").classList.remove("visible");
+}
+
+function closeFileModal(e) {
+  if (e && e.target !== document.getElementById("file-modal")) return;
+  const ta = document.querySelector(".modal-editor");
+  if (ta && ta.value !== _modalOrig) {
+    if (!confirm("Close without saving?")) return;
+  }
+  document.getElementById("file-modal").classList.remove("open");
+  document.removeEventListener("keydown", _modalKey);
+  _modalFile = null;
+  _modalOrig = null;
+}
+
+function _modalKey(e) {
+  if (e.key === "Escape") closeFileModal();
+  // Ctrl/Cmd+S saves
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    e.preventDefault();
+    saveFile();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Utility
+// ═══════════════════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Boot
+// ═══════════════════════════════════════════════════════════════════════════════
+setupDropZone("upload-zone",   f => handleUpload(f));
+setupDropZone("reimp-drop",    f => handleReimpUpload(f));
+loadWorkspaces();
+</script>
+</body>
+</html>
