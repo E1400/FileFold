@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from filefold.core.keywords import Category
@@ -255,7 +255,7 @@ async def export_workspace(name: str):
 
 
 # ---------------------------------------------------------------------------
-# Get individual file content
+# Get / save individual file content
 # ---------------------------------------------------------------------------
 
 @app.get("/api/workspaces/{name}/files/{filename}")
@@ -265,3 +265,14 @@ async def get_file(name: str, filename: str):
     if not fpath.exists():
         raise HTTPException(404, f"File '{filename}' not found in workspace '{name}'")
     return FileResponse(fpath, media_type="text/plain")
+
+
+@app.put("/api/workspaces/{name}/files/{filename}")
+async def save_file(name: str, filename: str, request: Request):
+    """Overwrite a workspace file with edited content sent as plain-text body."""
+    fpath = workspace_path(name) / filename
+    if not fpath.exists():
+        raise HTTPException(404, f"File '{filename}' not found in workspace '{name}'")
+    content = (await request.body()).decode("utf-8", errors="surrogateescape")
+    fpath.write_text(content, encoding="utf-8", errors="surrogateescape")
+    return {"saved": filename, "bytes": len(content)}

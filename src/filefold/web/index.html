@@ -498,6 +498,34 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   color: var(--muted);
   font-size: 13px;
 }
+.modal-editor {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 16px;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+  resize: none;
+  outline: none;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+.modal-editor:focus { outline: none; }
+.unsaved-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  display: none;
+  flex-shrink: 0;
+}
+.unsaved-dot.visible { display: inline-block; }
 </style>
 </head>
 <body>
@@ -676,11 +704,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 <!-- Toast container -->
 <div id="toast-container"></div>
 
-<!-- File viewer modal -->
+<!-- File editor modal -->
 <div id="file-modal" class="modal-backdrop" onclick="closeFileModal(event)">
   <div class="modal">
     <div class="modal-header">
+      <span class="unsaved-dot" id="unsaved-dot"></span>
       <h3 id="modal-filename"></h3>
+      <span class="spacer"></span>
+      <button id="modal-save-btn" class="btn btn-primary btn-sm" onclick="saveFile()" style="display:none">Save</button>
+      <button id="modal-discard-btn" class="btn btn-ghost btn-sm" onclick="discardEdits()" style="display:none">Discard</button>
       <a id="modal-download" class="btn btn-ghost btn-sm" download>⬇ Download</a>
       <button class="btn btn-ghost btn-sm" onclick="closeFileModal()">✕</button>
     </div>
@@ -1278,42 +1310,129 @@ async function applyReimp() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// File viewer modal
+// File editor modal
 // ═══════════════════════════════════════════════════════════════════════════════
+let _modalFile = null;    // filename currently open
+let _modalOrig = null;    // original content (for discard / dirty check)
+
 async function viewFile(filename) {
-  const modal = document.getElementById("file-modal");
-  const body  = document.getElementById("modal-body");
-  const title = document.getElementById("modal-filename");
-  const dlBtn = document.getElementById("modal-download");
+  _modalFile = filename;
+  _modalOrig = null;
+
+  const modal   = document.getElementById("file-modal");
+  const body    = document.getElementById("modal-body");
+  const title   = document.getElementById("modal-filename");
+  const dlBtn   = document.getElementById("modal-download");
+  const saveBtn = document.getElementById("modal-save-btn");
+  const discBtn = document.getElementById("modal-discard-btn");
+  const dot     = document.getElementById("unsaved-dot");
 
   title.textContent = filename;
   const url = `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(filename)}`;
   dlBtn.href = url;
   dlBtn.download = filename;
+  saveBtn.style.display = "none";
+  discBtn.style.display = "none";
+  dot.classList.remove("visible");
 
   body.innerHTML = `<div class="modal-loading"><span class="spinner"></span> Loading…</div>`;
   modal.classList.add("open");
-  document.addEventListener("keydown", _modalEsc);
+  document.addEventListener("keydown", _modalKey);
 
   try {
     const text = await api("GET", url);
-    const pre = document.createElement("pre");
-    pre.textContent = text;
+    _modalOrig = text;
+
+    const ta = document.createElement("textarea");
+    ta.className = "modal-editor";
+    ta.value = text;
+    ta.spellcheck = false;
+    ta.addEventListener("input", _onEditorInput);
+    ta.addEventListener("keydown", e => {
+      // Tab inserts spaces instead of jumping focus
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const s = ta.selectionStart, en = ta.selectionEnd;
+        ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(en);
+        ta.selectionStart = ta.selectionEnd = s + 2;
+        _onEditorInput();
+      }
+    });
+
     body.innerHTML = "";
-    body.appendChild(pre);
+    body.appendChild(ta);
+    saveBtn.style.display = "";
+    discBtn.style.display = "";
   } catch (e) {
     body.innerHTML = `<div class="modal-loading" style="color:var(--danger)">Failed to load: ${esc(e.message)}</div>`;
   }
 }
 
-function closeFileModal(e) {
-  if (e && e.target !== document.getElementById("file-modal")) return;
-  document.getElementById("file-modal").classList.remove("open");
-  document.removeEventListener("keydown", _modalEsc);
+function _onEditorInput() {
+  const ta  = document.querySelector(".modal-editor");
+  const dot = document.getElementById("unsaved-dot");
+  if (!ta) return;
+  const dirty = ta.value !== _modalOrig;
+  dot.classList.toggle("visible", dirty);
 }
 
-function _modalEsc(e) {
+async function saveFile() {
+  const ta  = document.querySelector(".modal-editor");
+  const btn = document.getElementById("modal-save-btn");
+  if (!ta || !_modalFile) return;
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>`;
+
+  try {
+    await fetch(
+      `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(_modalFile)}`,
+      { method: "PUT", body: ta.value, headers: { "Content-Type": "text/plain" } }
+    );
+    _modalOrig = ta.value;
+    document.getElementById("unsaved-dot").classList.remove("visible");
+    toast(`Saved ${_modalFile}`, "ok");
+    // Refresh the detail table so the "edited" badge updates
+    if (state.wsData) {
+      const data = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+      state.wsData = data;
+      renderDetail(data);
+    }
+  } catch (e) {
+    toast("Save failed: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save";
+  }
+}
+
+function discardEdits() {
+  const ta = document.querySelector(".modal-editor");
+  if (!ta || _modalOrig === null) return;
+  if (ta.value !== _modalOrig && !confirm("Discard unsaved changes?")) return;
+  ta.value = _modalOrig;
+  document.getElementById("unsaved-dot").classList.remove("visible");
+}
+
+function closeFileModal(e) {
+  if (e && e.target !== document.getElementById("file-modal")) return;
+  const ta = document.querySelector(".modal-editor");
+  if (ta && ta.value !== _modalOrig) {
+    if (!confirm("Close without saving?")) return;
+  }
+  document.getElementById("file-modal").classList.remove("open");
+  document.removeEventListener("keydown", _modalKey);
+  _modalFile = null;
+  _modalOrig = null;
+}
+
+function _modalKey(e) {
   if (e.key === "Escape") closeFileModal();
+  // Ctrl/Cmd+S saves
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    e.preventDefault();
+    saveFile();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
