@@ -5,8 +5,11 @@ description = "File parsing package for finite element analysis models"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.139.0",
+    "python-multipart>=0.0.32",
     "rich>=15.0.0",
     "typer>=0.26.8",
+    "uvicorn[standard]>=0.51.0",
 ]
 
 [project.scripts]

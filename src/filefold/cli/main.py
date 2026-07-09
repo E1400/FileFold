@@ -177,6 +177,18 @@ def workspace_status(
         console.print(f"  {filename:<30} {label:<20} {status}")
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Bind address"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port number"),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (dev mode)"),
+) -> None:
+    """Start the FileFold web server."""
+    import uvicorn
+    console.print(f"\n[bold green]FileFold[/bold green] web UI → [cyan]http://{host}:{port}[/cyan]\n")
+    uvicorn.run("filefold.api.main:app", host=host, port=port, reload=reload)
+
+
 @ws_app.command("reimport")
 def workspace_reimport(
     directory: Path = typer.Argument(..., help="Workspace directory"),

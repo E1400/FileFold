@@ -193,26 +193,67 @@ class Workspace:
         new_source: Path,
         preview: ReimportPreview,
         filenames_to_update: set[str],
+        added_selections: list[SplitSelection] | None = None,
     ) -> None:
-        """Write approved child updates and the new mother file."""
+        """Write approved child updates, optional new selections, and the new mother file."""
+        all_selections = list(self.selections)
+        truly_new: list[SplitSelection] = []
+
+        if added_selections:
+            existing_cats = {s.category for s in self.selections}
+            truly_new = [s for s in added_selections if s.category not in existing_cats]
+            all_selections.extend(truly_new)
+
+        # Recompute full split when new selections are added (updates *INCLUDE lines in mother)
+        if truly_new:
+            blocks = parse(new_source)
+            new_mother_content, new_child_contents = compute_split(blocks, all_selections)
+        else:
+            new_mother_content = preview.new_mother_content
+            new_child_contents = {s.filename: s.new_content for s in preview.statuses}
+
+        # Write existing children that were approved
         for status in preview.statuses:
-            if status.filename in filenames_to_update and status.new_content:
-                child_path = self.path / status.filename
-                child_path.write_text(
-                    status.new_content, encoding="utf-8", errors="surrogateescape"
+            if status.filename in filenames_to_update:
+                content = new_child_contents.get(status.filename, status.new_content)
+                if content:
+                    (self.path / status.filename).write_text(
+                        content, encoding="utf-8", errors="surrogateescape"
+                    )
+                    self.file_records[status.filename] = FileRecord(
+                        sha256=_sha256(content), role="child", category=status.category.value
+                    )
+
+        # Write newly added children
+        for sel in truly_new:
+            content = new_child_contents.get(sel.filename, "")
+            if content:
+                (self.path / sel.filename).write_text(
+                    content, encoding="utf-8", errors="surrogateescape"
                 )
-                self.file_records[status.filename] = FileRecord(
-                    sha256=_sha256(status.new_content),
-                    role="child",
-                    category=status.category.value,
+                self.file_records[sel.filename] = FileRecord(
+                    sha256=_sha256(content), role="child", category=sel.category.value
                 )
 
-        mother_path = self.path / self.source_name
-        mother_path.write_text(
-            preview.new_mother_content, encoding="utf-8", errors="surrogateescape"
+        if truly_new:
+            self.selections = all_selections
+
+        # Always write the new mother using the uploaded filename
+        new_name = new_source.name
+        (self.path / new_name).write_text(
+            new_mother_content, encoding="utf-8", errors="surrogateescape"
         )
-        self.file_records[self.source_name] = FileRecord(
-            sha256=_sha256(preview.new_mother_content), role="mother"
+
+        # Clean up old mother file when the filename changed
+        if new_name != self.source_name:
+            old = self.path / self.source_name
+            if old.exists():
+                old.unlink()
+            self.file_records.pop(self.source_name, None)
+            self.source_name = new_name
+
+        self.file_records[new_name] = FileRecord(
+            sha256=_sha256(new_mother_content), role="mother"
         )
         self._save()
 
