@@ -178,6 +178,18 @@ def workspace_status(
 
 
 @app.command()
+def launch() -> None:
+    """Launch the FileFold desktop app (requires the desktop extra: pip install filefold[desktop])."""
+    try:
+        from filefold.desktop.app import main as _main
+    except ImportError:
+        console.print("[red]PySide6 is not installed.[/red]")
+        console.print("[dim]Install the desktop extra:  pip install filefold[desktop][/dim]")
+        raise typer.Exit(1)
+    _main()
+
+
+@app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", "--host", "-h", help="Bind address"),
     port: int = typer.Option(8000, "--port", "-p", help="Port number"),
