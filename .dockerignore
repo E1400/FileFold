@@ -1,0 +1,14 @@
+.git
+.github
+dist/
+build/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+*.egg-info/
+tests/
+filefold.spec
+parse-tests.ipynb
+node_modules/

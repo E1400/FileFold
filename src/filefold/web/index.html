@@ -1027,10 +1027,11 @@ function treeNodeHTML(b, depth) {
 
 // ── Split config ─────────────────────────────────────────────────────────────
 function renderSplitConfig(blocks) {
-  // Collect unique categories present (excluding UNKNOWN)
+  // Only collect categories from TOP-LEVEL blocks — the splitter routes by
+  // top-level category, so nested blocks (e.g. *SOLID SECTION inside *PART)
+  // always follow their container and cannot be independently extracted.
   const cats = new Set();
-  function walk(bs) { bs.forEach(b => { if (b.category !== "unknown") cats.add(b.category); walk(b.children); }); }
-  walk(blocks);
+  blocks.forEach(b => { if (b.category !== "unknown") cats.add(b.category); });
 
   const el = document.getElementById("split-config");
   el.innerHTML = [...cats].map(cat => {
@@ -1182,9 +1183,9 @@ function renderReimpInspector(blocks) {
 
 function renderReimpNewCats(blocks) {
   const existingCats = new Set((state.wsData?.selections ?? []).map(s => s.category));
+  // Top-level only — matches what compute_split can actually route
   const fileCats = new Set();
-  function walkCats(bs) { bs.forEach(b => { if (b.category !== "unknown") fileCats.add(b.category); walkCats(b.children || []); }); }
-  walkCats(blocks);
+  blocks.forEach(b => { if (b.category !== "unknown") fileCats.add(b.category); });
 
   const newCats = [...fileCats].filter(c => !existingCats.has(c));
   state.reimp.availableNewCats = newCats;
