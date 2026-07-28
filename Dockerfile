@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 
 # Dependency files first — Docker layer caches these until they change
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
 
 # Production deps only: no pyside6, no pytest/httpx/pyinstaller
