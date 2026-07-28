@@ -191,8 +191,8 @@ def launch() -> None:
 
 @app.command()
 def serve(
-    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Bind address"),
-    port: int = typer.Option(8000, "--port", "-p", help="Port number"),
+    host: str = typer.Option("127.0.0.1", "--host", "-h", envvar="FILEFOLD_HOST", help="Bind address"),
+    port: int = typer.Option(8000, "--port", "-p", envvar="PORT", help="Port number"),
     reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (dev mode)"),
 ) -> None:
     """Start the FileFold web server."""
