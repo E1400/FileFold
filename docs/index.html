@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FileFold — Abaqus .inp Workspace Manager</title>
+  <meta name="description" content="Split large Abaqus .inp files by category, track edits, and reimport updated sources without losing your work.">
+  <style>
+    :root {
+      --bg: #09090E;
+      --surface: #0E1118;
+      --card: #131824;
+      --border: #1C2438;
+      --accent: #58A6FF;
+      --accent-dim: rgba(88, 166, 255, 0.12);
+      --accent-border: rgba(88, 166, 255, 0.3);
+      --text: #9BADC4;
+      --text-strong: #DDE4EE;
+      --text-muted: #3D4F66;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
+      --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --radius: 10px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(9, 9, 14, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(28, 36, 56, 0.6);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+      color: var(--text-strong);
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-ff {
+      width: 28px; height: 28px;
+      border-radius: 7px;
+      background: #0C0F14;
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .nav-ff::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 48%;
+      background: var(--accent);
+      border-radius: 5px 5px 0 0;
+    }
+    .nav-ff::after {
+      content: 'FF';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 0.5rem;
+      font-weight: 900;
+      color: #000;
+      padding-bottom: 2px;
+    }
+
+    nav a.nav-gh {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.15s;
+    }
+    nav a.nav-gh:hover { color: var(--text); }
+
+    /* ── hero ── */
+    .hero {
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 7rem 2rem 5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(88,166,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(88,166,255,0.05) 1px, transparent 1px),
+        linear-gradient(rgba(88,166,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(88,166,255,0.018) 1px, transparent 1px);
+      background-size: 72px 72px, 72px 72px, 18px 18px, 18px 18px;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 75% 65% at 50% 50%, transparent 20%, var(--bg) 85%);
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid var(--accent-border);
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.73rem;
+      letter-spacing: 0.06em;
+      padding: 0.35rem 0.8rem;
+      border-radius: 100px;
+      margin-bottom: 2rem;
+    }
+    .hero-badge span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+    .hero h1 {
+      font-size: clamp(3rem, 8vw, 5rem);
+      font-weight: 800;
+      color: var(--text-strong);
+      letter-spacing: -0.05em;
+      line-height: 1.0;
+      text-wrap: balance;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--text);
+      line-height: 1.75;
+      text-wrap: balance;
+      margin-bottom: 2.5rem;
+    }
+
+    .kw {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      color: var(--accent);
+      background: var(--accent-dim);
+      padding: 0.08em 0.4em;
+      border-radius: 4px;
+    }
+
+    .ctas {
+      display: flex;
+      gap: 0.875rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-p {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: -0.01em;
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .btn-p:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    .btn-s {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.75rem 1.5rem;
+      background: transparent;
+      color: var(--text-strong);
+      font-weight: 600;
+      font-size: 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s, transform 0.15s;
+    }
+    .btn-s:hover { border-color: var(--accent-border); color: var(--accent); transform: translateY(-1px); }
+
+    .scroll-down {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .scroll-down svg { animation: bob 2.2s ease-in-out infinite; }
+    @keyframes bob { 0%,100% { transform: translateY(0); } 55% { transform: translateY(5px); } }
+
+    /* ── section chrome ── */
+    .section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 5.5rem 2rem;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-size: clamp(1.6rem, 3.5vw, 2.25rem);
+      font-weight: 700;
+      color: var(--text-strong);
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      text-wrap: balance;
+      margin-bottom: 3rem;
+    }
+
+    hr.rule { border: none; border-top: 1px solid var(--border); }
+
+    /* ── workflow strip ── */
+    .steps-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .step {
+      padding: 1.6rem 1.4rem;
+      border-right: 1px solid var(--border);
+    }
+    .step:last-child { border-right: none; }
+
+    .step-num {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .step h3 {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-strong);
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.01em;
+    }
+
+    .step p {
+      font-size: 0.8rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+
+    /* ── feature grid ── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .feat {
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.4rem;
+      transition: border-color 0.2s;
+    }
+    .feat:hover { border-color: var(--accent-border); }
+
+    .feat-icon {
+      width: 32px; height: 32px;
+      color: var(--accent);
+      margin-bottom: 0.875rem;
+    }
+
+    .feat h3 {
+      font-size: 0.87rem;
+      font-weight: 700;
+      color: var(--text-strong);
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.01em;
+    }
+
+    .feat p {
+      font-size: 0.8rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+
+    /* ── get it section ── */
+    .get-section {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .online-card {
+      border: 1px solid var(--accent-border);
+      background: var(--accent-dim);
+      border-radius: var(--radius);
+      padding: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+
+    .online-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-strong);
+      margin-bottom: 0.3rem;
+    }
+    .online-card p { font-size: 0.83rem; color: var(--text); }
+
+    .dl-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .dl-card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+    }
+
+    .dl-card-head {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-strong);
+    }
+    .dl-card-head svg { color: var(--text); flex-shrink: 0; }
+
+    .dl-card p {
+      font-size: 0.8rem;
+      line-height: 1.65;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .btn-dl {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.65rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text-strong);
+      font-size: 0.83rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-dl:hover { border-color: var(--accent-border); color: var(--accent); }
+
+    /* ── footer ── */
+    footer {
+      text-align: center;
+      padding: 2.5rem 2rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+
+    /* ── responsive ── */
+    @media (max-width: 720px) {
+      .steps-wrap { grid-template-columns: 1fr 1fr; }
+      .step { border-right: none; border-bottom: 1px solid var(--border); }
+      .step:nth-child(odd) { border-right: 1px solid var(--border); }
+      .step:last-child, .step:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+      .features { grid-template-columns: 1fr 1fr; }
+      .dl-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 480px) {
+      .steps-wrap { grid-template-columns: 1fr; }
+      .step { border-right: none !important; }
+      .step:last-child { border-bottom: none; }
+      .features { grid-template-columns: 1fr; }
+      .online-card { flex-direction: column; align-items: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .scroll-down svg, .btn-p, .btn-s { animation: none; transition: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-ff" aria-hidden="true"></div>
+    FileFold
+  </a>
+  <a class="nav-gh" href="https://github.com/E1400/FileFold" target="_blank" rel="noopener">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/>
+    </svg>
+    GitHub
+  </a>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <span></span> Abaqus .inp workspace manager
+    </div>
+    <h1>Tame your<br><em>FEA models.</em></h1>
+    <p>
+      Split large <span class="kw">*.inp</span> files by category —
+      <span class="kw">*MESH</span>, <span class="kw">*MATERIAL</span>, <span class="kw">*STEP</span> and more —
+      into a clean workspace. Track edits, detect conflicts,
+      reimport updated sources without losing your changes.
+    </p>
+    <div class="ctas">
+      <a class="btn-p" href="https://filefold-production.up.railway.app" target="_blank" rel="noopener">
+        Try it online
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+      </a>
+      <a class="btn-s" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 14h12"/></svg>
+        Download for Mac / Windows
+      </a>
+    </div>
+  </div>
+  <div class="scroll-down" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M8 3v10M4 9l4 4 4-4"/>
+    </svg>
+  </div>
+</header>
+
+<!-- WORKFLOW -->
+<section class="section">
+  <p class="eyebrow">How it works</p>
+  <h2 class="section-title">One file in. Organized workspace out.</h2>
+  <div class="steps-wrap">
+    <div class="step">
+      <span class="step-num">01</span>
+      <h3>Upload mother file</h3>
+      <p>Drop your <span class="kw">.inp</span> — FileFold parses every keyword block and maps the full structure.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">02</span>
+      <h3>Choose categories</h3>
+      <p>Pick which top-level blocks to extract. Nested sections stay with their container — no misclassification.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">03</span>
+      <h3>Get a workspace</h3>
+      <p>Each category becomes its own file. The mother file gets <span class="kw">*INCLUDE</span> pointers — Abaqus reads it identically.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">04</span>
+      <h3>Edit and reimport</h3>
+      <p>Edit child files freely. When the source updates, reimport it — conflict detection shows exactly what changed.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- FEATURES -->
+<section class="section">
+  <p class="eyebrow">Features</p>
+  <h2 class="section-title">Built for engineers who<br>maintain real models.</h2>
+  <div class="features">
+
+    <div class="feat">
+      <svg class="feat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/>
+      </svg>
+      <h3>Byte-exact round-trips</h3>
+      <p>The reassembled model is character-for-character identical to the original. No reformatting, no silent changes to your data lines.</p>
+    </div>
+
+    <div class="feat">
+      <svg class="feat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+      </svg>
+      <h3>Hash-based change detection</h3>
+      <p>SHA-256 tracks every file. Reimport knows whether a child changed in the new source, was manually edited, or both — and flags conflicts.</p>
+    </div>
+
+    <div class="feat">
+      <svg class="feat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+      </svg>
+      <h3>In-browser file editor</h3>
+      <p>View and edit any workspace file directly in the UI. Tab indenting, unsaved-changes guard, Cmd+S to save.</p>
+    </div>
+
+    <div class="feat">
+      <svg class="feat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+      </svg>
+      <h3>Container-aware parsing</h3>
+      <p>Understands <span class="kw">*PART</span>, <span class="kw">*STEP</span>, <span class="kw">*ASSEMBLY</span> nesting. Blocks nested inside a container follow the container — never split incorrectly.</p>
+    </div>
+
+    <div class="feat">
+      <svg class="feat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+      </svg>
+      <h3>Export as ZIP</h3>
+      <p>Download your complete workspace — mother file plus all children — as a single archive ready for submission or archiving.</p>
+    </div>
+
+    <div class="feat">
+      <svg class="feat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg>
+      <h3>Native desktop app</h3>
+      <p>Runs locally on Mac and Windows — system tray icon, no internet needed, files never leave your machine.</p>
+    </div>
+
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- GET IT -->
+<div class="get-section">
+  <section class="section">
+    <p class="eyebrow">Get FileFold</p>
+    <h2 class="section-title">Online or on your machine.</h2>
+
+    <div class="online-card">
+      <div>
+        <h3>Try it in your browser — no install</h3>
+        <p>Upload a file, explore the workspace, export the result. Free to use.</p>
+      </div>
+      <a class="btn-p" href="https://filefold-production.up.railway.app" target="_blank" rel="noopener">
+        Open FileFold online
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+      </a>
+    </div>
+
+    <div class="dl-grid">
+      <div class="dl-card">
+        <div class="dl-card-head">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+          </svg>
+          macOS
+        </div>
+        <p>Universal binary for Apple Silicon and Intel. Installs as a tray app — launch once, available from the menu bar whenever you need it.</p>
+        <a class="btn-dl" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 14h12"/></svg>
+          Download .app
+        </a>
+      </div>
+
+      <div class="dl-card">
+        <div class="dl-card-head">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+          </svg>
+          Windows
+        </div>
+        <p>Standalone executable — no installer, no terminal window. Same tray-icon experience. Unzip and run.</p>
+        <a class="btn-dl" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 14h12"/></svg>
+          Download .exe
+        </a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    FileFold &nbsp;·&nbsp;
+    <a href="https://github.com/E1400/FileFold" target="_blank" rel="noopener">GitHub</a>
+    &nbsp;·&nbsp;
+    Built for FEA engineers
+  </p>
+</footer>
+
+</body>
+</html>
