@@ -537,18 +537,31 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 }
 /* ── Code editor ─────────────────────────────────────────── */
 .editor-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-.find-bar {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
+/* Inline find bar in modal header */
+.header-find { display: none; align-items: center; gap: 4px; }
+.modal-backdrop.open .header-find { display: flex; }
+.header-find-wrap { position: relative; display: flex; align-items: center; }
+.header-find input {
+  font-size: 12px;
+  width: 150px;
+  padding: 4px 50px 4px 8px;
   background: var(--surface2);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
 }
-.find-bar.visible { display: flex; }
-.find-bar > input { flex: 1; min-width: 160px; max-width: 280px; font-size: 12px; }
-#find-count { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 60px; }
+.header-find input:focus { border-color: var(--accent); }
+#find-count {
+  position: absolute;
+  right: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  pointer-events: none;
+  white-space: nowrap;
+}
 .editor-body { display: flex; flex: 1; overflow: hidden; }
 .editor-gutter {
   width: 52px;
@@ -569,6 +582,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   color: var(--muted);
   text-align: right;
   pointer-events: none;
+  white-space: pre;        /* so \n in textContent renders as line breaks */
 }
 .editor-code-area { flex: 1; overflow: auto; position: relative; background: var(--bg); }
 .editor-code-inner { position: relative; min-height: 100%; }
@@ -823,6 +837,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
       <span class="unsaved-dot" id="unsaved-dot"></span>
       <h3 id="modal-filename"></h3>
       <span class="spacer"></span>
+      <div class="header-find" id="header-find">
+        <div class="header-find-wrap">
+          <input id="find-input" type="text" placeholder="Search…"
+                 oninput="runFind()" onkeydown="_findKey(event)" spellcheck="false">
+          <span id="find-count"></span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="findPrev()" title="Previous (Shift+Enter)">↑</button>
+        <button class="btn btn-ghost btn-sm" onclick="findNext()" title="Next (Enter)">↓</button>
+      </div>
       <button id="modal-save-btn" class="btn btn-primary btn-sm" onclick="saveFile()" style="display:none">Save</button>
       <button id="modal-discard-btn" class="btn btn-ghost btn-sm" onclick="discardEdits()" style="display:none">Discard</button>
       <a id="modal-download" class="btn btn-ghost btn-sm" download>⬇ Download</a>
@@ -1658,17 +1681,9 @@ async function viewFile(filename) {
     const text = await api("GET", url);
     _modalOrig = text;
 
-    // Build editor structure
+    // Build editor structure (find bar lives in modal-header, always visible)
     body.innerHTML = `
       <div class="editor-wrap" id="editor-wrap">
-        <div class="find-bar" id="find-bar">
-          <input id="find-input" type="text" placeholder="Find…"
-                 oninput="runFind()" onkeydown="_findKey(event)" spellcheck="false">
-          <span id="find-count"></span>
-          <button class="btn btn-ghost btn-sm" onclick="findPrev()" title="Previous (Shift+Enter)">↑</button>
-          <button class="btn btn-ghost btn-sm" onclick="findNext()" title="Next (Enter)">↓</button>
-          <button class="btn btn-ghost btn-sm" onclick="closeFindBar()">✕</button>
-        </div>
         <div class="editor-body">
           <div class="editor-gutter" id="editor-gutter">
             <div class="editor-gutter-inner" id="editor-gutter-inner"></div>
@@ -1699,6 +1714,22 @@ async function viewFile(filename) {
         ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(en);
         ta.selectionStart = ta.selectionEnd = s + 2;
         syncHighlight();
+      }
+      // * with a selection: prepend * to each selected line instead of replacing
+      if (e.key === "*" && ta.selectionStart !== ta.selectionEnd) {
+        e.preventDefault();
+        const val = ta.value;
+        const s = ta.selectionStart, en = ta.selectionEnd;
+        const blockStart = val.lastIndexOf("\n", s - 1) + 1;
+        const nlAfter   = val.indexOf("\n", en - 1);
+        const blockEnd  = nlAfter === -1 ? val.length : nlAfter;
+        const lines     = val.slice(blockStart, blockEnd).split("\n");
+        const newBlock  = lines.map(l => "*" + l).join("\n");
+        ta.value = val.slice(0, blockStart) + newBlock + val.slice(blockEnd);
+        ta.selectionStart = s + 1;
+        ta.selectionEnd   = en + lines.length;
+        syncHighlight();
+        document.getElementById("unsaved-dot")?.classList.toggle("visible", ta.value !== _modalOrig);
       }
     });
 
@@ -1767,24 +1798,24 @@ function buildHighlightHTML(text, query, matches, curIdx) {
 
 // ── Find bar ──────────────────────────────────────────────────────────────────
 function openFindBar() {
-  const bar = document.getElementById("find-bar");
-  if (!bar) return;
-  bar.classList.add("visible");
   const inp = document.getElementById("find-input");
+  if (!inp) return;
+  // Pre-fill with any active selection in the editor
   const ta = _editorTa();
   if (ta && ta.selectionStart !== ta.selectionEnd) {
     inp.value = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    runFind();
   }
   inp.focus();
   inp.select();
-  runFind();
 }
 
 function closeFindBar() {
-  const bar = document.getElementById("find-bar");
-  if (bar) bar.classList.remove("visible");
+  const inp = document.getElementById("find-input");
+  if (inp) inp.value = "";
   _findQuery = ""; _findMatches = []; _findIdx = 0;
-  document.getElementById("find-count").textContent = "";
+  const fc = document.getElementById("find-count");
+  if (fc) fc.textContent = "";
   syncHighlight();
   _editorTa()?.focus();
 }
@@ -1918,12 +1949,21 @@ function closeFileModal(e) {
   document.getElementById("file-modal").classList.remove("open");
   document.removeEventListener("keydown", _modalKey);
   _modalFile = null; _modalOrig = null;
+  // Reset find state and clear input for next open
   _findQuery = ""; _findMatches = []; _findIdx = 0;
+  const fi = document.getElementById("find-input");
+  if (fi) fi.value = "";
+  const fc = document.getElementById("find-count");
+  if (fc) fc.textContent = "";
 }
 
 function _modalKey(e) {
-  if (e.key === "Escape" && !document.getElementById("find-bar")?.classList.contains("visible"))
-    closeFileModal();
+  // Escape: if find input is focused, blur it; otherwise close modal
+  if (e.key === "Escape") {
+    const fi = document.getElementById("find-input");
+    if (fi && document.activeElement === fi) { fi.blur(); closeFindBar(); }
+    else closeFileModal();
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveFile(); }
   if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); openFindBar(); }
   if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); toggleComment(); }
