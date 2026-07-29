@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .block import Block, emit
-from .keywords import Category
+from .keywords import CATEGORY_SUB_KEYWORDS, Category
 
 # Maps category -> output filename for non-STEP top-level blocks
 CATEGORY_FILES: dict[Category, str] = {
@@ -84,18 +84,27 @@ def split(blocks: list[Block], source: Path, output_dir: Path) -> list[Path]:
 # ---------------------------------------------------------------------------
 
 @dataclass
+class SubSplitSelection:
+    """One sub-category to extract from a child, mapped to its own filename."""
+    sub_category: str   # e.g. "nodes", "elements", "nsets", "elsets", "surfaces"
+    filename: str       # e.g. "mesh-nodes.inp"
+
+
+@dataclass
 class SplitSelection:
     """One category to extract, mapped to a child filename."""
     category: Category
     filename: str  # e.g. "mesh.inp" — no path, always same folder as mother
+    sub_selections: list[SubSplitSelection] = field(default_factory=list)
 
 
 @dataclass
 class ChildFile:
     filename: str
     path: Path
-    category: Category
+    category: Category | None
     sha256: str  # hash of written content, used for change detection on re-import
+    parent: str | None = None  # parent child filename if this is a sub-child
 
 
 @dataclass
@@ -121,29 +130,50 @@ def compute_split(
 
     Returns:
         mother_content: the modified mother file text (with *INCLUDE lines)
-        child_contents: {filename: content} for each selection that has blocks
+        child_contents: {filename: content} for each child and sub-child that has blocks
     """
-    selection_map: dict[Category, str] = {s.category: s.filename for s in selections}
+    sel_map: dict[Category, SplitSelection] = {s.category: s for s in selections}
     mother_lines: list[str] = []
-    child_lines: dict[Category, list[str]] = {s.category: [] for s in selections}
-    include_inserted: set[Category] = set()
+    child_lines: dict[str, list[str]] = {}   # filename -> line list
+    cat_inserted: set[Category] = set()       # categories already *INCLUDEd in mother
+    sub_inserted: dict[str, set[str]] = {}    # parent_filename -> set of sub_cats inserted
 
     for block in blocks:
         cat = block.category
-        if cat in selection_map:
-            child_lines[cat].extend(emit(block))
-            if cat not in include_inserted:
-                mother_lines.append(_include_line(selection_map[cat]))
-                include_inserted.add(cat)
-        else:
+        if cat not in sel_map:
             mother_lines.extend(emit(block))
+            continue
 
-    child_contents = {
-        s.filename: "".join(child_lines[s.category])
-        for s in selections
-        if "".join(child_lines[s.category])  # skip empty
-    }
-    return "".join(mother_lines), child_contents
+        sel = sel_map[cat]
+
+        # Insert *INCLUDE in mother at first block of this category
+        if cat not in cat_inserted:
+            mother_lines.append(_include_line(sel.filename))
+            cat_inserted.add(cat)
+
+        if not sel.sub_selections:
+            # No sub-splits: block goes directly to the child file
+            child_lines.setdefault(sel.filename, []).extend(emit(block))
+            continue
+
+        # Has sub-selections: route block to appropriate sub-child or keep in parent child
+        sub_map = {ss.sub_category: ss for ss in sel.sub_selections}
+        kw_map = CATEGORY_SUB_KEYWORDS.get(cat, {})
+        block_sub_cat = kw_map.get(block.keyword)
+
+        if block_sub_cat and block_sub_cat in sub_map:
+            ss = sub_map[block_sub_cat]
+            child_lines.setdefault(ss.filename, []).extend(emit(block))
+            # Insert *INCLUDE in parent child at first occurrence of this sub-category
+            parent_inserts = sub_inserted.setdefault(sel.filename, set())
+            if block_sub_cat not in parent_inserts:
+                child_lines.setdefault(sel.filename, []).append(_include_line(ss.filename))
+                parent_inserts.add(block_sub_cat)
+        else:
+            # Block stays in parent child file (not selected for sub-splitting)
+            child_lines.setdefault(sel.filename, []).extend(emit(block))
+
+    return "".join(mother_lines), {f: "".join(ls) for f, ls in child_lines.items() if ls}
 
 
 def split_with_includes(
@@ -164,16 +194,24 @@ def split_with_includes(
     mother_path = output_dir / source.name
     mother_path.write_text(mother_text, encoding="utf-8", errors="surrogateescape")
 
-    sel_map = {s.filename: s for s in selections}
+    # Build lookup: filename -> (category, parent_filename)
+    file_meta: dict[str, tuple[Category | None, str | None]] = {}
+    for sel in selections:
+        file_meta[sel.filename] = (sel.category, None)
+        for ss in sel.sub_selections:
+            file_meta[ss.filename] = (sel.category, sel.filename)
+
     result = SplitResult(mother_path=mother_path, mother_sha256=_sha256(mother_text))
     for filename, text in child_contents.items():
         child_path = output_dir / filename
         child_path.write_text(text, encoding="utf-8", errors="surrogateescape")
+        cat, parent = file_meta.get(filename, (None, None))
         result.children.append(ChildFile(
             filename=filename,
             path=child_path,
-            category=sel_map[filename].category,
+            category=cat,
             sha256=_sha256(text),
+            parent=parent,
         ))
 
     return result

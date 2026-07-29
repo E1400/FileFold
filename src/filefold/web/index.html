@@ -289,6 +289,29 @@ body {
 }
 .split-row.selected { border-color: var(--accent); }
 .split-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+.sub-options {
+  display: none;
+  grid-column: 1 / -1;
+  margin-left: 20px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.sub-options.visible { display: flex; }
+.sub-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sub-option-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.sub-option-row input[type="text"] { font-size: 11px; padding: 4px 8px; width: 160px; }
+.tree-indent { width: 20px; flex-shrink: 0; color: var(--muted); font-family: var(--mono); font-size: 12px; text-align: center; }
+.filename-cell { display: flex; align-items: center; }
 input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 input[type="text"] {
   background: var(--surface);
@@ -635,6 +658,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
               <th>Filename</th>
               <th>Role</th>
               <th>Category</th>
+              <th>Lines</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -739,6 +763,7 @@ const state = {
   wsData: null,         // full detail response for the open workspace
   inspectResult: null,  // { filename, blocks }
   uploadedFile: null,   // File object
+  subOptions: {},       // { [category]: [{sub_category, label, default_filename}] }
   reimp: {
     file: null,
     preview: null,
@@ -832,8 +857,12 @@ function showView(name) {
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadWorkspaces() {
   try {
-    const data = await api("GET", "/api/workspaces");
-    state.workspaces = data.workspaces ?? [];
+    const [wsData, subOpts] = await Promise.all([
+      api("GET", "/api/workspaces"),
+      api("GET", "/api/sub-options").catch(() => ({})),
+    ]);
+    state.workspaces = wsData.workspaces ?? [];
+    state.subOptions = subOpts;
     renderSidebar();
     renderHome();
   } catch (e) {
@@ -900,21 +929,47 @@ function renderDetail(data) {
   document.getElementById("detail-meta").innerHTML =
     `Source: <span class="mono">${esc(data.source_name)}</span> &nbsp;·&nbsp; Updated: ${esc(data.updated_at)}`;
 
+  // Sort files: mother first, then children (no parent), then grandchildren
+  // immediately after the child they belong to.
+  const mothers = data.files.filter(f => f.role === "mother");
+  const children = data.files.filter(f => f.role === "child");
+  const grandchildren = data.files.filter(f => f.role === "grandchild");
+
+  const ordered = [...mothers];
+  children.forEach(child => {
+    ordered.push(child);
+    grandchildren.filter(gc => gc.parent === child.filename).forEach(gc => ordered.push(gc));
+  });
+  // Any grandchildren whose parent wasn't in children list (shouldn't happen, but safe)
+  grandchildren.filter(gc => !children.some(c => c.filename === gc.parent))
+    .forEach(gc => ordered.push(gc));
+
   const tbody = document.getElementById("detail-files");
-  tbody.innerHTML = data.files.map(f => {
+  tbody.innerHTML = ordered.map(f => {
     let statusBadge;
-    if (!f.exists)          statusBadge = `<span class="badge badge-danger">missing</span>`;
-    else if (f.manually_edited) statusBadge = `<span class="badge badge-warn">edited</span>`;
-    else                    statusBadge = `<span class="badge badge-ok">clean</span>`;
+    if (!f.exists)               statusBadge = `<span class="badge badge-danger">missing</span>`;
+    else if (f.manually_edited)  statusBadge = `<span class="badge badge-warn">edited</span>`;
+    else                         statusBadge = `<span class="badge badge-ok">clean</span>`;
 
     const roleBadge = f.role === "mother"
       ? `<span class="badge badge-muted">mother</span>`
-      : `<span class="badge badge-accent">child</span>`;
+      : f.role === "grandchild"
+        ? `<span class="badge" style="background:var(--accent)33;color:var(--accent);font-size:10px">sub-child</span>`
+        : `<span class="badge badge-accent">child</span>`;
+
+    const lineCount = f.line_count != null
+      ? `<span style="font-variant-numeric:tabular-nums">${f.line_count.toLocaleString()}</span>`
+      : `<span class="text-muted">—</span>`;
+
+    const indent = f.role === "grandchild"
+      ? `<span class="tree-indent">└</span>`
+      : "";
 
     return `<tr>
-      <td class="filename">${esc(f.filename)}</td>
+      <td class="filename"><div class="filename-cell">${indent}${esc(f.filename)}</div></td>
       <td>${roleBadge}</td>
       <td>${f.category ? catChip(f.category) : "—"}</td>
+      <td>${lineCount}</td>
       <td>${statusBadge}</td>
       <td>
         <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
@@ -1043,6 +1098,19 @@ function renderSplitConfig(blocks) {
   el.innerHTML = [...cats].map(cat => {
     const c = CAT_COLORS[cat] ?? "#7D8590";
     const id = `sel-${cat}`;
+    const subOpts = state.subOptions[cat] ?? [];
+    const subPanel = subOpts.length ? `
+      <div class="sub-options" id="sub-opts-${cat}">
+        <div class="text-muted text-sm" style="margin-bottom:4px">Split into sub-files:</div>
+        ${subOpts.map(opt => `
+          <div class="sub-option-row">
+            <label>
+              <input type="checkbox" id="sub-${cat}-${opt.sub_category}" value="${opt.sub_category}" onchange="toggleSubOption('${cat}','${opt.sub_category}')">
+              ${esc(opt.label)}
+            </label>
+            <input type="text" id="subfn-${cat}-${opt.sub_category}" value="${opt.default_filename}" placeholder="${opt.default_filename}" disabled style="opacity:.4">
+          </div>`).join("")}
+      </div>` : "";
     return `<div class="split-row" id="row-${cat}">
       <label>
         <input type="checkbox" id="${id}" onchange="toggleSplitRow('${cat}')">
@@ -1050,6 +1118,7 @@ function renderSplitConfig(blocks) {
       </label>
       <input type="text" id="fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
       <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
+      ${subPanel}
     </div>`;
   }).join("");
 }
@@ -1061,6 +1130,27 @@ function toggleSplitRow(cat) {
   row.classList.toggle("selected", checked);
   fnInput.disabled = !checked;
   fnInput.style.opacity = checked ? "1" : ".4";
+
+  const subPanel = document.getElementById(`sub-opts-${cat}`);
+  if (subPanel) {
+    subPanel.classList.toggle("visible", checked);
+    // When the parent is toggled off, uncheck and disable all sub-checkboxes
+    subPanel.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      if (!checked) cb.checked = false;
+    });
+    subPanel.querySelectorAll("input[type=text]").forEach(inp => {
+      inp.disabled = true;
+      inp.style.opacity = ".4";
+    });
+  }
+}
+
+function toggleSubOption(cat, subCat) {
+  const cb = document.getElementById(`sub-${cat}-${subCat}`);
+  const inp = document.getElementById(`subfn-${cat}-${subCat}`);
+  if (!inp) return;
+  inp.disabled = !cb.checked;
+  inp.style.opacity = cb.checked ? "1" : ".4";
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1076,13 +1166,22 @@ async function createWorkspace() {
   const selections = [];
   if (state.inspectResult) {
     const cats = new Set();
-    function walk(bs) { bs.forEach(b => { cats.add(b.category); walk(b.children); }); }
-    walk(state.inspectResult.blocks);
+    state.inspectResult.blocks.forEach(b => { if (b.category !== "unknown") cats.add(b.category); });
     cats.forEach(cat => {
       const cb = document.getElementById(`sel-${cat}`);
       if (cb && cb.checked) {
         const fn = document.getElementById(`fn-${cat}`).value.trim() || `${cat}.inp`;
-        selections.push({ category: cat, filename: fn });
+        const sub_selections = [];
+        const subOpts = state.subOptions[cat] ?? [];
+        subOpts.forEach(opt => {
+          const subCb = document.getElementById(`sub-${cat}-${opt.sub_category}`);
+          if (subCb && subCb.checked) {
+            const subFn = document.getElementById(`subfn-${cat}-${opt.sub_category}`).value.trim()
+              || opt.default_filename;
+            sub_selections.push({ sub_category: opt.sub_category, filename: subFn });
+          }
+        });
+        selections.push({ category: cat, filename: fn, sub_selections });
       }
     });
   }

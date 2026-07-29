@@ -9,9 +9,9 @@ from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
-from filefold.core.keywords import Category
+from filefold.core.keywords import CATEGORY_SUB_OPTIONS, Category
 from filefold.core.parser import parse
-from filefold.core.splitter import SplitSelection
+from filefold.core.splitter import SplitSelection, SubSplitSelection
 from filefold.core.workspace import Workspace
 
 from .server import WORKSPACE_BASE, list_workspaces, workspace_path
@@ -65,6 +65,15 @@ def _blocks_to_json(blocks) -> list[dict]:
 # Workspace CRUD
 # ---------------------------------------------------------------------------
 
+@app.get("/api/sub-options")
+async def get_sub_options():
+    """Return available sub-split options per category."""
+    return {
+        cat.value: opts
+        for cat, opts in CATEGORY_SUB_OPTIONS.items()
+    }
+
+
 @app.get("/api/workspaces")
 async def list_all_workspaces():
     return {"workspaces": list_workspaces()}
@@ -86,7 +95,14 @@ async def create_workspace(
 
     sel_data = json.loads(selections) if selections else []
     sel_list = [
-        SplitSelection(Category(s["category"]), s["filename"])
+        SplitSelection(
+            Category(s["category"]),
+            s["filename"],
+            sub_selections=[
+                SubSplitSelection(ss["sub_category"], ss["filename"])
+                for ss in s.get("sub_selections", [])
+            ],
+        )
         for s in sel_data
     ]
 
@@ -119,16 +135,21 @@ async def get_workspace(name: str):
         fpath = ws_dir / fname
         if fpath.exists():
             from filefold.core.splitter import _sha256
-            current = _sha256(fpath.read_text(encoding="utf-8", errors="surrogateescape"))
+            text = fpath.read_text(encoding="utf-8", errors="surrogateescape")
+            current = _sha256(text)
             edited = (bool(rec.sha256) and current != rec.sha256)
+            line_count = len(text.splitlines())
         else:
             edited = False
+            line_count = None
         files.append({
             "filename": fname,
             "role": rec.role,
             "category": rec.category,
+            "parent": rec.parent,
             "manually_edited": edited,
             "exists": fpath.exists(),
+            "line_count": line_count,
         })
 
     return {

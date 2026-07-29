@@ -108,3 +108,37 @@ KEYWORD_CATEGORIES: dict[str, Category] = {
 def categorize(keyword: str) -> Category:
     """Return the Category for a keyword string (leading * and params stripped, any case)."""
     return KEYWORD_CATEGORIES.get(keyword.strip().upper(), Category.UNKNOWN)
+
+
+# ---------------------------------------------------------------------------
+# Sub-category definitions
+# ---------------------------------------------------------------------------
+
+# Maps keyword (normalized) -> sub_category name within MESH
+MESH_SUB_KEYWORDS: dict[str, str] = {
+    "NODE":    "nodes",
+    "NGEN":    "nodes",
+    "NCOPY":   "nodes",
+    "ELEMENT": "elements",
+    "ELGEN":   "elements",
+    "ELCOPY":  "elements",
+    "NSET":    "nsets",
+    "ELSET":   "elsets",
+    "SURFACE": "surfaces",
+}
+
+# Maps Category -> {keyword -> sub_category name}
+CATEGORY_SUB_KEYWORDS: dict[Category, dict[str, str]] = {
+    Category.MESH: MESH_SUB_KEYWORDS,
+}
+
+# Available sub-categories per category (ordered for UI display)
+CATEGORY_SUB_OPTIONS: dict[Category, list[dict[str, str]]] = {
+    Category.MESH: [
+        {"sub_category": "nodes",    "label": "Nodes (*NODE)",         "default_filename": "mesh-nodes.inp"},
+        {"sub_category": "elements", "label": "Elements (*ELEMENT)",   "default_filename": "mesh-elements.inp"},
+        {"sub_category": "nsets",    "label": "Node Sets (*NSET)",     "default_filename": "mesh-nsets.inp"},
+        {"sub_category": "elsets",   "label": "Element Sets (*ELSET)", "default_filename": "mesh-elsets.inp"},
+        {"sub_category": "surfaces", "label": "Surfaces (*SURFACE)",   "default_filename": "mesh-surfaces.inp"},
+    ],
+}
