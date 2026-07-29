@@ -200,13 +200,29 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
-  cursor: pointer;
+  padding: 16px;
   transition: border-color .15s, transform .1s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .workspace-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-.workspace-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-.workspace-card p { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.workspace-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.wsc-top { display: flex; align-items: flex-start; gap: 10px; }
+.wsc-check { flex-shrink: 0; margin-top: 2px; }
+.wsc-name { font-size: 14px; font-weight: 600; cursor: pointer; flex: 1; }
+.wsc-name:hover { color: var(--accent); }
+.wsc-subtitle { font-size: 12px; color: var(--muted); cursor: pointer; padding-left: 25px; }
+.wsc-actions {
+  display: flex;
+  gap: 4px;
+  padding-left: 22px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.workspace-card:hover .wsc-actions { opacity: 1; }
+.workspace-card.selected .wsc-actions { opacity: 1; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip {
   font-size: 11px;
@@ -519,26 +535,84 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   color: var(--muted);
   font-size: 13px;
 }
-.modal-editor {
+/* ── Code editor ─────────────────────────────────────────── */
+.editor-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.find-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.find-bar.visible { display: flex; }
+.find-bar > input { flex: 1; min-width: 160px; max-width: 280px; font-size: 12px; }
+#find-count { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 60px; }
+.editor-body { display: flex; flex: 1; overflow: hidden; }
+.editor-gutter {
+  width: 52px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+.editor-gutter-inner {
+  position: absolute;
+  top: 0; right: 0; left: 0;
+  padding: 16px 6px 16px 0;
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.6;
+  color: var(--muted);
+  text-align: right;
+  pointer-events: none;
+}
+.editor-code-area { flex: 1; overflow: auto; position: relative; background: var(--bg); }
+.editor-code-inner { position: relative; min-height: 100%; }
+.editor-highlight {
+  display: block;
   padding: 16px;
   margin: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 400px;
-  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 4;
+  word-break: normal;
   color: var(--text);
+  pointer-events: none;
+  min-width: max-content;
+}
+.modal-editor {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 4;
+  color: transparent;
+  caret-color: var(--text);
+  background: transparent;
   border: none;
   resize: none;
   outline: none;
-  tab-size: 4;
-  white-space: pre;
-  overflow-wrap: normal;
-  overflow-x: auto;
+  overflow: hidden;
+  z-index: 1;
+  min-width: 100%;
 }
 .modal-editor:focus { outline: none; }
+/* Syntax colours */
+.hl-comment { color: #6B7280; font-style: italic; }
+.hl-keyword  { color: var(--accent); font-weight: 600; }
+.hl-param    { color: #C9A9FF; }
+/* Find highlights (background, not colour, so they work on any syntax class) */
+.hl-match     { background: rgba(240,136,62,.35); border-radius: 2px; }
+.hl-match-cur { background: #F0883E; color: #0C0F14 !important; border-radius: 2px; }
 .unsaved-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
@@ -568,8 +642,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   </div>
   <div class="sidebar-footer">
     <button class="btn btn-primary btn-sm" style="flex:1" onclick="showView('new-workspace')">+ New</button>
-    <a class="btn btn-ghost btn-sm" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener" title="Download desktop app">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v13M7 10l5 5 5-5"/><path d="M3 20h18"/></svg>
+    <a class="btn btn-ghost btn-sm" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener" title="Download desktop app" style="gap:5px;font-size:11px">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v13M7 10l5 5 5-5"/><path d="M3 20h18"/></svg>
+      Desktop App
     </a>
     <button class="btn btn-ghost btn-sm" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">◑</button>
   </div>
@@ -582,6 +657,13 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   <div id="view-home" class="view active">
     <div class="topbar">
       <h1>Workspaces</h1>
+      <span class="spacer"></span>
+      <div id="ws-sel-toolbar" style="display:none;align-items:center;gap:8px">
+        <span class="text-muted text-sm" id="ws-sel-count"></span>
+        <button class="btn btn-ghost btn-sm" onclick="exportSelected()">⬇ Export</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">Delete</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearWsSelection()">✕ Clear</button>
+      </div>
       <button class="btn btn-primary btn-sm" onclick="showView('new-workspace')">+ New workspace</button>
     </div>
     <div class="content">
@@ -764,6 +846,7 @@ const state = {
   inspectResult: null,  // { filename, blocks }
   uploadedFile: null,   // File object
   subOptions: {},       // { [category]: [{sub_category, label, default_filename}] }
+  selectedWs: new Set(), // workspace names selected on home page
   reimp: {
     file: null,
     preview: null,
@@ -894,15 +977,131 @@ function renderHome() {
       </div>`;
     return;
   }
-  el.innerHTML = state.workspaces.map(name =>
-    `<div class="workspace-card" onclick="openWorkspace('${esc(name)}')">
-       <h3>${esc(name)}</h3>
-       <p class="text-muted">Click to open</p>
-       <div class="chip-row">
-         <span class="chip" style="background:var(--surface2);color:var(--muted)">${esc(name)}</span>
-       </div>
-     </div>`
-  ).join("");
+  el.innerHTML = state.workspaces.map(name => {
+    const sel = state.selectedWs.has(name);
+    const sn = esc(name).replace(/'/g, "\\'");
+    return `<div class="workspace-card${sel ? " selected" : ""}" data-ws="${esc(name)}">
+      <div class="wsc-top">
+        <input type="checkbox" class="wsc-check" ${sel ? "checked" : ""}
+               onchange="toggleWsSelect('${sn}', this)" onclick="event.stopPropagation()">
+        <span class="wsc-name" onclick="openWorkspace('${sn}')">${esc(name)}</span>
+      </div>
+      <div class="wsc-subtitle" onclick="openWorkspace('${sn}')">Click to open</div>
+      <div class="wsc-actions">
+        <button class="btn btn-ghost btn-sm" onclick="renameWorkspace('${sn}')" title="Rename">✏ Rename</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportWsCard('${sn}')" title="Export ZIP">⬇ Export</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteWsCard('${sn}')" title="Delete">✕ Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ── Workspace selection ───────────────────────────────────────────────────────
+function toggleWsSelect(name, cb) {
+  if (cb.checked) state.selectedWs.add(name);
+  else state.selectedWs.delete(name);
+  const card = document.querySelector(`.workspace-card[data-ws="${name.replace(/"/g,'\\"')}"]`);
+  if (card) card.classList.toggle("selected", cb.checked);
+  updateSelToolbar();
+}
+
+function clearWsSelection() {
+  state.selectedWs.clear();
+  renderHome();
+  updateSelToolbar();
+}
+
+function updateSelToolbar() {
+  const n = state.selectedWs.size;
+  const toolbar = document.getElementById("ws-sel-toolbar");
+  toolbar.style.display = n ? "flex" : "none";
+  document.getElementById("ws-sel-count").textContent = `${n} selected`;
+}
+
+// ── Single-card actions ───────────────────────────────────────────────────────
+function renameWorkspace(name) {
+  const card = document.querySelector(`.workspace-card[data-ws="${name.replace(/"/g,'\\"')}"]`);
+  if (!card) return;
+  const nameEl = card.querySelector(".wsc-name");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = name;
+  input.style.cssText = "font-size:14px;font-weight:600;width:100%;background:transparent;border:none;border-bottom:1px solid var(--accent);outline:none;color:var(--text);padding:0";
+  let committed = false;
+  const finish = async () => {
+    if (committed) return;
+    committed = true;
+    const newName = input.value.trim();
+    nameEl.textContent = name;
+    nameEl.style.display = "";
+    input.replaceWith(nameEl);
+    if (!newName || newName === name) return;
+    try {
+      await api("PATCH", `/api/workspaces/${encodeURIComponent(name)}`, { name: newName });
+      toast(`Renamed to "${newName}"`, "ok");
+      state.selectedWs.delete(name);
+      await loadWorkspaces();
+    } catch(e) {
+      toast("Rename failed: " + e.message, "error");
+    }
+  };
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { input.value = name; input.blur(); }
+  });
+  input.addEventListener("blur", finish);
+  nameEl.style.display = "none";
+  nameEl.insertAdjacentElement("afterend", input);
+  input.focus();
+  input.select();
+}
+
+async function exportWsCard(name) {
+  try {
+    const blob = await api("GET", `/api/workspaces/${encodeURIComponent(name)}/export`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${name}.zip`; a.click();
+    URL.revokeObjectURL(url);
+    toast(`${name}.zip downloaded`);
+  } catch(e) {
+    toast("Export failed: " + e.message, "error");
+  }
+}
+
+async function deleteWsCard(name) {
+  if (!confirm(`Delete workspace "${name}"? This cannot be undone.`)) return;
+  try {
+    await api("DELETE", `/api/workspaces/${encodeURIComponent(name)}`);
+    state.selectedWs.delete(name);
+    toast(`Deleted ${name}`);
+    await loadWorkspaces();
+    updateSelToolbar();
+  } catch(e) {
+    toast("Delete failed: " + e.message, "error");
+  }
+}
+
+// ── Batch actions ─────────────────────────────────────────────────────────────
+async function exportSelected() {
+  for (const name of state.selectedWs) await exportWsCard(name);
+}
+
+async function deleteSelected() {
+  const names = [...state.selectedWs];
+  if (!names.length) return;
+  if (!confirm(`Delete ${names.length} workspace(s)? This cannot be undone.\n\n${names.join(", ")}`)) return;
+  for (const name of names) {
+    try {
+      await api("DELETE", `/api/workspaces/${encodeURIComponent(name)}`);
+      state.selectedWs.delete(name);
+    } catch(e) {
+      toast(`Failed to delete ${name}: ` + e.message, "error");
+    }
+  }
+  toast(`Deleted ${names.length} workspace(s)`);
+  await loadWorkspaces();
+  updateSelToolbar();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1416,14 +1615,24 @@ async function applyReimp() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 // File editor modal
 // ═══════════════════════════════════════════════════════════════════════════════
-let _modalFile = null;    // filename currently open
-let _modalOrig = null;    // original content (for discard / dirty check)
+let _modalFile = null;
+let _modalOrig = null;
+let _findQuery  = "";
+let _findMatches = [];
+let _findIdx    = 0;
+
+function _editorTa()   { return document.getElementById("editor-ta"); }
+function _editorHL()   { return document.getElementById("editor-highlight"); }
+function _editorGutter() { return document.getElementById("editor-gutter-inner"); }
+function _editorArea() { return document.getElementById("editor-code-area"); }
 
 async function viewFile(filename) {
   _modalFile = filename;
   _modalOrig = null;
+  _findQuery = ""; _findMatches = []; _findIdx = 0;
 
   const modal   = document.getElementById("file-modal");
   const body    = document.getElementById("modal-body");
@@ -1449,24 +1658,55 @@ async function viewFile(filename) {
     const text = await api("GET", url);
     _modalOrig = text;
 
-    const ta = document.createElement("textarea");
-    ta.className = "modal-editor";
+    // Build editor structure
+    body.innerHTML = `
+      <div class="editor-wrap" id="editor-wrap">
+        <div class="find-bar" id="find-bar">
+          <input id="find-input" type="text" placeholder="Find…"
+                 oninput="runFind()" onkeydown="_findKey(event)" spellcheck="false">
+          <span id="find-count"></span>
+          <button class="btn btn-ghost btn-sm" onclick="findPrev()" title="Previous (Shift+Enter)">↑</button>
+          <button class="btn btn-ghost btn-sm" onclick="findNext()" title="Next (Enter)">↓</button>
+          <button class="btn btn-ghost btn-sm" onclick="closeFindBar()">✕</button>
+        </div>
+        <div class="editor-body">
+          <div class="editor-gutter" id="editor-gutter">
+            <div class="editor-gutter-inner" id="editor-gutter-inner"></div>
+          </div>
+          <div class="editor-code-area" id="editor-code-area">
+            <div class="editor-code-inner" id="editor-code-inner">
+              <pre class="editor-highlight" id="editor-highlight" aria-hidden="true"></pre>
+              <textarea class="modal-editor" id="editor-ta" spellcheck="false"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    const ta = _editorTa();
     ta.value = text;
-    ta.spellcheck = false;
-    ta.addEventListener("input", _onEditorInput);
+    syncHighlight();
+
+    ta.addEventListener("input", () => {
+      syncHighlight();
+      const dot = document.getElementById("unsaved-dot");
+      dot.classList.toggle("visible", ta.value !== _modalOrig);
+    });
+
     ta.addEventListener("keydown", e => {
-      // Tab inserts spaces instead of jumping focus
       if (e.key === "Tab") {
         e.preventDefault();
         const s = ta.selectionStart, en = ta.selectionEnd;
         ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(en);
         ta.selectionStart = ta.selectionEnd = s + 2;
-        _onEditorInput();
+        syncHighlight();
       }
     });
 
-    body.innerHTML = "";
-    body.appendChild(ta);
+    _editorArea().addEventListener("scroll", () => {
+      const g = _editorGutter();
+      if (g) g.style.transform = `translateY(-${_editorArea().scrollTop}px)`;
+    });
+
     saveBtn.style.display = "";
     discBtn.style.display = "";
   } catch (e) {
@@ -1474,22 +1714,171 @@ async function viewFile(filename) {
   }
 }
 
-function _onEditorInput() {
-  const ta  = document.querySelector(".modal-editor");
-  const dot = document.getElementById("unsaved-dot");
-  if (!ta) return;
-  const dirty = ta.value !== _modalOrig;
-  dot.classList.toggle("visible", dirty);
+// ── Highlight + gutter sync ───────────────────────────────────────────────────
+function syncHighlight() {
+  const ta = _editorTa();
+  const hl = _editorHL();
+  const gt = _editorGutter();
+  if (!ta || !hl) return;
+  const text = ta.value;
+  hl.innerHTML = buildHighlightHTML(text, _findQuery, _findMatches, _findIdx);
+  if (gt) {
+    const lines = text.split("\n");
+    gt.textContent = lines.map((_, i) => i + 1).join("\n");
+  }
 }
 
+function buildHighlightHTML(text, query, matches, curIdx) {
+  const n = text.length;
+  // Per-character syntax class: 0=data 1=comment 2=keyword 3=param
+  const syn = new Uint8Array(n);
+  let pos = 0;
+  for (const line of text.split("\n")) {
+    const len = line.length;
+    if (line.startsWith("**")) {
+      syn.fill(1, pos, pos + len);
+    } else if (/^\s*\*[^*]/.test(line)) {
+      const ci = line.indexOf(",");
+      const kEnd = ci === -1 ? len : ci;
+      syn.fill(2, pos, pos + kEnd);
+      if (ci !== -1) syn.fill(3, pos + ci, pos + len);
+    }
+    pos += len + 1;
+  }
+  // Per-character find class: 0=none 1=match 2=current
+  const find = new Uint8Array(n);
+  matches.forEach((m, i) => find.fill(i === curIdx ? 2 : 1, m.start, m.end));
+
+  const SYN  = ["", "hl-comment", "hl-keyword", "hl-param"];
+  const FIND = ["", "hl-match",   "hl-match-cur"];
+  let html = "", i = 0;
+  while (i < n) {
+    const sc = syn[i], fc = find[i];
+    let j = i + 1;
+    while (j < n && syn[j] === sc && find[j] === fc) j++;
+    const seg = text.slice(i, j)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const cls = [SYN[sc], FIND[fc]].filter(Boolean).join(" ");
+    html += cls ? `<span class="${cls}">${seg}</span>` : seg;
+    i = j;
+  }
+  return html;
+}
+
+// ── Find bar ──────────────────────────────────────────────────────────────────
+function openFindBar() {
+  const bar = document.getElementById("find-bar");
+  if (!bar) return;
+  bar.classList.add("visible");
+  const inp = document.getElementById("find-input");
+  const ta = _editorTa();
+  if (ta && ta.selectionStart !== ta.selectionEnd) {
+    inp.value = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+  }
+  inp.focus();
+  inp.select();
+  runFind();
+}
+
+function closeFindBar() {
+  const bar = document.getElementById("find-bar");
+  if (bar) bar.classList.remove("visible");
+  _findQuery = ""; _findMatches = []; _findIdx = 0;
+  document.getElementById("find-count").textContent = "";
+  syncHighlight();
+  _editorTa()?.focus();
+}
+
+function runFind() {
+  const inp = document.getElementById("find-input");
+  _findQuery = inp?.value ?? "";
+  _findMatches = [];
+  _findIdx = 0;
+  const ta = _editorTa();
+  if (!ta) return;
+  if (_findQuery) {
+    const re = new RegExp(_escRe(_findQuery), "gi");
+    let m;
+    while ((m = re.exec(ta.value)) !== null)
+      _findMatches.push({ start: m.index, end: m.index + m[0].length });
+  }
+  _updateFindCount();
+  syncHighlight();
+  _scrollToMatch();
+}
+
+function findNext() {
+  if (!_findMatches.length) return;
+  _findIdx = (_findIdx + 1) % _findMatches.length;
+  _updateFindCount(); syncHighlight(); _scrollToMatch();
+}
+
+function findPrev() {
+  if (!_findMatches.length) return;
+  _findIdx = (_findIdx - 1 + _findMatches.length) % _findMatches.length;
+  _updateFindCount(); syncHighlight(); _scrollToMatch();
+}
+
+function _findKey(e) {
+  if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? findPrev() : findNext(); }
+  if (e.key === "Escape") closeFindBar();
+}
+
+function _updateFindCount() {
+  const el = document.getElementById("find-count");
+  if (!el) return;
+  el.textContent = _findMatches.length
+    ? `${_findIdx + 1} / ${_findMatches.length}`
+    : (_findQuery ? "No matches" : "");
+}
+
+function _scrollToMatch() {
+  if (!_findMatches.length) return;
+  const ta = _editorTa();
+  if (!ta) return;
+  const m = _findMatches[_findIdx];
+  ta.setSelectionRange(m.start, m.end);
+  // Calculate approximate line position and scroll to it
+  const linesBefore = ta.value.slice(0, m.start).split("\n").length - 1;
+  const lineH = 12 * 1.6; // font-size * line-height
+  const area = _editorArea();
+  if (area) {
+    const targetY = linesBefore * lineH - area.clientHeight / 2;
+    area.scrollTop = Math.max(0, targetY);
+  }
+}
+
+function _escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+// ── Comment toggle (Ctrl+/) ───────────────────────────────────────────────────
+function toggleComment() {
+  const ta = _editorTa();
+  if (!ta) return;
+  const val  = ta.value;
+  const sS   = ta.selectionStart;
+  const sE   = ta.selectionEnd;
+  const lineStart = val.lastIndexOf("\n", sS - 1) + 1;
+  const lineEnd   = val.indexOf("\n", sE);
+  const block     = val.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+  const lines     = block.split("\n");
+  const allCommented = lines.every(l => l.startsWith("**"));
+  const newLines  = lines.map(l => allCommented ? l.slice(2) : "**" + l);
+  const newBlock  = newLines.join("\n");
+  const delta     = newBlock.length - block.length;
+  ta.value = val.slice(0, lineStart) + newBlock + val.slice(lineEnd === -1 ? val.length : lineEnd);
+  ta.selectionStart = sS + (allCommented ? -2 : 2);
+  ta.selectionEnd   = sE + delta;
+  syncHighlight();
+  document.getElementById("unsaved-dot")?.classList.toggle("visible", ta.value !== _modalOrig);
+}
+
+// ── Save / discard / close ────────────────────────────────────────────────────
 async function saveFile() {
-  const ta  = document.querySelector(".modal-editor");
+  const ta  = _editorTa();
   const btn = document.getElementById("modal-save-btn");
   if (!ta || !_modalFile) return;
-
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span>`;
-
   try {
     await fetch(
       `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(_modalFile)}`,
@@ -1498,7 +1887,6 @@ async function saveFile() {
     _modalOrig = ta.value;
     document.getElementById("unsaved-dot").classList.remove("visible");
     toast(`Saved ${_modalFile}`, "ok");
-    // Refresh the detail table so the "edited" badge updates
     if (state.wsData) {
       const data = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
       state.wsData = data;
@@ -1513,32 +1901,32 @@ async function saveFile() {
 }
 
 function discardEdits() {
-  const ta = document.querySelector(".modal-editor");
+  const ta = _editorTa();
   if (!ta || _modalOrig === null) return;
   if (ta.value !== _modalOrig && !confirm("Discard unsaved changes?")) return;
   ta.value = _modalOrig;
+  syncHighlight();
   document.getElementById("unsaved-dot").classList.remove("visible");
 }
 
 function closeFileModal(e) {
   if (e && e.target !== document.getElementById("file-modal")) return;
-  const ta = document.querySelector(".modal-editor");
+  const ta = _editorTa();
   if (ta && ta.value !== _modalOrig) {
     if (!confirm("Close without saving?")) return;
   }
   document.getElementById("file-modal").classList.remove("open");
   document.removeEventListener("keydown", _modalKey);
-  _modalFile = null;
-  _modalOrig = null;
+  _modalFile = null; _modalOrig = null;
+  _findQuery = ""; _findMatches = []; _findIdx = 0;
 }
 
 function _modalKey(e) {
-  if (e.key === "Escape") closeFileModal();
-  // Ctrl/Cmd+S saves
-  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-    e.preventDefault();
-    saveFile();
-  }
+  if (e.key === "Escape" && !document.getElementById("find-bar")?.classList.contains("visible"))
+    closeFileModal();
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveFile(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); openFindBar(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); toggleComment(); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

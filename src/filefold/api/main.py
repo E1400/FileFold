@@ -161,6 +161,26 @@ async def get_workspace(name: str):
     }
 
 
+@app.patch("/api/workspaces/{name}")
+async def rename_workspace(name: str, request: Request):
+    """Rename a workspace directory and update its manifest."""
+    body = await request.json()
+    new_name = body.get("name", "").strip()
+    if not new_name:
+        raise HTTPException(400, "name is required")
+    old_dir = workspace_path(name)
+    new_dir = workspace_path(new_name)
+    if not old_dir.exists():
+        raise HTTPException(404, f"Workspace '{name}' not found")
+    if new_dir.exists():
+        raise HTTPException(400, f"Workspace '{new_name}' already exists")
+    ws = Workspace.load(old_dir)
+    ws.name = new_name
+    ws._save()
+    old_dir.rename(new_dir)
+    return {"workspace": new_name}
+
+
 @app.delete("/api/workspaces/{name}")
 async def delete_workspace(name: str):
     import shutil
