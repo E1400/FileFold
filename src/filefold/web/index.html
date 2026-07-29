@@ -1715,21 +1715,31 @@ async function viewFile(filename) {
         ta.selectionStart = ta.selectionEnd = s + 2;
         syncHighlight();
       }
-      // * with a selection: prepend * to each selected line instead of replacing
-      if (e.key === "*" && ta.selectionStart !== ta.selectionEnd) {
-        e.preventDefault();
+      // * or Backspace with a multi-line selection: prepend/remove * per line
+      if ((e.key === "*" || e.key === "Backspace") && ta.selectionStart !== ta.selectionEnd) {
         const val = ta.value;
         const s = ta.selectionStart, en = ta.selectionEnd;
         const blockStart = val.lastIndexOf("\n", s - 1) + 1;
         const nlAfter   = val.indexOf("\n", en - 1);
         const blockEnd  = nlAfter === -1 ? val.length : nlAfter;
         const lines     = val.slice(blockStart, blockEnd).split("\n");
-        const newBlock  = lines.map(l => "*" + l).join("\n");
-        ta.value = val.slice(0, blockStart) + newBlock + val.slice(blockEnd);
-        ta.selectionStart = s + 1;
-        ta.selectionEnd   = en + lines.length;
-        syncHighlight();
-        document.getElementById("unsaved-dot")?.classList.toggle("visible", ta.value !== _modalOrig);
+
+        if (e.key === "Backspace" && !lines.every(l => l.startsWith("*"))) {
+          // Not all lines start with * — let default Backspace run
+        } else {
+          e.preventDefault();
+          const removing   = e.key === "Backspace";
+          const newLines   = removing ? lines.map(l => l.slice(1)) : lines.map(l => "*" + l);
+          const newBlock   = newLines.join("\n");
+          const delta      = removing ? -lines.length : lines.length;
+          // Use execCommand so Cmd+Z / Ctrl+Z can undo this operation
+          ta.setSelectionRange(blockStart, blockEnd);
+          document.execCommand("insertText", false, newBlock);
+          ta.selectionStart = s + (removing ? -1 : 1);
+          ta.selectionEnd   = en + delta;
+          syncHighlight();
+          document.getElementById("unsaved-dot")?.classList.toggle("visible", ta.value !== _modalOrig);
+        }
       }
     });
 
@@ -1890,13 +1900,16 @@ function toggleComment() {
   const sE   = ta.selectionEnd;
   const lineStart = val.lastIndexOf("\n", sS - 1) + 1;
   const lineEnd   = val.indexOf("\n", sE);
-  const block     = val.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+  const blockEnd  = lineEnd === -1 ? val.length : lineEnd;
+  const block     = val.slice(lineStart, blockEnd);
   const lines     = block.split("\n");
   const allCommented = lines.every(l => l.startsWith("**"));
   const newLines  = lines.map(l => allCommented ? l.slice(2) : "**" + l);
   const newBlock  = newLines.join("\n");
   const delta     = newBlock.length - block.length;
-  ta.value = val.slice(0, lineStart) + newBlock + val.slice(lineEnd === -1 ? val.length : lineEnd);
+  // Use execCommand so Cmd+Z undoes this
+  ta.setSelectionRange(lineStart, blockEnd);
+  document.execCommand("insertText", false, newBlock);
   ta.selectionStart = sS + (allCommented ? -2 : 2);
   ta.selectionEnd   = sE + delta;
   syncHighlight();
