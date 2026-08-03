@@ -426,7 +426,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* ── Views (shown/hidden) ───────────────────────────────── */
 .view { display: none; }
-.view.active { display: flex; flex-direction: column; }
+.view.active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+/* Editor view must clip its own content so #main doesn't scroll */
+#view-editor { overflow: hidden; }
 
 /* ── Detail page tabs ────────────────────────────────────── */
 .detail-tabs {
@@ -816,12 +818,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
     </div>
   </div>
 
-
-</main>
-
-<!-- Toast container -->
-<div id="toast-container"></div>
-
   <!-- ── FILE EDITOR ─────────────────────────────────────────────────────── -->
   <div id="view-editor" class="view">
     <div class="topbar">
@@ -859,6 +855,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
       </div>
     </div>
   </div>
+
+</main>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1839,29 +1840,37 @@ async function viewFile(filename) {
 
   const loading = document.getElementById("editor-loading");
   const body    = document.getElementById("editor-body");
+  loading.innerHTML = `<span class="spinner"></span> Loading…`;
   loading.style.cssText = "";
+  loading.style.display = "";
   body.style.display    = "none";
 
   showView("editor");
 
   try {
-    const text = await api("GET", url);
+    // Stream the response so the spinner shows while downloading large files
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
     _modalOrig = text;
+
+    const lineCount = (text.match(/\n/g) || []).length + 1;
+    if (lineCount > _LARGE_FILE_LINES) {
+      loading.innerHTML = `<span class="spinner"></span> Rendering ${lineCount.toLocaleString()} lines…`;
+    }
 
     _editorTa().value = text;
     loading.style.display = "none";
     body.style.display = "";
 
-    // Defer expensive initial render so the view paints first
-    requestAnimationFrame(() => {
-      _syncGutter(text);
-      syncHighlight();
-    });
+    // Gutter first (synchronous, establishes height), highlight deferred
+    _syncGutter(text);
+    requestAnimationFrame(() => syncHighlight());
 
     saveBtn.style.display = "";
     discBtn.style.display = "";
   } catch (e) {
-    loading.textContent = `Failed to load: ${esc(e.message)}`;
+    loading.innerHTML = `Failed to load: ${esc(e.message)}`;
     loading.style.color = "var(--danger)";
   }
 }
