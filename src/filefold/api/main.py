@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from filefold.core.keywords import CATEGORY_SUB_OPTIONS, Category
 from filefold.core.parser import parse
-from filefold.core.splitter import SplitSelection, SubSplitSelection
+from filefold.core.splitter import SplitSelection, SubSplitSelection, split_with_includes
 from filefold.core.workspace import Workspace
 
 from .server import WORKSPACE_BASE, list_workspaces, workspace_path
@@ -201,6 +201,40 @@ async def delete_workspace(name: str):
 # ---------------------------------------------------------------------------
 # Reimport
 # ---------------------------------------------------------------------------
+
+@app.post("/api/workspaces/{name}/extract")
+async def extract_splits(name: str, request: Request):
+    """Extract new splits from the existing mother file without re-uploading it."""
+    body = await request.json()
+    sel_data = body.get("selections", [])
+    if not sel_data:
+        raise HTTPException(400, "selections is required")
+    ws_dir = workspace_path(name)
+    try:
+        ws = Workspace.load(ws_dir)
+    except FileNotFoundError:
+        raise HTTPException(404, f"Workspace '{name}' not found")
+    mother_path = ws_dir / ws.source_name
+    if not mother_path.exists():
+        raise HTTPException(404, f"Mother file '{ws.source_name}' not found")
+    new_sels = [
+        SplitSelection(
+            Category(s["category"]),
+            s["filename"],
+            sub_selections=[
+                SubSplitSelection(ss["sub_category"], ss["filename"])
+                for ss in s.get("sub_selections", [])
+            ],
+        )
+        for s in sel_data
+    ]
+    blocks = parse(mother_path)
+    result = split_with_includes(blocks, mother_path, ws_dir, new_sels)
+    ws.selections.extend(new_sels)
+    ws._record_result(result)
+    ws._save()
+    return {"extracted": [s["filename"] for s in sel_data], "workspace": name}
+
 
 @app.post("/api/workspaces/{name}/recombine")
 async def recombine_files(name: str, request: Request):

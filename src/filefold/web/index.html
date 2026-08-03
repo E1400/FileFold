@@ -426,7 +426,29 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* ── Views (shown/hidden) ───────────────────────────────── */
 .view { display: none; }
-.view.active { display: block; }
+.view.active { display: flex; flex-direction: column; }
+
+/* ── Detail page tabs ────────────────────────────────────── */
+.detail-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.detail-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  margin-bottom: -1px;
+  cursor: pointer;
+  color: var(--muted);
+  font: 500 13px var(--sans);
+  transition: color .15s;
+}
+.detail-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.detail-tab:hover:not(.active) { color: var(--text); }
 
 /* ── Toast ──────────────────────────────────────────────── */
 #toast-container {
@@ -535,32 +557,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   color: var(--muted);
   font-size: 13px;
 }
-/* ── Edit-splits panel ───────────────────────────────────── */
-.merge-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--surface2);
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-}
-.merge-row.unchecked { opacity: .55; border-color: var(--warn); }
-.merge-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; flex: 1; }
-.merge-row .line-count { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: auto; }
-.merge-sub-rows { margin-left: 28px; display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-.merge-sub-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--surface);
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  font-size: 12px;
-}
-.merge-sub-row.unchecked { opacity: .55; border-color: var(--warn); }
-.merge-sub-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; }
 /* ── Code editor ─────────────────────────────────────────── */
 .editor-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 /* Inline find bar in modal header */
@@ -767,13 +763,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
       <h1 id="detail-title">Workspace</h1>
       <span class="spacer"></span>
       <button class="btn btn-ghost btn-sm" onclick="exportWorkspace()">⬇ Export ZIP</button>
-      <button class="btn btn-ghost btn-sm" onclick="showEditSplits()">⚙ Edit Splits</button>
       <button class="btn btn-ghost btn-sm" onclick="startReimp()">↑ Re-import</button>
       <button class="btn btn-danger btn-sm" onclick="deleteWorkspace()">Delete</button>
     </div>
-    <div class="content">
+    <div class="detail-tabs">
+      <button class="detail-tab active" id="tab-btn-files" onclick="switchDetailTab('files')">Files</button>
+      <button class="detail-tab" id="tab-btn-splits" onclick="switchDetailTab('splits')">Splits</button>
+    </div>
+    <!-- Files tab -->
+    <div id="tab-content-files" class="content">
       <div id="detail-meta" class="text-muted text-sm" style="margin-bottom:20px"></div>
-      <div class="section-title">Files</div>
       <div class="card" style="padding:0;overflow:hidden">
         <table class="file-table">
           <thead>
@@ -788,6 +787,17 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
           </thead>
           <tbody id="detail-files"></tbody>
         </table>
+      </div>
+    </div>
+    <!-- Splits tab -->
+    <div id="tab-content-splits" class="content" style="display:none">
+      <p class="text-muted text-sm" style="margin-bottom:16px">
+        Check categories to extract them into their own file. Uncheck existing splits to fold them back into the mother file.
+      </p>
+      <div id="ws-split-config" class="split-grid"></div>
+      <div class="row" style="margin-top:24px">
+        <span class="spacer"></span>
+        <button id="ws-splits-apply-btn" class="btn btn-primary" onclick="applyEditSplits()">Apply changes</button>
       </div>
     </div>
   </div>
@@ -852,24 +862,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
     </div>
   </div>
 
-  <!-- ── EDIT SPLITS ──────────────────────────────────────────────────────── -->
-  <div id="view-edit-splits" class="view">
-    <div class="topbar">
-      <button class="btn btn-ghost btn-sm" onclick="openWorkspace(state.activeWs)">← Back</button>
-      <h1 id="edit-splits-title">Edit Splits</h1>
-    </div>
-    <div class="content">
-      <p class="text-muted text-sm" style="margin-bottom:16px">
-        Uncheck any file to merge it back into its parent. Changes apply immediately — this cannot be undone without re-importing.
-      </p>
-      <div id="edit-splits-list" class="split-grid"></div>
-      <div class="row" style="margin-top:24px">
-        <button class="btn btn-ghost" onclick="openWorkspace(state.activeWs)">Cancel</button>
-        <span class="spacer"></span>
-        <button id="edit-splits-apply-btn" class="btn btn-primary" onclick="applyEditSplits()">Apply changes</button>
-      </div>
-    </div>
-  </div>
 
 </main>
 
@@ -1273,93 +1265,160 @@ async function deleteWorkspace() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Edit Splits (rezip / recombine)
+// Workspace detail tabs + Splits tab
 // ═══════════════════════════════════════════════════════════════════════════════
-function showEditSplits() {
-  if (!state.wsData) return;
-  document.getElementById("edit-splits-title").textContent = `Edit Splits — ${state.activeWs}`;
-  renderEditSplits(state.wsData);
-  showView("edit-splits");
+function switchDetailTab(tab) {
+  ["files", "splits"].forEach(t => {
+    document.getElementById(`tab-content-${t}`).style.display = t === tab ? "" : "none";
+    document.getElementById(`tab-btn-${t}`).classList.toggle("active", t === tab);
+  });
+  if (tab === "splits" && state.wsData) renderSplitsTab(state.wsData);
 }
 
-function renderEditSplits(data) {
-  // Build a line-count lookup from the files array
-  const lineCounts = {};
-  data.files.forEach(f => { lineCounts[f.filename] = f.line_count; });
+function renderSplitsTab(data) {
+  const existingByCategory = {};
+  data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
 
-  const el = document.getElementById("edit-splits-list");
-  if (!data.selections || !data.selections.length) {
-    el.innerHTML = `<p class="text-muted">No extracted files in this workspace.</p>`;
+  // All known categories from sub-options, plus any already-extracted ones not in subOptions
+  const allCats = Object.keys(state.subOptions).filter(c => c !== "unknown");
+  data.selections.forEach(sel => { if (!allCats.includes(sel.category)) allCats.push(sel.category); });
+
+  const el = document.getElementById("ws-split-config");
+  if (!allCats.length) {
+    el.innerHTML = `<p class="text-muted">No categories available.</p>`;
     return;
   }
 
-  el.innerHTML = data.selections.map(sel => {
-    const c = CAT_COLORS[sel.category] ?? "#7D8590";
-    const lc = lineCounts[sel.filename];
-    const lcText = lc != null ? lc.toLocaleString() + " lines" : "";
-    const subRows = (sel.sub_selections ?? []).map(ss => {
-      const slc = lineCounts[ss.filename];
-      const slcText = slc != null ? slc.toLocaleString() + " lines" : "";
-      return `<div class="merge-sub-row" id="msr-${esc(ss.filename)}">
-        <label>
-          <input type="checkbox" checked onchange="toggleMergeRow(this,'${esc(ss.filename).replace(/'/g,"\\'")}')">
-          <span class="tree-indent">└</span>
-          <span class="mono" style="font-size:12px">${esc(ss.filename)}</span>
-        </label>
-        <span class="line-count">${slcText}</span>
-      </div>`;
-    }).join("");
+  el.innerHTML = allCats.map(cat => {
+    const c = CAT_COLORS[cat] ?? "#7D8590";
+    const existing = existingByCategory[cat];
+    const isExtracted = !!existing;
+    const defaultFn = isExtracted ? existing.filename : `${cat}.inp`;
+    const subOpts = state.subOptions[cat] ?? [];
+    const existingSubs = {};
+    if (existing) existing.sub_selections.forEach(ss => { existingSubs[ss.sub_category] = ss.filename; });
 
-    return `<div style="display:flex;flex-direction:column;gap:6px">
-      <div class="merge-row" id="mr-${esc(sel.filename)}">
-        <label>
-          <input type="checkbox" checked onchange="toggleMergeRow(this,'${esc(sel.filename).replace(/'/g,"\\'")}')">
-          <span class="chip" style="background:${c}22;color:${c}">${esc(sel.category)}</span>
-          <span class="mono" style="font-size:12px">${esc(sel.filename)}</span>
-        </label>
-        <span class="line-count">${lcText}</span>
-      </div>
-      ${subRows ? `<div class="merge-sub-rows">${subRows}</div>` : ""}
+    const subPanel = subOpts.length ? `
+      <div class="sub-options${isExtracted ? " visible" : ""}" id="ws-sub-opts-${cat}">
+        <div class="text-muted text-sm" style="margin-bottom:4px">Split into sub-files:</div>
+        ${subOpts.map(opt => {
+          const subChecked = !!existingSubs[opt.sub_category];
+          const subFn = existingSubs[opt.sub_category] || opt.default_filename;
+          return `<div class="sub-option-row">
+            <label>
+              <input type="checkbox" id="ws-sub-${cat}-${opt.sub_category}"
+                     value="${opt.sub_category}" ${subChecked ? "checked" : ""}
+                     onchange="wsToggleSubOption('${cat}','${opt.sub_category}')">
+              ${esc(opt.label)}
+            </label>
+            <input type="text" id="ws-subfn-${cat}-${opt.sub_category}" value="${subFn}"
+                   placeholder="${opt.default_filename}"
+                   ${subChecked ? "" : "disabled"} style="opacity:${subChecked ? "1" : ".4"}">
+          </div>`;
+        }).join("")}
+      </div>` : "";
+
+    return `<div class="split-row${isExtracted ? " selected" : ""}" id="ws-row-${cat}">
+      <label>
+        <input type="checkbox" id="ws-sel-${cat}" ${isExtracted ? "checked" : ""}
+               onchange="wsToggleSplitRow('${cat}')">
+        <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
+        ${isExtracted ? `<span class="badge badge-accent" style="font-size:10px">extracted</span>` : ""}
+      </label>
+      <input type="text" id="ws-fn-${cat}" value="${defaultFn}" placeholder="${cat}.inp"
+             style="opacity:${isExtracted ? "1" : ".4"}" ${isExtracted ? "" : "disabled"}>
+      <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
+      ${subPanel}
     </div>`;
   }).join("");
 }
 
-function toggleMergeRow(cb, filename) {
-  const isSub = filename.includes("-") && document.getElementById(`msr-${filename}`);
-  const el = document.getElementById(isSub ? `msr-${filename}` : `mr-${filename}`);
-  if (el) el.classList.toggle("unchecked", !cb.checked);
+function wsToggleSplitRow(cat) {
+  const checked = document.getElementById(`ws-sel-${cat}`).checked;
+  const row = document.getElementById(`ws-row-${cat}`);
+  const fnInput = document.getElementById(`ws-fn-${cat}`);
+  row.classList.toggle("selected", checked);
+  fnInput.disabled = !checked;
+  fnInput.style.opacity = checked ? "1" : ".4";
+  const subPanel = document.getElementById(`ws-sub-opts-${cat}`);
+  if (subPanel) {
+    subPanel.classList.toggle("visible", checked);
+    if (!checked) {
+      subPanel.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
+      subPanel.querySelectorAll("input[type=text]").forEach(inp => { inp.disabled = true; inp.style.opacity = ".4"; });
+    }
+  }
+}
+
+function wsToggleSubOption(cat, subCat) {
+  const cb = document.getElementById(`ws-sub-${cat}-${subCat}`);
+  const inp = document.getElementById(`ws-subfn-${cat}-${subCat}`);
+  if (!inp) return;
+  inp.disabled = !cb.checked;
+  inp.style.opacity = cb.checked ? "1" : ".4";
 }
 
 async function applyEditSplits() {
-  // Collect unchecked filenames
+  const data = state.wsData;
+  if (!data) return;
+
+  const existingByCategory = {};
+  data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
+
   const toMerge = [];
-  document.querySelectorAll("#edit-splits-list input[type=checkbox]").forEach(cb => {
-    if (!cb.checked) {
-      // Extract filename from the label's .mono span
-      const label = cb.closest("label");
-      const mono = label?.querySelector(".mono");
-      if (mono) toMerge.push(mono.textContent.trim());
+  const toExtract = [];
+
+  Object.keys(state.subOptions).filter(c => c !== "unknown").forEach(cat => {
+    const cb = document.getElementById(`ws-sel-${cat}`);
+    if (!cb) return;
+    const isChecked = cb.checked;
+    const wasExtracted = !!existingByCategory[cat];
+
+    if (wasExtracted && !isChecked) {
+      // Fold child (and any sub-children) back into parent
+      toMerge.push(existingByCategory[cat].filename);
+      existingByCategory[cat].sub_selections.forEach(ss => toMerge.push(ss.filename));
+    } else if (!wasExtracted && isChecked) {
+      // Extract new split from mother file
+      const fn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || `${cat}.inp`;
+      const subOpts = state.subOptions[cat] ?? [];
+      const sub_selections = subOpts
+        .filter(opt => document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked)
+        .map(opt => ({
+          sub_category: opt.sub_category,
+          filename: document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim() || opt.default_filename,
+        }));
+      toExtract.push({ category: cat, filename: fn, sub_selections });
     }
   });
 
-  if (!toMerge.length) {
-    toast("No changes selected", "warn");
+  if (!toMerge.length && !toExtract.length) {
+    toast("No changes to apply", "warn");
     return;
   }
 
-  const btn = document.getElementById("edit-splits-apply-btn");
+  const btn = document.getElementById("ws-splits-apply-btn");
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span> Applying…`;
 
   try {
-    await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/recombine`,
-      { filenames: toMerge });
-    toast(`Merged ${toMerge.length} file(s) back into parent`, "ok");
-    const data = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
-    state.wsData = data;
-    openWorkspace(state.activeWs);
+    if (toMerge.length)
+      await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/recombine`, { filenames: toMerge });
+    if (toExtract.length)
+      await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/extract`, { selections: toExtract });
+
+    const parts = [];
+    if (toMerge.length)   parts.push(`${toMerge.length} merged back`);
+    if (toExtract.length) parts.push(`${toExtract.length} extracted`);
+    toast(parts.join(", "), "ok");
+
+    const freshData = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+    state.wsData = freshData;
+    renderDetail(freshData);
+    renderSplitsTab(freshData);
   } catch (e) {
     toast("Failed: " + e.message, "error");
+  } finally {
     btn.disabled = false;
     btn.textContent = "Apply changes";
   }
@@ -1897,17 +1956,35 @@ async function viewFile(filename) {
 }
 
 // ── Highlight + gutter sync ───────────────────────────────────────────────────
+const _LARGE_FILE_LINES = 5000;
+
 function syncHighlight() {
   const ta = _editorTa();
   const hl = _editorHL();
   const gt = _editorGutter();
   if (!ta || !hl) return;
   const text = ta.value;
-  hl.innerHTML = buildHighlightHTML(text, _findQuery, _findMatches, _findIdx);
-  if (gt) {
-    const lines = text.split("\n");
-    gt.textContent = lines.map((_, i) => i + 1).join("\n");
-  }
+  const lines = text.split("\n");
+  hl.innerHTML = lines.length > _LARGE_FILE_LINES
+    ? _buildMatchOnlyHTML(text, _findMatches, _findIdx)
+    : buildHighlightHTML(text, _findQuery, _findMatches, _findIdx);
+  if (gt) gt.textContent = lines.map((_, i) => i + 1).join("\n");
+}
+
+function _escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function _buildMatchOnlyHTML(text, matches, curIdx) {
+  if (!matches.length) return _escHtml(text);
+  let html = "", pos = 0;
+  matches.forEach((m, i) => {
+    if (pos < m.start) html += _escHtml(text.slice(pos, m.start));
+    html += `<span class="${i === curIdx ? "hl-match-cur" : "hl-match"}">${_escHtml(text.slice(m.start, m.end))}</span>`;
+    pos = m.end;
+  });
+  if (pos < text.length) html += _escHtml(text.slice(pos));
+  return html;
 }
 
 function buildHighlightHTML(text, query, matches, curIdx) {
@@ -1995,16 +2072,34 @@ function runFind() {
   _scrollToMatch();
 }
 
+function _swapMatchCur(newIdx) {
+  const hl = _editorHL();
+  if (!hl) return;
+  hl.querySelectorAll(".hl-match-cur").forEach(el => {
+    el.classList.remove("hl-match-cur");
+    el.classList.add("hl-match");
+  });
+  const all = hl.querySelectorAll(".hl-match");
+  if (all[newIdx]) {
+    all[newIdx].classList.remove("hl-match");
+    all[newIdx].classList.add("hl-match-cur");
+  }
+}
+
 function findNext() {
   if (!_findMatches.length) return;
   _findIdx = (_findIdx + 1) % _findMatches.length;
-  _updateFindCount(); syncHighlight(); _scrollToMatch();
+  _updateFindCount();
+  _swapMatchCur(_findIdx);
+  _scrollToMatch();
 }
 
 function findPrev() {
   if (!_findMatches.length) return;
   _findIdx = (_findIdx - 1 + _findMatches.length) % _findMatches.length;
-  _updateFindCount(); syncHighlight(); _scrollToMatch();
+  _updateFindCount();
+  _swapMatchCur(_findIdx);
+  _scrollToMatch();
 }
 
 function _findKey(e) {
@@ -2029,10 +2124,17 @@ function _scrollToMatch() {
   requestAnimationFrame(() => {
     const area = _editorArea();
     if (!area) return;
-    const linesBefore = ta.value.slice(0, m.start).split("\n").length - 1;
-    const lineH = 12 * 1.6; // font-size * line-height
-    const targetY = 16 + linesBefore * lineH - area.clientHeight / 2;
-    area.scrollTop = Math.max(0, targetY);
+    const cur = _editorHL()?.querySelector(".hl-match-cur");
+    if (cur) {
+      // Use the actual rendered position of the highlighted span
+      const areaRect = area.getBoundingClientRect();
+      const curRect  = cur.getBoundingClientRect();
+      area.scrollTop += (curRect.top - areaRect.top) - area.clientHeight / 2;
+    } else {
+      // Fallback: line-count calculation
+      const linesBefore = ta.value.slice(0, m.start).split("\n").length - 1;
+      area.scrollTop = Math.max(0, 16 + linesBefore * 19.2 - area.clientHeight / 2);
+    }
   });
 }
 
