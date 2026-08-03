@@ -503,51 +503,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .empty .icon { font-size: 40px; margin-bottom: 12px; }
 .empty p { font-size: 14px; margin-bottom: 16px; }
 
-/* ── File viewer modal ──────────────────────────────────── */
-.modal-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.65);
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
-}
-.modal-backdrop.open { display: flex; }
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  width: min(90vw, 900px);
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0,0,0,.5);
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.modal-header h3 { font-family: var(--mono); font-size: 13px; font-weight: 600; flex: 1; }
-.modal-body {
-  flex: 1;
-  overflow: auto;
-  padding: 0;
-}
-.modal-body pre {
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.6;
-  padding: 16px;
-  margin: 0;
-  white-space: pre;
-  tab-size: 4;
-  color: var(--text);
-}
 .modal-loading {
   display: flex;
   align-items: center;
@@ -558,10 +513,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   font-size: 13px;
 }
 /* ── Code editor ─────────────────────────────────────────── */
-.editor-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-/* Inline find bar in modal header */
-.header-find { display: none; align-items: center; gap: 4px; }
-.modal-backdrop.open .header-find { display: flex; }
+.editor-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+/* Find bar — always visible when editor view is active */
+.header-find { display: flex; align-items: center; gap: 4px; }
 .header-find-wrap { position: relative; display: flex; align-items: center; }
 .header-find input {
   font-size: 12px;
@@ -868,12 +822,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 <!-- Toast container -->
 <div id="toast-container"></div>
 
-<!-- File editor modal -->
-<div id="file-modal" class="modal-backdrop" onclick="closeFileModal(event)">
-  <div class="modal">
-    <div class="modal-header">
+  <!-- ── FILE EDITOR ─────────────────────────────────────────────────────── -->
+  <div id="view-editor" class="view">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" onclick="closeEditor()">← Back</button>
       <span class="unsaved-dot" id="unsaved-dot"></span>
-      <h3 id="modal-filename"></h3>
+      <span id="editor-filename" class="mono" style="font-size:13px;font-weight:600"></span>
       <span class="spacer"></span>
       <div class="header-find" id="header-find">
         <div class="header-find-wrap">
@@ -884,16 +838,27 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
         <button class="btn btn-ghost btn-sm" onclick="findPrev()" title="Previous (Shift+Enter)">↑</button>
         <button class="btn btn-ghost btn-sm" onclick="findNext()" title="Next (Enter)">↓</button>
       </div>
-      <button id="modal-save-btn" class="btn btn-primary btn-sm" onclick="saveFile()" style="display:none">Save</button>
-      <button id="modal-discard-btn" class="btn btn-ghost btn-sm" onclick="discardEdits()" style="display:none">Discard</button>
-      <a id="modal-download" class="btn btn-ghost btn-sm" download>⬇ Download</a>
-      <button class="btn btn-ghost btn-sm" onclick="closeFileModal()">✕</button>
+      <a id="editor-download" class="btn btn-ghost btn-sm" download>⬇ Download</a>
+      <button id="editor-save-btn" class="btn btn-primary btn-sm" onclick="saveFile()" style="display:none">Save</button>
+      <button id="editor-discard-btn" class="btn btn-ghost btn-sm" onclick="discardEdits()" style="display:none">Discard</button>
     </div>
-    <div class="modal-body" id="modal-body">
-      <div class="modal-loading"><span class="spinner"></span> Loading…</div>
+    <div class="editor-wrap">
+      <div id="editor-loading" class="modal-loading" style="display:none">
+        <span class="spinner"></span> Loading…
+      </div>
+      <div class="editor-body" id="editor-body" style="display:none">
+        <div class="editor-gutter" id="editor-gutter">
+          <div class="editor-gutter-inner" id="editor-gutter-inner"></div>
+        </div>
+        <div class="editor-code-area" id="editor-code-area">
+          <div class="editor-code-inner" id="editor-code-inner">
+            <pre class="editor-highlight" id="editor-highlight" aria-hidden="true"></pre>
+            <textarea class="modal-editor" id="editor-ta" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1836,8 +1801,7 @@ async function applyReimp() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
-// File editor modal
+// File editor (embedded view)
 // ═══════════════════════════════════════════════════════════════════════════════
 let _modalFile = null;
 let _modalOrig = null;
@@ -1845,130 +1809,81 @@ let _findQuery  = "";
 let _findMatches = [];
 let _findIdx    = 0;
 
-function _editorTa()   { return document.getElementById("editor-ta"); }
-function _editorHL()   { return document.getElementById("editor-highlight"); }
+function _editorTa()     { return document.getElementById("editor-ta"); }
+function _editorHL()     { return document.getElementById("editor-highlight"); }
 function _editorGutter() { return document.getElementById("editor-gutter-inner"); }
-function _editorArea() { return document.getElementById("editor-code-area"); }
+function _editorArea()   { return document.getElementById("editor-code-area"); }
 
 async function viewFile(filename) {
   _modalFile = filename;
   _modalOrig = null;
   _findQuery = ""; _findMatches = []; _findIdx = 0;
 
-  const modal   = document.getElementById("file-modal");
-  const body    = document.getElementById("modal-body");
-  const title   = document.getElementById("modal-filename");
-  const dlBtn   = document.getElementById("modal-download");
-  const saveBtn = document.getElementById("modal-save-btn");
-  const discBtn = document.getElementById("modal-discard-btn");
+  const findInput = document.getElementById("find-input");
+  if (findInput) findInput.value = "";
+  const findCount = document.getElementById("find-count");
+  if (findCount) findCount.textContent = "";
+
+  document.getElementById("editor-filename").textContent = filename;
+  const url = `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(filename)}`;
+  const dlBtn   = document.getElementById("editor-download");
+  const saveBtn = document.getElementById("editor-save-btn");
+  const discBtn = document.getElementById("editor-discard-btn");
   const dot     = document.getElementById("unsaved-dot");
 
-  title.textContent = filename;
-  const url = `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(filename)}`;
   dlBtn.href = url;
   dlBtn.download = filename;
   saveBtn.style.display = "none";
   discBtn.style.display = "none";
   dot.classList.remove("visible");
 
-  body.innerHTML = `<div class="modal-loading"><span class="spinner"></span> Loading…</div>`;
-  modal.classList.add("open");
-  document.addEventListener("keydown", _modalKey);
+  const loading = document.getElementById("editor-loading");
+  const body    = document.getElementById("editor-body");
+  loading.style.cssText = "";
+  body.style.display    = "none";
+
+  showView("editor");
 
   try {
     const text = await api("GET", url);
     _modalOrig = text;
 
-    // Build editor structure (find bar lives in modal-header, always visible)
-    body.innerHTML = `
-      <div class="editor-wrap" id="editor-wrap">
-        <div class="editor-body">
-          <div class="editor-gutter" id="editor-gutter">
-            <div class="editor-gutter-inner" id="editor-gutter-inner"></div>
-          </div>
-          <div class="editor-code-area" id="editor-code-area">
-            <div class="editor-code-inner" id="editor-code-inner">
-              <pre class="editor-highlight" id="editor-highlight" aria-hidden="true"></pre>
-              <textarea class="modal-editor" id="editor-ta" spellcheck="false"></textarea>
-            </div>
-          </div>
-        </div>
-      </div>`;
+    _editorTa().value = text;
+    loading.style.display = "none";
+    body.style.display = "";
 
-    const ta = _editorTa();
-    ta.value = text;
-    syncHighlight();
-
-    let _hlTimer = null;
-    ta.addEventListener("input", () => {
-      const dot = document.getElementById("unsaved-dot");
-      dot.classList.toggle("visible", ta.value !== _modalOrig);
-      clearTimeout(_hlTimer);
-      _hlTimer = setTimeout(syncHighlight, 150);
-    });
-
-    ta.addEventListener("keydown", e => {
-      if (e.key === "Tab") {
-        e.preventDefault();
-        const s = ta.selectionStart, en = ta.selectionEnd;
-        ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(en);
-        ta.selectionStart = ta.selectionEnd = s + 2;
-        syncHighlight();
-      }
-      // * or Backspace with a multi-line selection: prepend/remove * per line
-      if ((e.key === "*" || e.key === "Backspace") && ta.selectionStart !== ta.selectionEnd) {
-        const val = ta.value;
-        const s = ta.selectionStart, en = ta.selectionEnd;
-        const blockStart = val.lastIndexOf("\n", s - 1) + 1;
-        const nlAfter   = val.indexOf("\n", en - 1);
-        const blockEnd  = nlAfter === -1 ? val.length : nlAfter;
-        const lines     = val.slice(blockStart, blockEnd).split("\n");
-
-        if (e.key === "Backspace" && !lines.every(l => l.startsWith("*"))) {
-          // Not all lines start with * — let default Backspace run
-        } else {
-          e.preventDefault();
-          const removing   = e.key === "Backspace";
-          const newLines   = removing ? lines.map(l => l.slice(1)) : lines.map(l => "*" + l);
-          const newBlock   = newLines.join("\n");
-          const delta      = removing ? -lines.length : lines.length;
-          // Use execCommand so Cmd+Z / Ctrl+Z can undo this operation
-          ta.setSelectionRange(blockStart, blockEnd);
-          document.execCommand("insertText", false, newBlock);
-          ta.selectionStart = s + (removing ? -1 : 1);
-          ta.selectionEnd   = en + delta;
-          syncHighlight();
-          document.getElementById("unsaved-dot")?.classList.toggle("visible", ta.value !== _modalOrig);
-        }
-      }
-    });
-
-    _editorArea().addEventListener("scroll", () => {
-      const g = _editorGutter();
-      if (g) g.style.transform = `translateY(-${_editorArea().scrollTop}px)`;
+    // Defer expensive initial render so the view paints first
+    requestAnimationFrame(() => {
+      _syncGutter(text);
+      syncHighlight();
     });
 
     saveBtn.style.display = "";
     discBtn.style.display = "";
   } catch (e) {
-    body.innerHTML = `<div class="modal-loading" style="color:var(--danger)">Failed to load: ${esc(e.message)}</div>`;
+    loading.textContent = `Failed to load: ${esc(e.message)}`;
+    loading.style.color = "var(--danger)";
   }
 }
 
 // ── Highlight + gutter sync ───────────────────────────────────────────────────
 const _LARGE_FILE_LINES = 5000;
 
+function _syncGutter(text) {
+  const gt = _editorGutter();
+  if (!gt) return;
+  gt.textContent = text.split("\n").map((_, i) => i + 1).join("\n");
+}
+
 function syncHighlight() {
   const ta = _editorTa();
   const hl = _editorHL();
-  const gt = _editorGutter();
   if (!ta || !hl) return;
   const text = ta.value;
   const lines = text.split("\n");
   hl.innerHTML = lines.length > _LARGE_FILE_LINES
     ? _buildMatchOnlyHTML(text, _findMatches, _findIdx)
     : buildHighlightHTML(text, _findQuery, _findMatches, _findIdx);
-  if (gt) gt.textContent = lines.map((_, i) => i + 1).join("\n");
 }
 
 function _escHtml(s) {
@@ -1976,15 +1891,24 @@ function _escHtml(s) {
 }
 
 function _buildMatchOnlyHTML(text, matches, curIdx) {
-  if (!matches.length) return _escHtml(text);
-  let html = "", pos = 0;
+  // For large files: use newline characters as vertical spacers so match spans
+  // appear at the correct line position without rendering the full file text.
+  const totalNl = (text.match(/\n/g) || []).length;
+  if (!matches.length) {
+    // Blank lines establish correct scroll height; textarea shows actual content
+    return totalNl > 0 ? "\n".repeat(totalNl) : " ";
+  }
+  const parts = [];
+  let pos = 0;
   matches.forEach((m, i) => {
-    if (pos < m.start) html += _escHtml(text.slice(pos, m.start));
-    html += `<span class="${i === curIdx ? "hl-match-cur" : "hl-match"}">${_escHtml(text.slice(m.start, m.end))}</span>`;
+    const nlInGap = (text.slice(pos, m.start).match(/\n/g) || []).length;
+    if (nlInGap > 0) parts.push("\n".repeat(nlInGap));
+    parts.push(`<span class="${i === curIdx ? "hl-match-cur" : "hl-match"}">${_escHtml(text.slice(m.start, m.end))}</span>`);
     pos = m.end;
   });
-  if (pos < text.length) html += _escHtml(text.slice(pos));
-  return html;
+  const trailingNl = (text.slice(pos).match(/\n/g) || []).length;
+  if (trailingNl > 0) parts.push("\n".repeat(trailingNl));
+  return parts.join("");
 }
 
 function buildHighlightHTML(text, query, matches, curIdx) {
@@ -2168,7 +2092,7 @@ function toggleComment() {
 // ── Save / discard / close ────────────────────────────────────────────────────
 async function saveFile() {
   const ta  = _editorTa();
-  const btn = document.getElementById("modal-save-btn");
+  const btn = document.getElementById("editor-save-btn");
   if (!ta || !_modalFile) return;
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span>`;
@@ -2202,33 +2126,18 @@ function discardEdits() {
   document.getElementById("unsaved-dot").classList.remove("visible");
 }
 
-function closeFileModal(e) {
-  if (e && e.target !== document.getElementById("file-modal")) return;
+function closeEditor() {
   const ta = _editorTa();
   if (ta && ta.value !== _modalOrig) {
     if (!confirm("Close without saving?")) return;
   }
-  document.getElementById("file-modal").classList.remove("open");
-  document.removeEventListener("keydown", _modalKey);
   _modalFile = null; _modalOrig = null;
-  // Reset find state and clear input for next open
   _findQuery = ""; _findMatches = []; _findIdx = 0;
   const fi = document.getElementById("find-input");
   if (fi) fi.value = "";
   const fc = document.getElementById("find-count");
   if (fc) fc.textContent = "";
-}
-
-function _modalKey(e) {
-  // Escape: if find input is focused, blur it; otherwise close modal
-  if (e.key === "Escape") {
-    const fi = document.getElementById("find-input");
-    if (fi && document.activeElement === fi) { fi.blur(); closeFindBar(); }
-    else closeFileModal();
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveFile(); }
-  if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); openFindBar(); }
-  if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); toggleComment(); }
+  showView("detail");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2246,6 +2155,76 @@ function esc(s) {
 setupDropZone("upload-zone",   f => handleUpload(f));
 setupDropZone("reimp-drop",    f => handleReimpUpload(f));
 loadWorkspaces();
+
+// ── Editor: one-time event setup (elements are static HTML now) ───────────────
+(function _initEditor() {
+  const ta   = _editorTa();
+  const area = _editorArea();
+  if (!ta || !area) return;
+
+  let _hlTimer = null;
+  let _lastLineCount = 0;
+  ta.addEventListener("input", () => {
+    document.getElementById("unsaved-dot")?.classList.toggle("visible", ta.value !== _modalOrig);
+    clearTimeout(_hlTimer);
+    _hlTimer = setTimeout(() => {
+      const lc = ta.value.split("\n").length;
+      if (lc !== _lastLineCount) { _syncGutter(ta.value); _lastLineCount = lc; }
+      syncHighlight();
+    }, 150);
+  });
+
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const s = ta.selectionStart, en = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(en);
+      ta.selectionStart = ta.selectionEnd = s + 2;
+      syncHighlight();
+    }
+    if ((e.key === "*" || e.key === "Backspace") && ta.selectionStart !== ta.selectionEnd) {
+      const val = ta.value;
+      const s = ta.selectionStart, en = ta.selectionEnd;
+      const blockStart = val.lastIndexOf("\n", s - 1) + 1;
+      const nlAfter    = val.indexOf("\n", en - 1);
+      const blockEnd   = nlAfter === -1 ? val.length : nlAfter;
+      const lines      = val.slice(blockStart, blockEnd).split("\n");
+      if (e.key === "Backspace" && !lines.every(l => l.startsWith("*"))) {
+        // not all starred — let default run
+      } else {
+        e.preventDefault();
+        const removing = e.key === "Backspace";
+        const newLines = removing ? lines.map(l => l.slice(1)) : lines.map(l => "*" + l);
+        const newBlock = newLines.join("\n");
+        const delta    = removing ? -lines.length : lines.length;
+        ta.setSelectionRange(blockStart, blockEnd);
+        document.execCommand("insertText", false, newBlock);
+        ta.selectionStart = s + (removing ? -1 : 1);
+        ta.selectionEnd   = en + delta;
+        syncHighlight();
+        document.getElementById("unsaved-dot")?.classList.toggle("visible", ta.value !== _modalOrig);
+      }
+    }
+  });
+
+  area.addEventListener("scroll", () => {
+    const g = _editorGutter();
+    if (g) g.style.transform = `translateY(-${area.scrollTop}px)`;
+  });
+})();
+
+// Persistent keyboard handler for the editor view
+document.addEventListener("keydown", e => {
+  if (state.view !== "editor") return;
+  if (e.key === "Escape") {
+    const fi = document.getElementById("find-input");
+    if (fi && document.activeElement === fi) { fi.blur(); closeFindBar(); }
+    else closeEditor();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveFile(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); openFindBar(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); toggleComment(); }
+});
 </script>
 </body>
 </html>
