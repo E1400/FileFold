@@ -155,7 +155,14 @@ async def get_workspace(name: str):
     return {
         "name": ws.name,
         "source_name": ws.source_name,
-        "selections": [{"category": s.category.value, "filename": s.filename} for s in ws.selections],
+        "selections": [
+            {
+                "category": s.category.value,
+                "filename": s.filename,
+                "sub_selections": [{"sub_category": ss.sub_category, "filename": ss.filename} for ss in s.sub_selections],
+            }
+            for s in ws.selections
+        ],
         "updated_at": ws.updated_at,
         "files": files,
     }
@@ -194,6 +201,22 @@ async def delete_workspace(name: str):
 # ---------------------------------------------------------------------------
 # Reimport
 # ---------------------------------------------------------------------------
+
+@app.post("/api/workspaces/{name}/recombine")
+async def recombine_files(name: str, request: Request):
+    """Fold listed child/sub-child files back into their parent (reverse of split)."""
+    body = await request.json()
+    filenames = body.get("filenames", [])
+    if not filenames:
+        raise HTTPException(400, "filenames is required")
+    ws_dir = workspace_path(name)
+    try:
+        ws = Workspace.load(ws_dir)
+    except FileNotFoundError:
+        raise HTTPException(404, f"Workspace '{name}' not found")
+    ws.recombine(filenames)
+    return {"recombined": filenames, "workspace": name}
+
 
 @app.post("/api/workspaces/{name}/reimport/preview")
 async def reimport_preview(name: str, file: UploadFile = File(...)):

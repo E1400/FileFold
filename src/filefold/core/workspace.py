@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re as _re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -284,6 +285,85 @@ class Workspace:
         self.file_records[new_name] = FileRecord(
             sha256=_sha256(new_mother_content), role="mother"
         )
+        self._save()
+
+    # ------------------------------------------------------------------
+    # Recombine
+    # ------------------------------------------------------------------
+
+    def recombine(self, filenames: list[str]) -> None:
+        """Fold listed child/sub-child files back into their parent file.
+
+        For each filename:
+        - Expand its content (recursively inlining any sub-includes it holds).
+        - Replace the *INCLUDE line in the parent with that expanded content.
+        - Delete the file and any files it owned.
+        - Remove it from selections/sub_selections and file_records.
+        """
+        def _expand(path: Path) -> str:
+            """Return content with all *INCLUDE lines replaced recursively."""
+            text = path.read_text(encoding="utf-8", errors="surrogateescape")
+            def _sub(m: _re.Match) -> str:
+                inc = self.path / m.group(1).strip()
+                return _expand(inc) if inc.exists() else m.group(0)
+            return _re.sub(
+                r"^\*INCLUDE\s*,\s*INPUT\s*=\s*(.+?)\s*$",
+                _sub, text, flags=_re.IGNORECASE | _re.MULTILINE,
+            )
+
+        def _sub_files(fname: str) -> list[str]:
+            """Return fname plus all files whose parent is fname (recursively)."""
+            result = [fname]
+            for n, r in self.file_records.items():
+                if r.parent == fname:
+                    result.extend(_sub_files(n))
+            return result
+
+        for fname in filenames:
+            rec = self.file_records.get(fname)
+            if not rec:
+                continue
+
+            parent_fname = rec.parent if rec.role == "grandchild" else self.source_name
+            parent_path  = self.path / parent_fname
+            child_path   = self.path / fname
+
+            if not child_path.exists():
+                continue
+
+            # Expand and inline
+            expanded = _expand(child_path).rstrip("\n")
+            parent_text = parent_path.read_text(encoding="utf-8", errors="surrogateescape")
+            pattern = _re.compile(
+                r"^\*INCLUDE\s*,\s*INPUT\s*=\s*" + _re.escape(fname) + r"[ \t]*$",
+                _re.IGNORECASE | _re.MULTILINE,
+            )
+            new_parent = pattern.sub(expanded, parent_text, count=1)
+            parent_path.write_text(new_parent, encoding="utf-8", errors="surrogateescape")
+
+            # Update parent hash
+            parent_rec = self.file_records[parent_fname]
+            self.file_records[parent_fname] = FileRecord(
+                sha256=_sha256(new_parent),
+                role=parent_rec.role,
+                category=parent_rec.category,
+                parent=parent_rec.parent,
+            )
+
+            # Delete this file and all files it owns
+            for to_del in _sub_files(fname):
+                p = self.path / to_del
+                if p.exists():
+                    p.unlink()
+                self.file_records.pop(to_del, None)
+
+            # Update selections
+            if rec.role == "child":
+                self.selections = [s for s in self.selections if s.filename != fname]
+            elif rec.role == "grandchild":
+                for sel in self.selections:
+                    sel.sub_selections = [ss for ss in sel.sub_selections if ss.filename != fname]
+
         self._save()
 
     # ------------------------------------------------------------------

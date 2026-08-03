@@ -535,6 +535,32 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   color: var(--muted);
   font-size: 13px;
 }
+/* ── Edit-splits panel ───────────────────────────────────── */
+.merge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+}
+.merge-row.unchecked { opacity: .55; border-color: var(--warn); }
+.merge-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; flex: 1; }
+.merge-row .line-count { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: auto; }
+.merge-sub-rows { margin-left: 28px; display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.merge-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-size: 12px;
+}
+.merge-sub-row.unchecked { opacity: .55; border-color: var(--warn); }
+.merge-sub-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; }
 /* ── Code editor ─────────────────────────────────────────── */
 .editor-wrap { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 /* Inline find bar in modal header */
@@ -741,6 +767,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
       <h1 id="detail-title">Workspace</h1>
       <span class="spacer"></span>
       <button class="btn btn-ghost btn-sm" onclick="exportWorkspace()">⬇ Export ZIP</button>
+      <button class="btn btn-ghost btn-sm" onclick="showEditSplits()">⚙ Edit Splits</button>
       <button class="btn btn-ghost btn-sm" onclick="startReimp()">↑ Re-import</button>
       <button class="btn btn-danger btn-sm" onclick="deleteWorkspace()">Delete</button>
     </div>
@@ -825,6 +852,25 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
     </div>
   </div>
 
+  <!-- ── EDIT SPLITS ──────────────────────────────────────────────────────── -->
+  <div id="view-edit-splits" class="view">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" onclick="openWorkspace(state.activeWs)">← Back</button>
+      <h1 id="edit-splits-title">Edit Splits</h1>
+    </div>
+    <div class="content">
+      <p class="text-muted text-sm" style="margin-bottom:16px">
+        Uncheck any file to merge it back into its parent. Changes apply immediately — this cannot be undone without re-importing.
+      </p>
+      <div id="edit-splits-list" class="split-grid"></div>
+      <div class="row" style="margin-top:24px">
+        <button class="btn btn-ghost" onclick="openWorkspace(state.activeWs)">Cancel</button>
+        <span class="spacer"></span>
+        <button id="edit-splits-apply-btn" class="btn btn-primary" onclick="applyEditSplits()">Apply changes</button>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <!-- Toast container -->
@@ -840,7 +886,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
       <div class="header-find" id="header-find">
         <div class="header-find-wrap">
           <input id="find-input" type="text" placeholder="Search…"
-                 oninput="runFind()" onkeydown="_findKey(event)" spellcheck="false">
+                 oninput="_runFindDebounced()" onkeydown="_findKey(event)" spellcheck="false">
           <span id="find-count"></span>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="findPrev()" title="Previous (Shift+Enter)">↑</button>
@@ -1223,6 +1269,99 @@ async function deleteWorkspace() {
     showView("home");
   } catch (e) {
     toast("Delete failed: " + e.message, "error");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Edit Splits (rezip / recombine)
+// ═══════════════════════════════════════════════════════════════════════════════
+function showEditSplits() {
+  if (!state.wsData) return;
+  document.getElementById("edit-splits-title").textContent = `Edit Splits — ${state.activeWs}`;
+  renderEditSplits(state.wsData);
+  showView("edit-splits");
+}
+
+function renderEditSplits(data) {
+  // Build a line-count lookup from the files array
+  const lineCounts = {};
+  data.files.forEach(f => { lineCounts[f.filename] = f.line_count; });
+
+  const el = document.getElementById("edit-splits-list");
+  if (!data.selections || !data.selections.length) {
+    el.innerHTML = `<p class="text-muted">No extracted files in this workspace.</p>`;
+    return;
+  }
+
+  el.innerHTML = data.selections.map(sel => {
+    const c = CAT_COLORS[sel.category] ?? "#7D8590";
+    const lc = lineCounts[sel.filename];
+    const lcText = lc != null ? lc.toLocaleString() + " lines" : "";
+    const subRows = (sel.sub_selections ?? []).map(ss => {
+      const slc = lineCounts[ss.filename];
+      const slcText = slc != null ? slc.toLocaleString() + " lines" : "";
+      return `<div class="merge-sub-row" id="msr-${esc(ss.filename)}">
+        <label>
+          <input type="checkbox" checked onchange="toggleMergeRow(this,'${esc(ss.filename).replace(/'/g,"\\'")}')">
+          <span class="tree-indent">└</span>
+          <span class="mono" style="font-size:12px">${esc(ss.filename)}</span>
+        </label>
+        <span class="line-count">${slcText}</span>
+      </div>`;
+    }).join("");
+
+    return `<div style="display:flex;flex-direction:column;gap:6px">
+      <div class="merge-row" id="mr-${esc(sel.filename)}">
+        <label>
+          <input type="checkbox" checked onchange="toggleMergeRow(this,'${esc(sel.filename).replace(/'/g,"\\'")}')">
+          <span class="chip" style="background:${c}22;color:${c}">${esc(sel.category)}</span>
+          <span class="mono" style="font-size:12px">${esc(sel.filename)}</span>
+        </label>
+        <span class="line-count">${lcText}</span>
+      </div>
+      ${subRows ? `<div class="merge-sub-rows">${subRows}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function toggleMergeRow(cb, filename) {
+  const isSub = filename.includes("-") && document.getElementById(`msr-${filename}`);
+  const el = document.getElementById(isSub ? `msr-${filename}` : `mr-${filename}`);
+  if (el) el.classList.toggle("unchecked", !cb.checked);
+}
+
+async function applyEditSplits() {
+  // Collect unchecked filenames
+  const toMerge = [];
+  document.querySelectorAll("#edit-splits-list input[type=checkbox]").forEach(cb => {
+    if (!cb.checked) {
+      // Extract filename from the label's .mono span
+      const label = cb.closest("label");
+      const mono = label?.querySelector(".mono");
+      if (mono) toMerge.push(mono.textContent.trim());
+    }
+  });
+
+  if (!toMerge.length) {
+    toast("No changes selected", "warn");
+    return;
+  }
+
+  const btn = document.getElementById("edit-splits-apply-btn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Applying…`;
+
+  try {
+    await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/recombine`,
+      { filenames: toMerge });
+    toast(`Merged ${toMerge.length} file(s) back into parent`, "ok");
+    const data = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+    state.wsData = data;
+    openWorkspace(state.activeWs);
+  } catch (e) {
+    toast("Failed: " + e.message, "error");
+    btn.disabled = false;
+    btn.textContent = "Apply changes";
   }
 }
 
@@ -1701,10 +1840,12 @@ async function viewFile(filename) {
     ta.value = text;
     syncHighlight();
 
+    let _hlTimer = null;
     ta.addEventListener("input", () => {
-      syncHighlight();
       const dot = document.getElementById("unsaved-dot");
       dot.classList.toggle("visible", ta.value !== _modalOrig);
+      clearTimeout(_hlTimer);
+      _hlTimer = setTimeout(syncHighlight, 150);
     });
 
     ta.addEventListener("keydown", e => {
@@ -1830,6 +1971,12 @@ function closeFindBar() {
   _editorTa()?.focus();
 }
 
+let _findTimer = null;
+function _runFindDebounced() {
+  clearTimeout(_findTimer);
+  _findTimer = setTimeout(runFind, 200);
+}
+
 function runFind() {
   const inp = document.getElementById("find-input");
   _findQuery = inp?.value ?? "";
@@ -1879,14 +2026,14 @@ function _scrollToMatch() {
   if (!ta) return;
   const m = _findMatches[_findIdx];
   ta.setSelectionRange(m.start, m.end);
-  // Calculate approximate line position and scroll to it
-  const linesBefore = ta.value.slice(0, m.start).split("\n").length - 1;
-  const lineH = 12 * 1.6; // font-size * line-height
-  const area = _editorArea();
-  if (area) {
-    const targetY = linesBefore * lineH - area.clientHeight / 2;
+  requestAnimationFrame(() => {
+    const area = _editorArea();
+    if (!area) return;
+    const linesBefore = ta.value.slice(0, m.start).split("\n").length - 1;
+    const lineH = 12 * 1.6; // font-size * line-height
+    const targetY = 16 + linesBefore * lineH - area.clientHeight / 2;
     area.scrollTop = Math.max(0, targetY);
-  }
+  });
 }
 
 function _escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
