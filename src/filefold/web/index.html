@@ -1881,7 +1881,9 @@ const _LARGE_FILE_LINES = 5000;
 function _syncGutter(text) {
   const gt = _editorGutter();
   if (!gt) return;
-  gt.textContent = text.split("\n").map((_, i) => i + 1).join("\n");
+  // Count lines without splitting the full string (avoids allocating N substrings)
+  const lineCount = (text.match(/\n/g) || []).length + 1;
+  gt.textContent = Array.from({length: lineCount}, (_, i) => i + 1).join("\n");
 }
 
 function syncHighlight() {
@@ -1889,10 +1891,23 @@ function syncHighlight() {
   const hl = _editorHL();
   if (!ta || !hl) return;
   const text = ta.value;
-  const lines = text.split("\n");
-  hl.innerHTML = lines.length > _LARGE_FILE_LINES
-    ? _buildMatchOnlyHTML(text, _findMatches, _findIdx)
-    : buildHighlightHTML(text, _findQuery, _findMatches, _findIdx);
+  const lineCount = (text.match(/\n/g) || []).length + 1;
+  const isLarge = lineCount > _LARGE_FILE_LINES;
+
+  if (isLarge) {
+    // Textarea shows its own text; pre is used only for scroll height + match backgrounds
+    ta.style.color = "var(--text)";
+    if (_findMatches.length) {
+      // Match span backgrounds show through the transparent-text textarea overlay
+      hl.innerHTML = _buildMatchOnlyHTML(text, _findMatches, _findIdx);
+    } else {
+      // Blank newlines establish correct scroll height without any visible content in pre
+      hl.textContent = "\n".repeat(lineCount - 1);
+    }
+  } else {
+    ta.style.color = "";  // CSS rule keeps it transparent; pre provides visible text
+    hl.innerHTML = buildHighlightHTML(text, _findQuery, _findMatches, _findIdx);
+  }
 }
 
 function _escHtml(s) {
@@ -2140,6 +2155,7 @@ function closeEditor() {
   if (ta && ta.value !== _modalOrig) {
     if (!confirm("Close without saving?")) return;
   }
+  if (ta) ta.style.color = "";  // Reset large-file color override
   _modalFile = null; _modalOrig = null;
   _findQuery = ""; _findMatches = []; _findIdx = 0;
   const fi = document.getElementById("find-input");
