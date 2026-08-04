@@ -1334,18 +1334,17 @@ async function applyEditSplits() {
   const toMerge = [];
   const toExtract = [];
 
-  Object.keys(state.subOptions).filter(c => c !== "unknown").forEach(cat => {
-    const cb = document.getElementById(`ws-sel-${cat}`);
-    if (!cb) return;
+  // Query all rendered checkboxes directly — iterating state.subOptions misses
+  // categories that exist in data.selections but have no sub-options defined.
+  document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
+    const cat = cb.id.slice("ws-sel-".length);
     const isChecked = cb.checked;
     const wasExtracted = !!existingByCategory[cat];
 
     if (wasExtracted && !isChecked) {
-      // Fold child (and any sub-children) back into parent
       toMerge.push(existingByCategory[cat].filename);
       existingByCategory[cat].sub_selections.forEach(ss => toMerge.push(ss.filename));
     } else if (!wasExtracted && isChecked) {
-      // Extract new split from mother file
       const fn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || `${cat}.inp`;
       const subOpts = state.subOptions[cat] ?? [];
       const sub_selections = subOpts
@@ -1915,18 +1914,28 @@ function _escHtml(s) {
 }
 
 function _buildMatchOnlyHTML(text, matches, curIdx) {
-  // For large files: use newline characters as vertical spacers so match spans
-  // appear at the correct line position without rendering the full file text.
+  // For large files: position spans using newlines for vertical placement and
+  // the line-prefix text (chars from line start to match) for horizontal placement.
+  // Without the prefix, every span lands at column 0 of the correct line.
   const totalNl = (text.match(/\n/g) || []).length;
   if (!matches.length) {
-    // Blank lines establish correct scroll height; textarea shows actual content
     return totalNl > 0 ? "\n".repeat(totalNl) : " ";
   }
   const parts = [];
   let pos = 0;
   matches.forEach((m, i) => {
-    const nlInGap = (text.slice(pos, m.start).match(/\n/g) || []).length;
-    if (nlInGap > 0) parts.push("\n".repeat(nlInGap));
+    const gap = text.slice(pos, m.start);
+    const lastNl = gap.lastIndexOf("\n");
+    if (lastNl >= 0) {
+      // Vertical: newlines to reach the right line
+      parts.push("\n".repeat((gap.match(/\n/g) || []).length));
+      // Horizontal: characters on this line before the match
+      const linePrefix = gap.slice(lastNl + 1);
+      if (linePrefix) parts.push(_escHtml(linePrefix));
+    } else {
+      // Same line as previous match — include all gap characters
+      if (gap) parts.push(_escHtml(gap));
+    }
     parts.push(`<span class="${i === curIdx ? "hl-match-cur" : "hl-match"}">${_escHtml(text.slice(m.start, m.end))}</span>`);
     pos = m.end;
   });
