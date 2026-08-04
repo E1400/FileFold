@@ -230,10 +230,14 @@ async def extract_splits(name: str, request: Request):
     ]
     blocks = parse(mother_path)
     result = split_with_includes(blocks, mother_path, ws_dir, new_sels)
-    ws.selections.extend(new_sels)
+    # Only add a selection to the manifest when blocks were actually written for it.
+    # If the category was already extracted (mother has *INCLUDE), compute_split finds
+    # no blocks and writes nothing — adding it again would create a stale duplicate entry.
+    extracted_files = {child.filename for child in result.children}
+    ws.selections.extend(s for s in new_sels if s.filename in extracted_files)
     ws._record_result(result)
     ws._save()
-    return {"extracted": [s["filename"] for s in sel_data], "workspace": name}
+    return {"extracted": sorted(extracted_files), "workspace": name}
 
 
 @app.post("/api/workspaces/{name}/resplit-child")

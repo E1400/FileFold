@@ -1234,11 +1234,14 @@ async function deleteWorkspace() {
 // Workspace detail tabs + Splits tab
 // ═══════════════════════════════════════════════════════════════════════════════
 function switchDetailTab(tab) {
+  const wasAlreadyActive = document.getElementById(`tab-btn-${tab}`)?.classList.contains("active");
   ["files", "splits"].forEach(t => {
     document.getElementById(`tab-content-${t}`).style.display = t === tab ? "" : "none";
     document.getElementById(`tab-btn-${t}`).classList.toggle("active", t === tab);
   });
-  if (tab === "splits" && state.wsData) renderSplitsTab(state.wsData);
+  // Only render on first open or when switching from another tab — never when the tab is already
+  // active, which would wipe the user's unsaved checkbox changes.
+  if (tab === "splits" && state.wsData && !wasAlreadyActive) renderSplitsTab(state.wsData);
 }
 
 function renderSplitsTab(data) {
@@ -1248,7 +1251,7 @@ function renderSplitsTab(data) {
   // Use file_records (data.files) as ground truth for which sub-splits actually exist on disk.
   // selections may list sub-splits that were never created (stale state from a failed extract).
   const actualGrandchildren = new Set(
-    (data.files || []).filter(f => f.role === "grandchild").map(f => f.filename)
+    (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
   );
 
   // All known categories from sub-options, plus any already-extracted ones not in subOptions
@@ -1371,9 +1374,10 @@ async function applyEditSplits() {
       const existingSel = existingByCategory[cat];
       const existingSubMap = {};
       existingSel.sub_selections.forEach(ss => { existingSubMap[ss.sub_category] = ss; });
-      // Use actual file_records (not selections) to determine current extracted state
+      // Use actual file_records (not selections) to determine current extracted state.
+      // Also check f.exists to exclude stale records whose file was deleted.
       const actualGrandchildren = new Set(
-        (data.files || []).filter(f => f.role === "grandchild").map(f => f.filename)
+        (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
       );
       let subChanged = false;
       const newSubSelections = [];
@@ -1403,6 +1407,11 @@ async function applyEditSplits() {
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span> Applying…`;
 
+  const parts = [];
+  if (toMerge.length)   parts.push(`${toMerge.length} merged back`);
+  if (toExtract.length) parts.push(`${toExtract.length} extracted`);
+  if (toResplit.length) parts.push(`${toResplit.length} re-split`);
+
   try {
     if (toMerge.length)
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/recombine`, { filenames: toMerge });
@@ -1410,20 +1419,18 @@ async function applyEditSplits() {
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/extract`, { selections: toExtract });
     for (const r of toResplit)
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/resplit-child`, r);
-
-    const parts = [];
-    if (toMerge.length)   parts.push(`${toMerge.length} merged back`);
-    if (toExtract.length) parts.push(`${toExtract.length} extracted`);
-    if (toResplit.length) parts.push(`${toResplit.length} re-split`);
     toast(parts.join(", "), "ok");
-
-    const freshData = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
-    state.wsData = freshData;
-    renderDetail(freshData);
-    renderSplitsTab(freshData);
   } catch (e) {
     toast("Failed: " + e.message, "error");
   } finally {
+    // Always refresh from server so the UI reflects actual workspace state, even after a
+    // partial failure (e.g. recombine succeeded but resplit failed mid-way).
+    try {
+      const freshData = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+      state.wsData = freshData;
+      renderDetail(freshData);
+      renderSplitsTab(freshData);
+    } catch (_) {}
     btn.disabled = false;
     btn.textContent = "Apply changes";
   }
