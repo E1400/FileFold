@@ -1333,6 +1333,7 @@ async function applyEditSplits() {
 
   const toMerge = [];
   const toExtract = [];
+  const toResplit = [];  // sub-split changes within already-extracted categories
 
   // Query all rendered checkboxes directly — iterating state.subOptions misses
   // categories that exist in data.selections but have no sub-options defined.
@@ -1342,9 +1343,11 @@ async function applyEditSplits() {
     const wasExtracted = !!existingByCategory[cat];
 
     if (wasExtracted && !isChecked) {
+      // Fold the whole category (and any sub-splits) back into parent
       toMerge.push(existingByCategory[cat].filename);
       existingByCategory[cat].sub_selections.forEach(ss => toMerge.push(ss.filename));
     } else if (!wasExtracted && isChecked) {
+      // Extract a brand-new category from the mother file
       const fn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || `${cat}.inp`;
       const subOpts = state.subOptions[cat] ?? [];
       const sub_selections = subOpts
@@ -1354,10 +1357,32 @@ async function applyEditSplits() {
           filename: document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim() || opt.default_filename,
         }));
       toExtract.push({ category: cat, filename: fn, sub_selections });
+    } else if (wasExtracted && isChecked) {
+      // Category stays extracted — check whether any sub-splits changed
+      const subOpts = state.subOptions[cat] ?? [];
+      if (!subOpts.length) return;
+      const existingSel = existingByCategory[cat];
+      const existingSubMap = {};
+      existingSel.sub_selections.forEach(ss => { existingSubMap[ss.sub_category] = ss; });
+      let subChanged = false;
+      const newSubSelections = [];
+      subOpts.forEach(opt => {
+        const isSubChecked = !!(document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked);
+        const wasSubExtracted = !!existingSubMap[opt.sub_category];
+        if (isSubChecked !== wasSubExtracted) subChanged = true;
+        if (isSubChecked) {
+          newSubSelections.push({
+            sub_category: opt.sub_category,
+            filename: document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim()
+                      || opt.default_filename,
+          });
+        }
+      });
+      if (subChanged) toResplit.push({ category: cat, sub_selections: newSubSelections });
     }
   });
 
-  if (!toMerge.length && !toExtract.length) {
+  if (!toMerge.length && !toExtract.length && !toResplit.length) {
     toast("No changes to apply", "warn");
     return;
   }
@@ -1371,10 +1396,13 @@ async function applyEditSplits() {
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/recombine`, { filenames: toMerge });
     if (toExtract.length)
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/extract`, { selections: toExtract });
+    for (const r of toResplit)
+      await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/resplit-child`, r);
 
     const parts = [];
     if (toMerge.length)   parts.push(`${toMerge.length} merged back`);
     if (toExtract.length) parts.push(`${toExtract.length} extracted`);
+    if (toResplit.length) parts.push(`${toResplit.length} re-split`);
     toast(parts.join(", "), "ok");
 
     const freshData = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);

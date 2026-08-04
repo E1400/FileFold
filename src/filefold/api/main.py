@@ -236,6 +236,27 @@ async def extract_splits(name: str, request: Request):
     return {"extracted": [s["filename"] for s in sel_data], "workspace": name}
 
 
+@app.post("/api/workspaces/{name}/resplit-child")
+async def resplit_child(name: str, request: Request):
+    """Modify sub-splits for an already-extracted category (recombine then re-extract)."""
+    body = await request.json()
+    category_str = body.get("category", "").strip()
+    sub_sel_data = body.get("sub_selections", [])
+    if not category_str:
+        raise HTTPException(400, "category is required")
+    ws_dir = workspace_path(name)
+    try:
+        ws = Workspace.load(ws_dir)
+    except FileNotFoundError:
+        raise HTTPException(404, f"Workspace '{name}' not found")
+    new_sub = [SubSplitSelection(ss["sub_category"], ss["filename"]) for ss in sub_sel_data]
+    try:
+        ws.resplit_child(category_str, new_sub)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(400, str(e))
+    return {"category": category_str, "sub_extracted": [ss["filename"] for ss in sub_sel_data], "workspace": name}
+
+
 @app.post("/api/workspaces/{name}/recombine")
 async def recombine_files(name: str, request: Request):
     """Fold listed child/sub-child files back into their parent (reverse of split)."""

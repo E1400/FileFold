@@ -367,6 +367,63 @@ class Workspace:
         self._save()
 
     # ------------------------------------------------------------------
+    # Resplit child
+    # ------------------------------------------------------------------
+
+    def resplit_child(self, category_str: str, new_sub: list[SubSplitSelection]) -> None:
+        """Modify sub-splits for an already-extracted category.
+
+        Steps:
+        1. Fold any existing sub-split files back into the child (recombine).
+        2. Re-parse the now-clean child file and extract the desired sub-splits.
+        """
+        existing_sel = next((s for s in self.selections if s.category.value == category_str), None)
+        if not existing_sel:
+            raise ValueError(f"Category '{category_str}' is not yet extracted")
+
+        # Recombine only the sub-splits that actually exist on disk
+        to_fold = [ss.filename for ss in existing_sel.sub_selections
+                   if (self.path / ss.filename).exists()]
+        if to_fold:
+            self.recombine(to_fold)
+            # recombine clears existing_sel.sub_selections and saves; re-find the selection
+            existing_sel = next((s for s in self.selections if s.category.value == category_str), None)
+
+        child_path = self.path / existing_sel.filename
+        if not child_path.exists():
+            raise FileNotFoundError(f"Child file '{existing_sel.filename}' not found")
+
+        if new_sub:
+            temp_sel = SplitSelection(existing_sel.category, existing_sel.filename, list(new_sub))
+            blocks = parse(child_path)
+            _, child_contents = compute_split(blocks, [temp_sel])
+
+            for filename, content in child_contents.items():
+                (self.path / filename).write_text(content, encoding="utf-8", errors="surrogateescape")
+
+            existing_sel.sub_selections = list(new_sub)
+
+            for filename, content in child_contents.items():
+                sha = _sha256(content)
+                if filename == existing_sel.filename:
+                    old_rec = self.file_records.get(filename)
+                    self.file_records[filename] = FileRecord(
+                        sha256=sha,
+                        role=old_rec.role if old_rec else "child",
+                        category=old_rec.category if old_rec else category_str,
+                        parent=old_rec.parent if old_rec else None,
+                    )
+                else:
+                    self.file_records[filename] = FileRecord(
+                        sha256=sha,
+                        role="grandchild",
+                        category=category_str,
+                        parent=existing_sel.filename,
+                    )
+
+        self._save()
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
