@@ -1245,6 +1245,12 @@ function renderSplitsTab(data) {
   const existingByCategory = {};
   data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
 
+  // Use file_records (data.files) as ground truth for which sub-splits actually exist on disk.
+  // selections may list sub-splits that were never created (stale state from a failed extract).
+  const actualGrandchildren = new Set(
+    (data.files || []).filter(f => f.role === "grandchild").map(f => f.filename)
+  );
+
   // All known categories from sub-options, plus any already-extracted ones not in subOptions
   const allCats = Object.keys(state.subOptions).filter(c => c !== "unknown");
   data.selections.forEach(sel => { if (!allCats.includes(sel.category)) allCats.push(sel.category); });
@@ -1268,8 +1274,9 @@ function renderSplitsTab(data) {
       <div class="sub-options${isExtracted ? " visible" : ""}" id="ws-sub-opts-${cat}">
         <div class="text-muted text-sm" style="margin-bottom:4px">Split into sub-files:</div>
         ${subOpts.map(opt => {
-          const subChecked = !!existingSubs[opt.sub_category];
           const subFn = existingSubs[opt.sub_category] || opt.default_filename;
+          // A sub-split is checked only if its file actually exists in file_records
+          const subChecked = !!(existingSubs[opt.sub_category] && actualGrandchildren.has(existingSubs[opt.sub_category]));
           return `<div class="sub-option-row">
             <label>
               <input type="checkbox" id="ws-sub-${cat}-${opt.sub_category}"
@@ -1364,11 +1371,16 @@ async function applyEditSplits() {
       const existingSel = existingByCategory[cat];
       const existingSubMap = {};
       existingSel.sub_selections.forEach(ss => { existingSubMap[ss.sub_category] = ss; });
+      // Use actual file_records (not selections) to determine current extracted state
+      const actualGrandchildren = new Set(
+        (data.files || []).filter(f => f.role === "grandchild").map(f => f.filename)
+      );
       let subChanged = false;
       const newSubSelections = [];
       subOpts.forEach(opt => {
         const isSubChecked = !!(document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked);
-        const wasSubExtracted = !!existingSubMap[opt.sub_category];
+        const wasSubExtracted = !!(existingSubMap[opt.sub_category] &&
+            actualGrandchildren.has(existingSubMap[opt.sub_category].filename));
         if (isSubChecked !== wasSubExtracted) subChanged = true;
         if (isSubChecked) {
           newSubSelections.push({
