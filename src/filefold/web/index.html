@@ -1141,11 +1141,17 @@ async function openWorkspace(name) {
   document.getElementById("detail-title").textContent = name;
   document.getElementById("detail-meta").textContent = "Loading…";
   document.getElementById("detail-files").innerHTML = "";
+  // Clear stale splits content from any previously-opened workspace.
+  document.getElementById("ws-split-config").innerHTML = "";
 
   try {
     const data = await api("GET", `/api/workspaces/${encodeURIComponent(name)}`);
     state.wsData = data;
     renderDetail(data);
+    // If the Splits tab is already visible, populate it now for the new workspace.
+    if (document.getElementById("tab-btn-splits")?.classList.contains("active")) {
+      renderSplitsTab(data);
+    }
   } catch (e) {
     toast("Failed to load workspace: " + e.message, "error");
   }
@@ -1239,9 +1245,12 @@ function switchDetailTab(tab) {
     document.getElementById(`tab-content-${t}`).style.display = t === tab ? "" : "none";
     document.getElementById(`tab-btn-${t}`).classList.toggle("active", t === tab);
   });
-  // Only render on first open or when switching from another tab — never when the tab is already
-  // active, which would wipe the user's unsaved checkbox changes.
-  if (tab === "splits" && state.wsData && !wasAlreadyActive) renderSplitsTab(state.wsData);
+  if (tab === "splits" && state.wsData) {
+    const grid = document.getElementById("ws-split-config");
+    // Re-render when switching from another tab, or when the grid was cleared (workspace changed).
+    // Skip re-render only when already on Splits with content — that would wipe unsaved checkbox changes.
+    if (!wasAlreadyActive || !grid.children.length) renderSplitsTab(state.wsData);
+  }
 }
 
 function renderSplitsTab(data) {
