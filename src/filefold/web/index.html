@@ -1278,7 +1278,10 @@ function renderSplitsTab(data) {
     const existing = existingByCategory[cat];
     const isExtracted = !!existing;
     const defaultFn = isExtracted ? existing.filename : `${cat}.inp`;
-    const subOpts = state.subOptions[cat] ?? [];
+    const availSubs = data.available_sub_cats?.[cat];
+    const subOpts = (state.subOptions[cat] ?? []).filter(
+      opt => !availSubs || availSubs.includes(opt.sub_category)
+    );
     const existingSubs = {};
     if (existing) existing.sub_selections.forEach(ss => { existingSubs[ss.sub_category] = ss.filename; });
 

@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
-from filefold.core.keywords import CATEGORY_SUB_OPTIONS, Category
+from filefold.core.keywords import CATEGORY_SUB_OPTIONS, CATEGORY_SUB_KEYWORDS, Category
 from filefold.core.parser import parse
 from filefold.core.splitter import SplitSelection, SubSplitSelection, split_with_includes
 from filefold.core.workspace import Workspace
@@ -154,18 +154,51 @@ async def get_workspace(name: str):
 
     # Compute which categories actually exist in this workspace:
     # (a) categories of already-extracted child files, from file_records
-    # (b) categories still present as blocks in the current mother file
+    # (b) top-level categories still present in the current mother file
+    # Only top-level blocks matter — blocks nested inside *STEP/*PART containers
+    # (e.g. *BOUNDARY inside *STEP) cannot be independently extracted.
     _SKIP = {"unknown", "model"}
     available_cats: set[str] = set()
     for rec in ws.file_records.values():
         if rec.role == "child" and rec.category and rec.category not in _SKIP:
             available_cats.add(rec.category)
     mother_path = ws_dir / ws.source_name
-    if mother_path.exists():
-        for b in parse(mother_path):
-            v = b.category.value
-            if v not in _SKIP:
-                available_cats.add(v)
+    mother_blocks = parse(mother_path) if mother_path.exists() else []
+    for b in mother_blocks:
+        v = b.category.value
+        if v not in _SKIP:
+            available_cats.add(v)
+
+    # Compute which sub-categories exist per category.
+    # If the category is already extracted, scan the child file (handles *PART nesting).
+    # If still in the mother, scan only the top-level blocks of that category.
+    def _scan_sub_cats(blocks, kw_map, found):
+        for b in blocks:
+            sc = kw_map.get(b.keyword)
+            if sc:
+                found.add(sc)
+            _scan_sub_cats(b.children, kw_map, found)
+
+    available_sub_cats: dict[str, list[str]] = {}
+    sel_by_cat = {s.category.value: s for s in ws.selections}
+    for cat_str in available_cats:
+        try:
+            cat_enum = Category(cat_str)
+        except ValueError:
+            continue
+        kw_map = CATEGORY_SUB_KEYWORDS.get(cat_enum)
+        if not kw_map:
+            continue
+        found: set[str] = set()
+        sel = sel_by_cat.get(cat_str)
+        if sel and (ws_dir / sel.filename).exists():
+            _scan_sub_cats(parse(ws_dir / sel.filename), kw_map, found)
+        else:
+            for b in mother_blocks:
+                if b.category == cat_enum:
+                    _scan_sub_cats([b], kw_map, found)
+        if found:
+            available_sub_cats[cat_str] = sorted(found)
 
     return {
         "name": ws.name,
@@ -181,6 +214,7 @@ async def get_workspace(name: str):
         "updated_at": ws.updated_at,
         "files": files,
         "available_categories": sorted(available_cats),
+        "available_sub_cats": available_sub_cats,
     }
 
 
