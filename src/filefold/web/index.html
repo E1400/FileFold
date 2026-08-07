@@ -1263,8 +1263,8 @@ function renderSplitsTab(data) {
     (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
   );
 
-  // All known categories from sub-options, plus any already-extracted ones not in subOptions
-  const allCats = Object.keys(state.subOptions).filter(c => c !== "unknown");
+  // Show every known category so recombining one doesn't make it vanish from the grid
+  const allCats = ["mesh", "material", "section", "step", "loads", "contact", "output", "model"];
   data.selections.forEach(sel => { if (!allCats.includes(sel.category)) allCats.push(sel.category); });
 
   const el = document.getElementById("ws-split-config");

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .block import Block, emit
 from .keywords import CATEGORY_SUB_KEYWORDS, Category
+from .parser import CONTAINER_KEYWORDS
 
 # Maps category -> output filename for non-STEP top-level blocks
 CATEGORY_FILES: dict[Category, str] = {
@@ -138,6 +139,34 @@ def compute_split(
     cat_inserted: set[Category] = set()       # categories already *INCLUDEd in mother
     sub_inserted: dict[str, set[str]] = {}    # parent_filename -> set of sub_cats inserted
 
+    def _route_sub(block: Block, sel: SplitSelection) -> None:
+        """Route one block into sel's child file or its sub-files.
+
+        Recurses into *PART/*ASSEMBLY containers so that NODE/ELEMENT blocks
+        nested inside a *PART scope are routed to the correct sub-split file.
+        The container header (*PART…) and footer (*END PART) stay in the
+        parent child file; only the inner keyword blocks are re-routed.
+        """
+        sub_map = {ss.sub_category: ss for ss in sel.sub_selections}
+        kw_map = CATEGORY_SUB_KEYWORDS.get(sel.category, {})
+        block_sub_cat = kw_map.get(block.keyword)
+
+        if block_sub_cat and block_sub_cat in sub_map:
+            ss = sub_map[block_sub_cat]
+            child_lines.setdefault(ss.filename, []).extend(emit(block))
+            parent_inserts = sub_inserted.setdefault(sel.filename, set())
+            if block_sub_cat not in parent_inserts:
+                child_lines.setdefault(sel.filename, []).append(_include_line(ss.filename))
+                parent_inserts.add(block_sub_cat)
+        elif block.keyword in CONTAINER_KEYWORDS and block.children:
+            # Container block (e.g. *PART): emit only its header line(s) to the child
+            # file, then recurse into its children so nested keyword blocks get routed.
+            child_lines.setdefault(sel.filename, []).extend(block.raw_lines)
+            for child in block.children:
+                _route_sub(child, sel)
+        else:
+            child_lines.setdefault(sel.filename, []).extend(emit(block))
+
     for block in blocks:
         cat = block.category
         if cat not in sel_map:
@@ -154,24 +183,8 @@ def compute_split(
         if not sel.sub_selections:
             # No sub-splits: block goes directly to the child file
             child_lines.setdefault(sel.filename, []).extend(emit(block))
-            continue
-
-        # Has sub-selections: route block to appropriate sub-child or keep in parent child
-        sub_map = {ss.sub_category: ss for ss in sel.sub_selections}
-        kw_map = CATEGORY_SUB_KEYWORDS.get(cat, {})
-        block_sub_cat = kw_map.get(block.keyword)
-
-        if block_sub_cat and block_sub_cat in sub_map:
-            ss = sub_map[block_sub_cat]
-            child_lines.setdefault(ss.filename, []).extend(emit(block))
-            # Insert *INCLUDE in parent child at first occurrence of this sub-category
-            parent_inserts = sub_inserted.setdefault(sel.filename, set())
-            if block_sub_cat not in parent_inserts:
-                child_lines.setdefault(sel.filename, []).append(_include_line(ss.filename))
-                parent_inserts.add(block_sub_cat)
         else:
-            # Block stays in parent child file (not selected for sub-splitting)
-            child_lines.setdefault(sel.filename, []).extend(emit(block))
+            _route_sub(block, sel)
 
     return "".join(mother_lines), {f: "".join(ls) for f, ls in child_lines.items() if ls}
 

@@ -468,8 +468,8 @@ class Workspace:
         if parent_path.exists():
             parent_text = parent_path.read_text(encoding="utf-8", errors="surrogateescape")
             parent_text = _re.sub(
-                r"(?i)(?<=\*INCLUDE\s*,\s*INPUT\s*=\s*)" + _re.escape(old_filename) + r"(?=[ \t]*$)",
-                new_filename,
+                r"(?i)(\*INCLUDE\s*,\s*INPUT\s*=\s*)" + _re.escape(old_filename) + r"([ \t]*)$",
+                lambda m: m.group(1) + new_filename + m.group(2),
                 parent_text,
                 flags=_re.MULTILINE,
             )
