@@ -1283,22 +1283,26 @@ function renderSplitsTab(data) {
     if (existing) existing.sub_selections.forEach(ss => { existingSubs[ss.sub_category] = ss.filename; });
 
     const subPanel = subOpts.length ? `
-      <div class="sub-options${isExtracted ? " visible" : ""}" id="ws-sub-opts-${cat}">
+      <div class="sub-options visible" id="ws-sub-opts-${cat}">
         <div class="text-muted text-sm" style="margin-bottom:4px">Split into sub-files:</div>
         ${subOpts.map(opt => {
           const subFn = existingSubs[opt.sub_category] || opt.default_filename;
-          // A sub-split is checked only if its file actually exists in file_records
+          // A sub-split is checked only if its file actually exists on disk (in file_records)
           const subChecked = !!(existingSubs[opt.sub_category] && actualGrandchildren.has(existingSubs[opt.sub_category]));
+          // Sub-options are interactive only when the parent category is extracted
+          const subDisabled = !isExtracted;
           return `<div class="sub-option-row">
             <label>
               <input type="checkbox" id="ws-sub-${cat}-${opt.sub_category}"
                      value="${opt.sub_category}" ${subChecked ? "checked" : ""}
+                     ${subDisabled ? "disabled" : ""}
                      onchange="wsToggleSubOption('${cat}','${opt.sub_category}')">
               ${esc(opt.label)}
             </label>
             <input type="text" id="ws-subfn-${cat}-${opt.sub_category}" value="${subFn}"
                    placeholder="${opt.default_filename}"
-                   ${subChecked ? "" : "disabled"} style="opacity:${subChecked ? "1" : ".4"}">
+                   ${!subChecked || subDisabled ? "disabled" : ""}
+                   style="opacity:${subChecked && !subDisabled ? "1" : ".4"}">
           </div>`;
         }).join("")}
       </div>` : "";
@@ -1326,12 +1330,21 @@ function wsToggleSplitRow(cat) {
   fnInput.disabled = !checked;
   fnInput.style.opacity = checked ? "1" : ".4";
   const subPanel = document.getElementById(`ws-sub-opts-${cat}`);
-  if (subPanel) {
-    subPanel.classList.toggle("visible", checked);
-    if (!checked) {
-      subPanel.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; });
-      subPanel.querySelectorAll("input[type=text]").forEach(inp => { inp.disabled = true; inp.style.opacity = ".4"; });
-    }
+  if (!subPanel) return;
+  if (!checked) {
+    // Parent unchecked: disable all sub-inputs (panel stays visible)
+    subPanel.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.disabled = true; });
+    subPanel.querySelectorAll("input[type=text]").forEach(inp => { inp.disabled = true; inp.style.opacity = ".4"; });
+  } else {
+    // Parent checked: enable sub-option checkboxes; text inputs follow their own checkbox
+    subPanel.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.disabled = false; });
+    subPanel.querySelectorAll("input[type=text]").forEach(inp => {
+      const subCat = inp.id.slice(`ws-subfn-${cat}-`.length);
+      const subCb = document.getElementById(`ws-sub-${cat}-${subCat}`);
+      const on = subCb ? subCb.checked : false;
+      inp.disabled = !on;
+      inp.style.opacity = on ? "1" : ".4";
+    });
   }
 }
 
@@ -1350,21 +1363,25 @@ async function applyEditSplits() {
   const existingByCategory = {};
   data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
 
-  const toMerge = [];
+  const toMerge   = [];
   const toExtract = [];
-  const toResplit = [];  // sub-split changes within already-extracted categories
+  const toResplit = [];  // sub-split checkbox/filename changes within extracted categories
+  const toRename  = [];  // simple file renames (no re-extraction needed)
 
-  // Query all rendered checkboxes directly — iterating state.subOptions misses
-  // categories that exist in data.selections but have no sub-options defined.
+  const actualGrandchildren = new Set(
+    (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
+  );
+
   document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
     const cat = cb.id.slice("ws-sel-".length);
     const isChecked = cb.checked;
     const wasExtracted = !!existingByCategory[cat];
 
     if (wasExtracted && !isChecked) {
-      // Fold the whole category (and any sub-splits) back into parent
+      // Fold the whole category (and any sub-splits) back into the mother
       toMerge.push(existingByCategory[cat].filename);
       existingByCategory[cat].sub_selections.forEach(ss => toMerge.push(ss.filename));
+
     } else if (!wasExtracted && isChecked) {
       // Extract a brand-new category from the mother file
       const fn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || `${cat}.inp`;
@@ -1376,38 +1393,45 @@ async function applyEditSplits() {
           filename: document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim() || opt.default_filename,
         }));
       toExtract.push({ category: cat, filename: fn, sub_selections });
+
     } else if (wasExtracted && isChecked) {
-      // Category stays extracted — check whether any sub-splits changed
-      const subOpts = state.subOptions[cat] ?? [];
-      if (!subOpts.length) return;
       const existingSel = existingByCategory[cat];
+
+      // Check if the parent child filename was renamed
+      const currentFn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || existingSel.filename;
+      if (currentFn !== existingSel.filename) {
+        toRename.push({ old_filename: existingSel.filename, new_filename: currentFn });
+      }
+
+      // Check sub-split checkbox and filename changes
+      const subOpts = state.subOptions[cat] ?? [];
+      if (!subOpts.length) return;  // no sub-options for this category
+
       const existingSubMap = {};
       existingSel.sub_selections.forEach(ss => { existingSubMap[ss.sub_category] = ss; });
-      // Use actual file_records (not selections) to determine current extracted state.
-      // Also check f.exists to exclude stale records whose file was deleted.
-      const actualGrandchildren = new Set(
-        (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
-      );
+
       let subChanged = false;
       const newSubSelections = [];
       subOpts.forEach(opt => {
         const isSubChecked = !!(document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked);
-        const wasSubExtracted = !!(existingSubMap[opt.sub_category] &&
-            actualGrandchildren.has(existingSubMap[opt.sub_category].filename));
-        if (isSubChecked !== wasSubExtracted) subChanged = true;
+        const existingEntry = existingSubMap[opt.sub_category];
+        const wasSubExtracted = !!(existingEntry && actualGrandchildren.has(existingEntry.filename));
+
+        // Detect both checkbox change AND filename change (for already-extracted sub-splits)
+        const currentSubFn = document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim()
+                             || (existingEntry?.filename ?? opt.default_filename);
+        const fnChanged = isSubChecked && wasSubExtracted && currentSubFn !== existingEntry?.filename;
+
+        if (isSubChecked !== wasSubExtracted || fnChanged) subChanged = true;
         if (isSubChecked) {
-          newSubSelections.push({
-            sub_category: opt.sub_category,
-            filename: document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim()
-                      || opt.default_filename,
-          });
+          newSubSelections.push({ sub_category: opt.sub_category, filename: currentSubFn });
         }
       });
       if (subChanged) toResplit.push({ category: cat, sub_selections: newSubSelections });
     }
   });
 
-  if (!toMerge.length && !toExtract.length && !toResplit.length) {
+  if (!toMerge.length && !toExtract.length && !toResplit.length && !toRename.length) {
     toast("No changes to apply", "warn");
     return;
   }
@@ -1420,6 +1444,7 @@ async function applyEditSplits() {
   if (toMerge.length)   parts.push(`${toMerge.length} merged back`);
   if (toExtract.length) parts.push(`${toExtract.length} extracted`);
   if (toResplit.length) parts.push(`${toResplit.length} re-split`);
+  if (toRename.length)  parts.push(`${toRename.length} renamed`);
 
   try {
     if (toMerge.length)
@@ -1428,6 +1453,8 @@ async function applyEditSplits() {
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/extract`, { selections: toExtract });
     for (const r of toResplit)
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/resplit-child`, r);
+    for (const r of toRename)
+      await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/rename-file`, r);
     toast(parts.join(", "), "ok");
   } catch (e) {
     toast("Failed: " + e.message, "error");

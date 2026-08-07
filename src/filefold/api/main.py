@@ -261,6 +261,28 @@ async def resplit_child(name: str, request: Request):
     return {"category": category_str, "sub_extracted": [ss["filename"] for ss in sub_sel_data], "workspace": name}
 
 
+@app.post("/api/workspaces/{name}/rename-file")
+async def rename_file(name: str, request: Request):
+    """Rename a child or grandchild file without re-extracting it."""
+    body = await request.json()
+    old_filename = body.get("old_filename", "").strip()
+    new_filename = body.get("new_filename", "").strip()
+    if not old_filename or not new_filename:
+        raise HTTPException(400, "old_filename and new_filename are required")
+    if old_filename == new_filename:
+        return {"renamed": old_filename, "workspace": name}
+    ws_dir = workspace_path(name)
+    try:
+        ws = Workspace.load(ws_dir)
+    except FileNotFoundError:
+        raise HTTPException(404, f"Workspace '{name}' not found")
+    try:
+        ws.rename_child(old_filename, new_filename)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(400, str(e))
+    return {"renamed": new_filename, "workspace": name}
+
+
 @app.post("/api/workspaces/{name}/recombine")
 async def recombine_files(name: str, request: Request):
     """Fold listed child/sub-child files back into their parent (reverse of split)."""

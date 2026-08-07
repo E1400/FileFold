@@ -398,10 +398,23 @@ class Workspace:
             blocks = parse(child_path)
             _, child_contents = compute_split(blocks, [temp_sel])
 
+            # child_contents maps filename -> content for every file that was produced.
+            # The parent child file (existing_sel.filename) is always present; the sub-split
+            # files only appear when matching keyword blocks were actually found.
+            requested_sub_files = {ss.filename for ss in new_sub}
+            created_sub_files = {f for f in child_contents if f in requested_sub_files}
+
+            if not created_sub_files:
+                raise ValueError(
+                    f"No sub-split blocks found in '{existing_sel.filename}'. "
+                    f"The file may use nested *PART containers or lack the expected keywords."
+                )
+
             for filename, content in child_contents.items():
                 (self.path / filename).write_text(content, encoding="utf-8", errors="surrogateescape")
 
-            existing_sel.sub_selections = list(new_sub)
+            # Only record sub-selections that were actually written to disk
+            existing_sel.sub_selections = [ss for ss in new_sub if ss.filename in created_sub_files]
 
             for filename, content in child_contents.items():
                 sha = _sha256(content)
@@ -420,6 +433,73 @@ class Workspace:
                         category=category_str,
                         parent=existing_sel.filename,
                     )
+
+        self._save()
+
+    # ------------------------------------------------------------------
+    # Rename child / grandchild
+    # ------------------------------------------------------------------
+
+    def rename_child(self, old_filename: str, new_filename: str) -> None:
+        """Rename a child or grandchild file in-place.
+
+        - Moves the file on disk.
+        - Updates the *INCLUDE line in the parent file.
+        - Updates selections, sub_selections, and file_records in the manifest.
+        """
+        rec = self.file_records.get(old_filename)
+        if not rec:
+            raise ValueError(f"File '{old_filename}' is not tracked in this workspace")
+
+        old_path = self.path / old_filename
+        new_path = self.path / new_filename
+
+        if not old_path.exists():
+            raise FileNotFoundError(f"File '{old_filename}' not found on disk")
+        if new_path.exists():
+            raise ValueError(f"Target filename '{new_filename}' already exists")
+
+        # Move the file
+        old_path.rename(new_path)
+
+        # Update the *INCLUDE line in the parent file
+        parent_fname = rec.parent if rec.role == "grandchild" else self.source_name
+        parent_path = self.path / parent_fname
+        if parent_path.exists():
+            parent_text = parent_path.read_text(encoding="utf-8", errors="surrogateescape")
+            parent_text = _re.sub(
+                r"(?i)(?<=\*INCLUDE\s*,\s*INPUT\s*=\s*)" + _re.escape(old_filename) + r"(?=[ \t]*$)",
+                new_filename,
+                parent_text,
+                flags=_re.MULTILINE,
+            )
+            parent_path.write_text(parent_text, encoding="utf-8", errors="surrogateescape")
+
+        # Update file_records
+        self.file_records.pop(old_filename)
+        self.file_records[new_filename] = FileRecord(
+            sha256=rec.sha256,
+            role=rec.role,
+            category=rec.category,
+            parent=rec.parent,
+        )
+
+        # Update any grandchildren that reference old_filename as their parent
+        if rec.role == "child":
+            for r in self.file_records.values():
+                if r.parent == old_filename:
+                    r.parent = new_filename
+
+        # Update selections / sub_selections
+        if rec.role == "child":
+            for sel in self.selections:
+                if sel.filename == old_filename:
+                    sel.filename = new_filename
+        elif rec.role == "grandchild":
+            for sel in self.selections:
+                for ss in sel.sub_selections:
+                    if ss.filename == old_filename:
+                        ss.filename = new_filename
 
         self._save()
 
