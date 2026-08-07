@@ -1311,12 +1311,14 @@ function renderSplitsTab(data) {
       </div>` : "";
 
     return `<div class="split-row${isExtracted ? " selected" : ""}" id="ws-row-${cat}">
-      <label>
+      <div class="split-row-header">
         <input type="checkbox" id="ws-sel-${cat}" ${isExtracted ? "checked" : ""}
                onchange="wsToggleSplitRow('${cat}')">
-        <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
-        ${isExtracted ? `<span class="badge badge-accent" style="font-size:10px">extracted</span>` : ""}
-      </label>
+        <label for="ws-sel-${cat}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
+          <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
+          ${isExtracted ? `<span class="badge badge-accent" style="font-size:10px">extracted</span>` : ""}
+        </label>
+      </div>
       <input type="text" id="ws-fn-${cat}" value="${defaultFn}" placeholder="${cat}.inp"
              style="opacity:${isExtracted ? "1" : ".4"}" ${isExtracted ? "" : "disabled"}>
       <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
@@ -1388,7 +1390,10 @@ async function applyEditSplits() {
     } else if (!wasExtracted && isChecked) {
       // Extract a brand-new category from the mother file
       const fn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || `${cat}.inp`;
-      const subOpts = state.subOptions[cat] ?? [];
+      const availSubs = data.available_sub_cats?.[cat];
+      const subOpts = (state.subOptions[cat] ?? []).filter(
+        opt => !availSubs || availSubs.includes(opt.sub_category)
+      );
       const sub_selections = subOpts
         .filter(opt => document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked)
         .map(opt => ({
@@ -1407,7 +1412,10 @@ async function applyEditSplits() {
       }
 
       // Check sub-split checkbox and filename changes
-      const subOpts = state.subOptions[cat] ?? [];
+      const availSubs = data.available_sub_cats?.[cat];
+      const subOpts = (state.subOptions[cat] ?? []).filter(
+        opt => !availSubs || availSubs.includes(opt.sub_category)
+      );
       if (!subOpts.length) return;  // no sub-options for this category
 
       const existingSubMap = {};
