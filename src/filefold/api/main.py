@@ -152,6 +152,24 @@ async def get_workspace(name: str):
             "line_count": line_count,
         })
 
+    # Compute which categories actually exist in this workspace:
+    # (a) categories of already-extracted child files, from file_records
+    # (b) categories still present as blocks in the current mother file
+    _SKIP = {"unknown", "model"}
+    available_cats: set[str] = set()
+    for rec in ws.file_records.values():
+        if rec.role == "child" and rec.category and rec.category not in _SKIP:
+            available_cats.add(rec.category)
+    mother_path = ws_dir / ws.source_name
+    if mother_path.exists():
+        def _collect_cats(block_list):
+            for b in block_list:
+                v = b.category.value
+                if v not in _SKIP:
+                    available_cats.add(v)
+                _collect_cats(b.children)
+        _collect_cats(parse(mother_path))
+
     return {
         "name": ws.name,
         "source_name": ws.source_name,
@@ -165,6 +183,7 @@ async def get_workspace(name: str):
         ],
         "updated_at": ws.updated_at,
         "files": files,
+        "available_categories": sorted(available_cats),
     }
 
 
