@@ -162,13 +162,10 @@ async def get_workspace(name: str):
             available_cats.add(rec.category)
     mother_path = ws_dir / ws.source_name
     if mother_path.exists():
-        def _collect_cats(block_list):
-            for b in block_list:
-                v = b.category.value
-                if v not in _SKIP:
-                    available_cats.add(v)
-                _collect_cats(b.children)
-        _collect_cats(parse(mother_path))
+        for b in parse(mother_path):
+            v = b.category.value
+            if v not in _SKIP:
+                available_cats.add(v)
 
     return {
         "name": ws.name,
