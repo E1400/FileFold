@@ -193,6 +193,14 @@ async def get_workspace(name: str):
         sel = sel_by_cat.get(cat_str)
         if sel and (ws_dir / sel.filename).exists():
             _scan_sub_cats(parse(ws_dir / sel.filename), kw_map, found)
+            # A sub-category that has already been extracted no longer appears in
+            # the child file (its blocks live in the grandchild), so the scan above
+            # cannot see it. Seed it from the recorded sub-selections — same rule
+            # as case (a) for available_cats — otherwise the UI drops the row and
+            # the user can neither uncheck it nor keep it across an apply.
+            for ss in sel.sub_selections:
+                if (ws_dir / ss.filename).exists():
+                    found.add(ss.sub_category)
         else:
             for b in mother_blocks:
                 if b.category == cat_enum:
