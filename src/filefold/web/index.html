@@ -304,7 +304,6 @@ body {
   border: 1px solid transparent;
 }
 .split-row.selected { border-color: var(--accent); }
-.split-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 .sub-options {
   display: none;
   grid-column: 1 / -1;
@@ -1295,13 +1294,12 @@ function renderSplitsTab(data) {
           // Sub-options are interactive only when the parent category is extracted
           const subDisabled = !isExtracted;
           return `<div class="sub-option-row">
-            <label>
-              <input type="checkbox" id="ws-sub-${cat}-${opt.sub_category}"
-                     value="${opt.sub_category}" ${subChecked ? "checked" : ""}
-                     ${subDisabled ? "disabled" : ""}
-                     onchange="wsToggleSubOption('${cat}','${opt.sub_category}')">
-              ${esc(opt.label)}
-            </label>
+            <input type="checkbox" id="ws-sub-${cat}-${opt.sub_category}"
+                   value="${opt.sub_category}" ${subChecked ? "checked" : ""}
+                   ${subDisabled ? "disabled" : ""}
+                   onchange="wsToggleSubOption('${cat}','${opt.sub_category}')">
+            <label for="ws-sub-${cat}-${opt.sub_category}"
+                   style="cursor:pointer;user-select:none">${esc(opt.label)}</label>
             <input type="text" id="ws-subfn-${cat}-${opt.sub_category}" value="${subFn}"
                    placeholder="${opt.default_filename}"
                    ${!subChecked || subDisabled ? "disabled" : ""}
