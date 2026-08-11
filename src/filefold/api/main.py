@@ -7,16 +7,55 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
 from filefold.core.keywords import CATEGORY_SUB_OPTIONS, CATEGORY_SUB_KEYWORDS, Category
 from filefold.core.parser import parse
 from filefold.core.splitter import SplitSelection, SubSplitSelection, split_with_includes
 from filefold.core.workspace import Workspace
 
-from .server import WORKSPACE_BASE, list_workspaces, workspace_path
+from .server import UnsafeName, WORKSPACE_BASE, list_workspaces, safe_segment, workspace_path
 
 app = FastAPI(title="FileFold", version="0.1.0")
+
+
+@app.exception_handler(UnsafeName)
+async def _unsafe_name_handler(request: Request, exc: UnsafeName) -> JSONResponse:
+    """A rejected name is a client error, not a crash."""
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+def _validate_selection_filenames(sel_data: list[dict]) -> None:
+    """Reject traversal in every filename a selection payload can carry.
+
+    Selections nest sub-selections, and both levels name files that get written
+    into the workspace directory.
+    """
+    seen: set[str] = set()
+    for s in sel_data:
+        fn = safe_segment(s.get("filename", ""), "filename")
+        if fn in seen:
+            raise UnsafeName(f"Duplicate filename in selections: {fn!r}")
+        seen.add(fn)
+        for ss in s.get("sub_selections", []):
+            sub_fn = safe_segment(ss.get("filename", ""), "filename")
+            if sub_fn in seen:
+                raise UnsafeName(f"Duplicate filename in selections: {sub_fn!r}")
+            seen.add(sub_fn)
+
+
+def _parse_category(value: str) -> Category:
+    """Turn a client-supplied category string into a Category, or a 400."""
+    try:
+        return Category(value)
+    except ValueError:
+        raise HTTPException(400, f"Unknown category: {value!r}")
+
+# Categories that must never be extracted into their own file.
+# "model" owns *INCLUDE (see CATEGORY_MAP), so extracting it pulls FileFold's own
+# generated include lines out of the mother and re-parents every other child under
+# model.inp — which also reorders the deck. "unknown" has no meaningful boundary.
+NON_EXTRACTABLE = {"unknown", "model"}
 
 # Serve the web frontend
 _WEB_DIR = Path(__file__).parent.parent / "web"
@@ -88,15 +127,23 @@ async def create_workspace(
     """Create a new workspace from an uploaded mother file."""
     import json, shutil, tempfile
 
-    ws_name = name.strip() or Path(file.filename or "model").stem
+    ws_name = safe_segment(name.strip() or Path(file.filename or "model").stem, "workspace name")
     ws_dir = workspace_path(ws_name)
     if ws_dir.exists():
         raise HTTPException(400, f"Workspace '{ws_name}' already exists")
 
     sel_data = json.loads(selections) if selections else []
+    blocked = sorted({s.get("category") for s in sel_data} & NON_EXTRACTABLE)
+    if blocked:
+        raise HTTPException(
+            400,
+            f"Category '{blocked[0]}' cannot be extracted into its own file. "
+            f"It owns the *INCLUDE directives that hold the workspace together.",
+        )
+    _validate_selection_filenames(sel_data)
     sel_list = [
         SplitSelection(
-            Category(s["category"]),
+            _parse_category(s["category"]),
             s["filename"],
             sub_selections=[
                 SubSplitSelection(ss["sub_category"], ss["filename"])
@@ -157,7 +204,7 @@ async def get_workspace(name: str):
     # (b) top-level categories still present in the current mother file
     # Only top-level blocks matter — blocks nested inside *STEP/*PART containers
     # (e.g. *BOUNDARY inside *STEP) cannot be independently extracted.
-    _SKIP = {"unknown", "model"}
+    _SKIP = NON_EXTRACTABLE
     available_cats: set[str] = set()
     for rec in ws.file_records.values():
         if rec.role == "child" and rec.category and rec.category not in _SKIP:
@@ -267,6 +314,13 @@ async def extract_splits(name: str, request: Request):
     sel_data = body.get("selections", [])
     if not sel_data:
         raise HTTPException(400, "selections is required")
+    blocked = sorted({s.get("category") for s in sel_data} & NON_EXTRACTABLE)
+    if blocked:
+        raise HTTPException(
+            400,
+            f"Category '{blocked[0]}' cannot be extracted into its own file. "
+            f"It owns the *INCLUDE directives that hold the workspace together.",
+        )
     ws_dir = workspace_path(name)
     try:
         ws = Workspace.load(ws_dir)
@@ -275,9 +329,10 @@ async def extract_splits(name: str, request: Request):
     mother_path = ws_dir / ws.source_name
     if not mother_path.exists():
         raise HTTPException(404, f"Mother file '{ws.source_name}' not found")
+    _validate_selection_filenames(sel_data)
     new_sels = [
         SplitSelection(
-            Category(s["category"]),
+            _parse_category(s["category"]),
             s["filename"],
             sub_selections=[
                 SubSplitSelection(ss["sub_category"], ss["filename"])
@@ -311,6 +366,21 @@ async def resplit_child(name: str, request: Request):
         ws = Workspace.load(ws_dir)
     except FileNotFoundError:
         raise HTTPException(404, f"Workspace '{name}' not found")
+    # A sub-split writes straight to its filename. Without this check, naming a
+    # sub-split after an existing child ("material.inp") silently overwrites that
+    # child with mesh data.
+    reserved = {ws.source_name} | {
+        s.filename for s in ws.selections if s.category.value != category_str
+    }
+    seen: set[str] = set()
+    for ss in sub_sel_data:
+        fn = safe_segment(ss.get("filename", ""), "filename")
+        if fn in reserved:
+            raise HTTPException(400, f"'{fn}' is already used by another file in this workspace")
+        if fn in seen:
+            raise HTTPException(400, f"Duplicate sub-split filename: '{fn}'")
+        seen.add(fn)
+
     new_sub = [SubSplitSelection(ss["sub_category"], ss["filename"]) for ss in sub_sel_data]
     try:
         ws.resplit_child(category_str, new_sub)
@@ -323,10 +393,8 @@ async def resplit_child(name: str, request: Request):
 async def rename_file(name: str, request: Request):
     """Rename a child or grandchild file without re-extracting it."""
     body = await request.json()
-    old_filename = body.get("old_filename", "").strip()
-    new_filename = body.get("new_filename", "").strip()
-    if not old_filename or not new_filename:
-        raise HTTPException(400, "old_filename and new_filename are required")
+    old_filename = safe_segment(body.get("old_filename", ""), "old_filename")
+    new_filename = safe_segment(body.get("new_filename", ""), "new_filename")
     if old_filename == new_filename:
         return {"renamed": old_filename, "workspace": name}
     ws_dir = workspace_path(name)
@@ -348,12 +416,26 @@ async def recombine_files(name: str, request: Request):
     filenames = body.get("filenames", [])
     if not filenames:
         raise HTTPException(400, "filenames is required")
+    filenames = [safe_segment(f, "filename") for f in filenames]
     ws_dir = workspace_path(name)
     try:
         ws = Workspace.load(ws_dir)
     except FileNotFoundError:
         raise HTTPException(404, f"Workspace '{name}' not found")
-    ws.recombine(filenames)
+
+    # recombine() ignores names it doesn't recognise, so a typo or a stale UI would
+    # report success while folding nothing back. Fail loudly instead.
+    known = {s.filename for s in ws.selections} | {
+        ss.filename for s in ws.selections for ss in s.sub_selections
+    }
+    unknown = [f for f in filenames if f not in known]
+    if unknown:
+        raise HTTPException(400, f"Not an extracted file in this workspace: {unknown[0]!r}")
+
+    try:
+        ws.recombine(filenames)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(400, str(e))
     return {"recombined": filenames, "workspace": name}
 
 
@@ -413,9 +495,18 @@ async def reimport_apply(
     to_update: set[str] = set(json.loads(filenames)) if filenames else set()
     added: list[SplitSelection] | None = None
     if added_selections:
+        added_data = json.loads(added_selections)
+        blocked = sorted({s.get("category") for s in added_data} & NON_EXTRACTABLE)
+        if blocked:
+            raise HTTPException(
+                400,
+                f"Category '{blocked[0]}' cannot be extracted into its own file. "
+                f"It owns the *INCLUDE directives that hold the workspace together.",
+            )
+        _validate_selection_filenames(added_data)
         added = [
-            SplitSelection(Category(s["category"]), s["filename"])
-            for s in json.loads(added_selections)
+            SplitSelection(_parse_category(s["category"]), s["filename"])
+            for s in added_data
         ]
 
     original_name = file.filename or "upload.inp"

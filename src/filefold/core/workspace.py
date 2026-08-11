@@ -242,6 +242,16 @@ class Workspace:
             new_mother_content = preview.new_mother_content
             new_child_contents = {s.filename: s.new_content for s in preview.statuses}
 
+        # preview.statuses flattens children and sub-children into one list, so the
+        # role/parent of each file has to come from the selections, not the status.
+        # Recording everything as a parentless "child" is what un-nests sub-children
+        # and makes them resurface as top-level children after a reimport.
+        roles: dict[str, tuple[str, str | None]] = {}
+        for sel in all_selections:
+            roles[sel.filename] = ("child", None)
+            for ss in sel.sub_selections:
+                roles[ss.filename] = ("grandchild", sel.filename)
+
         # Write existing children that were approved
         for status in preview.statuses:
             if status.filename in filenames_to_update:
@@ -250,8 +260,12 @@ class Workspace:
                     (self.path / status.filename).write_text(
                         content, encoding="utf-8", errors="surrogateescape"
                     )
+                    role, parent = roles.get(status.filename, ("child", None))
                     self.file_records[status.filename] = FileRecord(
-                        sha256=_sha256(content), role="child", category=status.category.value
+                        sha256=_sha256(content),
+                        role=role,
+                        category=status.category.value,
+                        parent=parent,
                     )
 
         # Write newly added children
@@ -462,10 +476,11 @@ class Workspace:
         # Move the file
         old_path.rename(new_path)
 
-        # Update the *INCLUDE line in the parent file
+        # Update the *INCLUDE line in the parent file. The mother has no parent to
+        # update — it is instead referenced by source_name, handled below.
         parent_fname = rec.parent if rec.role == "grandchild" else self.source_name
         parent_path = self.path / parent_fname
-        if parent_path.exists():
+        if rec.role != "mother" and parent_path.exists():
             parent_text = parent_path.read_text(encoding="utf-8", errors="surrogateescape")
             parent_text = _re.sub(
                 r"(?i)(\*INCLUDE\s*,\s*INPUT\s*=\s*)" + _re.escape(old_filename) + r"([ \t]*)$",
@@ -489,6 +504,11 @@ class Workspace:
             for r in self.file_records.values():
                 if r.parent == old_filename:
                     r.parent = new_filename
+
+        # The mother is tracked by source_name, not by a selection. Leaving it stale
+        # points the workspace at a filename that no longer exists on disk.
+        if rec.role == "mother":
+            self.source_name = new_filename
 
         # Update selections / sub_selections
         if rec.role == "child":

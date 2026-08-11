@@ -893,6 +893,11 @@ const CAT_COLORS = {
   unknown:  "#7D8590",
 };
 
+// Mirrors NON_EXTRACTABLE in api/main.py — the server rejects these outright.
+// "model" owns *INCLUDE, so extracting it swallows the mother's own include lines
+// and re-parents every other child underneath it.
+const NON_EXTRACTABLE = new Set(["unknown", "model"]);
+
 function catChip(cat) {
   const c = CAT_COLORS[cat] ?? "#7D8590";
   return `<span class="chip" style="background:${c}22;color:${c}">${cat}</span>`;
@@ -1135,6 +1140,11 @@ async function deleteSelected() {
 // ═══════════════════════════════════════════════════════════════════════════════
 async function openWorkspace(name) {
   state.activeWs = name;
+  // Drop the previous workspace's detail immediately. Leaving it in place means a
+  // failed fetch below would strand activeWs and wsData pointing at different
+  // workspaces, and every mutating action reads the plan from one and the target
+  // name from the other.
+  state.wsData = null;
   renderSidebar();
   showView("detail");
   document.getElementById("detail-title").textContent = name;
@@ -1308,6 +1318,11 @@ function renderSplitsTab(data) {
         }).join("")}
       </div>` : "";
 
+    // A non-extractable category only appears here when it was split by an older
+    // build. It can still be folded back, but not re-extracted — say so, rather
+    // than letting the row silently disappear after the next apply.
+    const oneWay = NON_EXTRACTABLE.has(cat) && isExtracted;
+
     return `<div class="split-row${isExtracted ? " selected" : ""}" id="ws-row-${cat}">
       <div class="split-row-header">
         <input type="checkbox" id="ws-sel-${cat}" ${isExtracted ? "checked" : ""}
@@ -1315,6 +1330,8 @@ function renderSplitsTab(data) {
         <label for="ws-sel-${cat}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
           <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
           ${isExtracted ? `<span class="badge badge-accent" style="font-size:10px">extracted</span>` : ""}
+          ${oneWay ? `<span class="badge" style="font-size:10px;background:#E3B34122;color:#E3B341"
+                            title="${cat} owns the *INCLUDE directives. Unchecking folds it back into the mother permanently — it cannot be re-extracted.">can't re-split</span>` : ""}
         </label>
       </div>
       <input type="text" id="ws-fn-${cat}" value="${defaultFn}" placeholder="${cat}.inp"
@@ -1362,6 +1379,12 @@ function wsToggleSubOption(cat, subCat) {
 async function applyEditSplits() {
   const data = state.wsData;
   if (!data) return;
+  // The plan is built from wsData but posted against activeWs. Refuse to act if the
+  // two ever disagree rather than applying one workspace's changes to another.
+  if (data.name !== state.activeWs) {
+    toast("Workspace changed while editing — reopen it and try again", "warn");
+    return;
+  }
 
   const existingByCategory = {};
   data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
@@ -1569,7 +1592,7 @@ function renderSplitConfig(blocks) {
   // top-level category, so nested blocks (e.g. *SOLID SECTION inside *PART)
   // always follow their container and cannot be independently extracted.
   const cats = new Set();
-  blocks.forEach(b => { if (b.category !== "unknown") cats.add(b.category); });
+  blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) cats.add(b.category); });
 
   const el = document.getElementById("split-config");
   el.innerHTML = [...cats].map(cat => {
