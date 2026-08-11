@@ -539,6 +539,17 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   pointer-events: none;
   white-space: nowrap;
 }
+/* Sits outside the input (unlike #find-count) because the range readout is too
+   wide to overlay, so it needs real breathing room from the box edge. */
+#chunk-hint {
+  margin-left: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  pointer-events: none;
+  white-space: nowrap;
+}
+#chunk-input { padding-right: 8px !important; }
 .editor-body { display: flex; flex: 1; overflow: hidden; }
 .editor-gutter {
   width: 52px;
@@ -832,6 +843,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
         </div>
         <button class="btn btn-ghost btn-sm" onclick="findPrev()" title="Previous (Shift+Enter)">↑</button>
         <button class="btn btn-ghost btn-sm" onclick="findNext()" title="Next (Enter)">↓</button>
+      </div>
+      <div class="header-find" id="header-chunk">
+        <button id="chunk-btn" class="btn btn-ghost btn-sm" onclick="toggleChunkBar()"
+                title="Chunk selection — select a line range (Ctrl/Cmd+G)">⇕ Chunk</button>
+        <div class="header-find-wrap" id="chunk-wrap" style="display:none">
+          <input id="chunk-input" type="text" placeholder="46-892 or 46"
+                 onkeydown="_chunkKey(event)" spellcheck="false" style="width:120px">
+          <span id="chunk-hint"></span>
+        </div>
       </div>
       <a id="editor-download" class="btn btn-ghost btn-sm" download>⬇ Download</a>
       <button id="editor-save-btn" class="btn btn-primary btn-sm" onclick="saveFile()" style="display:none">Save</button>
@@ -1282,7 +1302,23 @@ function renderSplitsTab(data) {
     return;
   }
 
-  el.innerHTML = allCats.map(cat => {
+  // Master toggle. Non-extractable categories are excluded from the count so it
+  // never reports "all selected" for rows it deliberately refuses to touch.
+  const togglable = allCats.filter(c => !NON_EXTRACTABLE.has(c));
+  const allOn = togglable.length > 0 && togglable.every(c => !!existingByCategory[c]);
+  const masterRow = `
+    <div class="split-row" style="background:transparent;border-style:dashed">
+      <div class="split-row-header">
+        <input type="checkbox" id="ws-sel-all" ${allOn ? "checked" : ""}
+               onchange="wsToggleAllCategories()">
+        <label for="ws-sel-all" style="cursor:pointer;user-select:none;font-weight:600">
+          Select all categories
+        </label>
+        <span class="text-muted text-sm" style="margin-left:8px">${togglable.length} available</span>
+      </div>
+    </div>`;
+
+  el.innerHTML = masterRow + allCats.map(cat => {
     const c = CAT_COLORS[cat] ?? "#7D8590";
     const existing = existingByCategory[cat];
     const isExtracted = !!existing;
@@ -1294,9 +1330,20 @@ function renderSplitsTab(data) {
     const existingSubs = {};
     if (existing) existing.sub_selections.forEach(ss => { existingSubs[ss.sub_category] = ss.filename; });
 
+    const allSubsOn = subOpts.length > 0 && subOpts.every(
+      opt => existingSubs[opt.sub_category] && actualGrandchildren.has(existingSubs[opt.sub_category])
+    );
     const subPanel = subOpts.length ? `
       <div class="sub-options visible" id="ws-sub-opts-${cat}">
-        <div class="text-muted text-sm" style="margin-bottom:4px">Split into sub-files:</div>
+        <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
+          <span>Split into sub-files:</span>
+          <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="ws-sub-all-${cat}" ${allSubsOn ? "checked" : ""}
+                   ${isExtracted ? "" : "disabled"}
+                   onchange="wsToggleAllSubOptions('${cat}')">
+            <span>all</span>
+          </label>
+        </div>
         ${subOpts.map(opt => {
           const subFn = existingSubs[opt.sub_category] || opt.default_filename;
           // A sub-split is checked only if its file actually exists on disk (in file_records)
@@ -1374,6 +1421,47 @@ function wsToggleSubOption(cat, subCat) {
   if (!inp) return;
   inp.disabled = !cb.checked;
   inp.style.opacity = cb.checked ? "1" : ".4";
+  _syncSubAllBox(cat);
+}
+
+// Keep a category's "all" box in sync when its sub-options are toggled one by one,
+// so it never claims everything is selected when it isn't.
+function _syncSubAllBox(cat) {
+  const master = document.getElementById(`ws-sub-all-${cat}`);
+  const panel  = document.getElementById(`ws-sub-opts-${cat}`);
+  if (!master || !panel) return;
+  const boxes = [...panel.querySelectorAll("input[type=checkbox]")].filter(b => b !== master);
+  master.checked = boxes.length > 0 && boxes.every(b => b.checked);
+}
+
+function wsToggleAllSubOptions(cat) {
+  const master = document.getElementById(`ws-sub-all-${cat}`);
+  const panel  = document.getElementById(`ws-sub-opts-${cat}`);
+  if (!master || !panel) return;
+  const on = master.checked;
+  panel.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    if (cb === master || cb.disabled) return;
+    cb.checked = on;
+    const subCat = cb.id.slice(`ws-sub-${cat}-`.length);
+    wsToggleSubOption(cat, subCat);
+  });
+  master.checked = on;  // wsToggleSubOption re-syncs; restore the intended state
+}
+
+function wsToggleAllCategories() {
+  const master = document.getElementById("ws-sel-all");
+  if (!master) return;
+  const on = master.checked;
+  document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
+    if (cb.id === "ws-sel-all") return;
+    const cat = cb.id.slice("ws-sel-".length);
+    // Never flip a category the server refuses to extract; unchecking one is a
+    // permanent fold-back, so leave those rows entirely under manual control.
+    if (NON_EXTRACTABLE.has(cat)) return;
+    if (cb.checked === on) return;
+    cb.checked = on;
+    wsToggleSplitRow(cat);
+  });
 }
 
 async function applyEditSplits() {
@@ -1702,6 +1790,10 @@ async function createWorkspace() {
     resetNewWorkspace();
   } catch (e) {
     toast("Failed: " + e.message, "error");
+  } finally {
+    // Always restore the button. On success the row is only hidden, so a button
+    // left reading "Creating…" and disabled comes back that way on the next
+    // upload and looks like an upload that hangs forever.
     btn.disabled = false;
     btn.textContent = "Create workspace";
   }
@@ -1732,11 +1824,22 @@ function startReimp() {
   showView("reimport");
 }
 
+// Markup for the idle re-import drop zone. handleReimpUpload overwrites the zone
+// with a spinner, so it has to be restored here — otherwise re-opening the view
+// shows the previous run's "Analysing <other-file>…" spinner, which looks like a
+// hang but is just stale DOM with no request behind it.
+const _REIMP_DROP_IDLE = `
+  <div class="icon">📂</div>
+  <p>Drop the updated <code>.inp</code> here or click to browse</p>
+  <div class="hint">This becomes the new mother file</div>`;
+
 function resetReimp() {
   state.reimp = { file: null, preview: null, checked: new Set(), availableNewCats: [] };
   document.getElementById("reimp-upload-section").style.display = "";
   document.getElementById("reimp-preview-section").style.display = "none";
   document.getElementById("reimp-input").value = "";
+  const zone = document.getElementById("reimp-drop");
+  if (zone) zone.innerHTML = _REIMP_DROP_IDLE;
 }
 
 async function handleReimpUpload(file) {
@@ -1788,9 +1891,11 @@ function renderReimpInspector(blocks) {
 
 function renderReimpNewCats(blocks) {
   const existingCats = new Set((state.wsData?.selections ?? []).map(s => s.category));
-  // Top-level only — matches what compute_split can actually route
+  // Top-level only — matches what compute_split can actually route. NON_EXTRACTABLE
+  // (not just "unknown"): the server rejects those, so offering them here only
+  // produces a checkbox that errors on apply.
   const fileCats = new Set();
-  blocks.forEach(b => { if (b.category !== "unknown") fileCats.add(b.category); });
+  blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) fileCats.add(b.category); });
 
   const newCats = [...fileCats].filter(c => !existingCats.has(c));
   state.reimp.availableNewCats = newCats;
@@ -1951,6 +2056,7 @@ async function viewFile(filename) {
   saveBtn.style.display = "none";
   discBtn.style.display = "none";
   dot.classList.remove("visible");
+  resetChunkBar();  // line numbers are per-file; a range from the last file means nothing here
 
   const loading = document.getElementById("editor-loading");
   const body    = document.getElementById("editor-body");
@@ -2129,19 +2235,140 @@ function _runFindDebounced() {
 function runFind() {
   const inp = document.getElementById("find-input");
   _findQuery = inp?.value ?? "";
-  _findMatches = [];
+  _recomputeMatches();
   _findIdx = 0;
-  const ta = _editorTa();
-  if (!ta) return;
-  if (_findQuery) {
-    const re = new RegExp(_escRe(_findQuery), "gi");
-    let m;
-    while ((m = re.exec(ta.value)) !== null)
-      _findMatches.push({ start: m.index, end: m.index + m[0].length });
-  }
   _updateFindCount();
   syncHighlight();
   _scrollToMatch();
+}
+
+// Matches are character offsets into the text. Any edit shifts every offset after
+// the caret, so re-rendering the highlight layer without recomputing them paints
+// the spans at stale positions — the highlights visibly slide away from the words
+// they belong to as you type. Recompute against the current text instead.
+function _recomputeMatches() {
+  _findMatches = [];
+  const ta = _editorTa();
+  if (!ta || !_findQuery) return;
+  const re = new RegExp(_escRe(_findQuery), "gi");
+  let m;
+  while ((m = re.exec(ta.value)) !== null) {
+    _findMatches.push({ start: m.index, end: m.index + m[0].length });
+    if (m.index === re.lastIndex) re.lastIndex++;  // guard against empty match
+  }
+}
+
+// ── Chunk selection (Notepad++ style line-range selection) ───────────────────
+// Notepad++ lets you click a line number in the margin to select that line and
+// shift-click another to select the range between them. The gutter here is one
+// text node with pointer-events:none, so the line is derived from the click's Y
+// position against the measured line height instead of per-line elements.
+let _chunkAnchor = null;   // first line of an in-progress gutter selection
+
+function _editorLineCount() {
+  const ta = _editorTa();
+  return ta ? (ta.value.match(/\n/g) || []).length + 1 : 0;
+}
+
+function _lineToOffsets(line) {
+  // 1-based line -> [startOffset, endOffsetIncludingNewline]
+  const text = _editorTa().value;
+  let start = 0;
+  for (let i = 1; i < line; i++) {
+    const nl = text.indexOf("\n", start);
+    if (nl === -1) { start = text.length; break; }
+    start = nl + 1;
+  }
+  const nl = text.indexOf("\n", start);
+  return [start, nl === -1 ? text.length : nl + 1];
+}
+
+function selectLineRange(from, to, {scroll = true} = {}) {
+  const ta = _editorTa();
+  if (!ta) return;
+  const total = _editorLineCount();
+  let a = Math.max(1, Math.min(total, from));
+  let b = Math.max(1, Math.min(total, to));
+  if (a > b) [a, b] = [b, a];
+
+  const [start] = _lineToOffsets(a);
+  const [, end] = _lineToOffsets(b);
+  ta.focus();
+  ta.setSelectionRange(start, end);
+
+  if (scroll) {
+    const cs = getComputedStyle(_editorHL());
+    const lh = parseFloat(cs.lineHeight) || 19;
+    const pad = parseFloat(cs.paddingTop) || 16;
+    const area = _editorArea();
+    const target = pad + (a - 1) * lh;
+    // Only scroll when the start line is outside the viewport
+    if (target < area.scrollTop || target > area.scrollTop + area.clientHeight - lh)
+      area.scrollTop = Math.max(0, target - area.clientHeight / 3);
+  }
+  _setChunkHint(a === b ? `L${a}` : `${a}–${b} · ${b - a + 1} lines`);
+}
+
+function _gutterLineFromEvent(e) {
+  const inner = _editorGutter();
+  const area  = _editorArea();
+  if (!inner || !area) return 1;
+  const cs = getComputedStyle(inner);
+  const lh = parseFloat(cs.lineHeight) || 19;
+  const padTop = parseFloat(cs.paddingTop) || 16;
+  // The gutter is translated to follow the scroll container, so add scrollTop back.
+  const rect = document.getElementById("editor-gutter").getBoundingClientRect();
+  const y = (e.clientY - rect.top) + area.scrollTop - padTop;
+  return Math.max(1, Math.min(_editorLineCount(), Math.floor(y / lh) + 1));
+}
+
+// Clear the chunk bar between files. Line numbers only mean something relative to
+// the file that is open, so carrying "46-392" into the next file is meaningless
+// and, worse, looks like a live selection that isn't there.
+function resetChunkBar() {
+  _chunkAnchor = null;
+  const wrap = document.getElementById("chunk-wrap");
+  const inp  = document.getElementById("chunk-input");
+  if (inp) inp.value = "";
+  if (wrap) wrap.style.display = "none";
+  _setChunkHint("");
+}
+
+function toggleChunkBar() {
+  const wrap = document.getElementById("chunk-wrap");
+  if (!wrap) return;
+  const showing = wrap.style.display !== "none";
+  wrap.style.display = showing ? "none" : "";
+  if (!showing) {
+    const inp = document.getElementById("chunk-input");
+    inp.value = "";
+    _setChunkHint("click gutter, shift-click to extend");
+    inp.focus();
+  }
+}
+
+function _setChunkHint(msg) {
+  const el = document.getElementById("chunk-hint");
+  if (el) el.textContent = msg;
+}
+
+function _chunkKey(e) {
+  if (e.key === "Escape") { toggleChunkBar(); _editorTa()?.focus(); return; }
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  applyChunkRange();
+}
+
+function applyChunkRange() {
+  const raw = (document.getElementById("chunk-input")?.value ?? "").trim();
+  if (!raw) return;
+  // Accept "46-892", "46:892", "46 892", or a single "46"
+  const parts = raw.split(/[-:,\s]+/).filter(Boolean).map(Number);
+  if (!parts.length || parts.some(n => !Number.isFinite(n) || n < 1)) {
+    _setChunkHint("enter a line or range, e.g. 46-892");
+    return;
+  }
+  selectLineRange(parts[0], parts.length > 1 ? parts[1] : parts[0]);
 }
 
 function _swapMatchCur(newIdx) {
@@ -2319,6 +2546,15 @@ loadWorkspaces();
     _hlTimer = setTimeout(() => {
       const lc = ta.value.split("\n").length;
       if (lc !== _lastLineCount) { _syncGutter(ta.value); _lastLineCount = lc; }
+      if (_findQuery) {
+        // Keep the caret's match selected across the edit rather than snapping
+        // back to match 1, which would yank the viewport to the top of the file.
+        const caret = ta.selectionStart;
+        _recomputeMatches();
+        const at = _findMatches.findIndex(m => m.end >= caret);
+        _findIdx = at === -1 ? Math.max(0, _findMatches.length - 1) : at;
+        _updateFindCount();
+      }
       syncHighlight();
     }, 150);
   });
@@ -2360,6 +2596,23 @@ loadWorkspaces();
     const g = _editorGutter();
     if (g) g.style.transform = `translateY(-${area.scrollTop}px)`;
   });
+
+  // Gutter click selects a line; shift-click extends from the last anchor, so a
+  // range of any size is two clicks with nothing held down in between.
+  const gutter = document.getElementById("editor-gutter");
+  if (gutter) {
+    gutter.style.cursor = "pointer";
+    gutter.addEventListener("mousedown", e => {
+      e.preventDefault();  // don't steal focus mid-selection
+      const line = _gutterLineFromEvent(e);
+      if (e.shiftKey && _chunkAnchor !== null) {
+        selectLineRange(_chunkAnchor, line, {scroll: false});
+      } else {
+        _chunkAnchor = line;
+        selectLineRange(line, line, {scroll: false});
+      }
+    });
+  }
 })();
 
 // Persistent keyboard handler for the editor view
@@ -2372,6 +2625,13 @@ document.addEventListener("keydown", e => {
   }
   if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveFile(); }
   if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); openFindBar(); }
+  // Ctrl/Cmd+G — Notepad++'s go-to-line, reused here to open the chunk range box
+  if ((e.ctrlKey || e.metaKey) && e.key === "g") {
+    e.preventDefault();
+    const wrap = document.getElementById("chunk-wrap");
+    if (wrap && wrap.style.display === "none") toggleChunkBar();
+    else document.getElementById("chunk-input")?.focus();
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); toggleComment(); }
 });
 </script>
