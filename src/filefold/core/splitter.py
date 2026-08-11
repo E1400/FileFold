@@ -119,6 +119,18 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="surrogateescape")).hexdigest()
 
 
+def read_raw(path: Path) -> str:
+    """Read a file without translating line endings.
+
+    Path.read_text() applies universal newlines, turning CRLF into LF. The parser
+    (tokenizer.open(..., newline="")) does not, so hashing a read_text() result
+    against content produced from a parse never matches for a CRLF deck — every
+    file reads as manually edited forever. Keep every content read raw.
+    """
+    with open(path, encoding="utf-8", errors="surrogateescape", newline="") as fh:
+        return fh.read()
+
+
 def _include_line(filename: str) -> str:
     return f"*INCLUDE, INPUT={filename}\n"
 

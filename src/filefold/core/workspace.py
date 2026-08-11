@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .keywords import Category
 from .parser import parse
-from .splitter import SplitResult, SplitSelection, SubSplitSelection, _sha256, compute_split, split_with_includes
+from .splitter import SplitResult, SplitSelection, SubSplitSelection, _sha256, compute_split, read_raw, split_with_includes
 
 _MANIFEST_DIR = ".filefold"
 _MANIFEST_FILE = "workspace.json"
@@ -204,7 +204,7 @@ class Workspace:
 
             current_path = self.path / filename
             current_hash = (
-                _sha256(current_path.read_text(encoding="utf-8", errors="surrogateescape"))
+                _sha256(read_raw(current_path))
                 if current_path.exists() else ""
             )
 
@@ -316,7 +316,7 @@ class Workspace:
         """
         def _expand(path: Path) -> str:
             """Return content with all *INCLUDE lines replaced recursively."""
-            text = path.read_text(encoding="utf-8", errors="surrogateescape")
+            text = read_raw(path)
             def _sub(m: _re.Match) -> str:
                 inc = self.path / m.group(1).strip()
                 return _expand(inc) if inc.exists() else m.group(0)
@@ -347,7 +347,7 @@ class Workspace:
 
             # Expand and inline
             expanded = _expand(child_path).rstrip("\n")
-            parent_text = parent_path.read_text(encoding="utf-8", errors="surrogateescape")
+            parent_text = read_raw(parent_path)
             pattern = _re.compile(
                 r"^\*INCLUDE\s*,\s*INPUT\s*=\s*" + _re.escape(fname) + r"[ \t]*$",
                 _re.IGNORECASE | _re.MULTILINE,
@@ -481,7 +481,7 @@ class Workspace:
         parent_fname = rec.parent if rec.role == "grandchild" else self.source_name
         parent_path = self.path / parent_fname
         if rec.role != "mother" and parent_path.exists():
-            parent_text = parent_path.read_text(encoding="utf-8", errors="surrogateescape")
+            parent_text = read_raw(parent_path)
             parent_text = _re.sub(
                 r"(?i)(\*INCLUDE\s*,\s*INPUT\s*=\s*)" + _re.escape(old_filename) + r"([ \t]*)$",
                 lambda m: m.group(1) + new_filename + m.group(2),

@@ -11,10 +11,10 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 
 from filefold.core.keywords import CATEGORY_SUB_OPTIONS, CATEGORY_SUB_KEYWORDS, Category
 from filefold.core.parser import parse
-from filefold.core.splitter import SplitSelection, SubSplitSelection, split_with_includes
+from filefold.core.splitter import SplitSelection, SubSplitSelection, read_raw, split_with_includes
 from filefold.core.workspace import Workspace
 
-from .server import UnsafeName, WORKSPACE_BASE, list_workspaces, safe_segment, workspace_path
+from .server import UnsafeName, WORKSPACE_BASE, child_path, list_workspaces, safe_segment, workspace_path
 
 app = FastAPI(title="FileFold", version="0.1.0")
 
@@ -182,7 +182,7 @@ async def get_workspace(name: str):
         fpath = ws_dir / fname
         if fpath.exists():
             from filefold.core.splitter import _sha256
-            text = fpath.read_text(encoding="utf-8", errors="surrogateescape")
+            text = read_raw(fpath)
             current = _sha256(text)
             edited = (bool(rec.sha256) and current != rec.sha256)
             line_count = len(text.splitlines())
@@ -555,7 +555,9 @@ async def export_workspace(name: str):
 @app.get("/api/workspaces/{name}/files/{filename}")
 async def get_file(name: str, filename: str):
     """Return the raw content of a workspace file (served inline as text/plain)."""
-    fpath = workspace_path(name) / filename
+    # Starlette's router already refuses encoded slashes in a path param, but this
+    # join must not depend on that: validate the segment here too.
+    fpath = child_path(workspace_path(name), filename)
     if not fpath.exists():
         raise HTTPException(404, f"File '{filename}' not found in workspace '{name}'")
     return FileResponse(fpath, media_type="text/plain")
@@ -564,9 +566,12 @@ async def get_file(name: str, filename: str):
 @app.put("/api/workspaces/{name}/files/{filename}")
 async def save_file(name: str, filename: str, request: Request):
     """Overwrite a workspace file with edited content sent as plain-text body."""
-    fpath = workspace_path(name) / filename
+    fpath = child_path(workspace_path(name), filename)
     if not fpath.exists():
         raise HTTPException(404, f"File '{filename}' not found in workspace '{name}'")
     content = (await request.body()).decode("utf-8", errors="surrogateescape")
-    fpath.write_text(content, encoding="utf-8", errors="surrogateescape")
+    # newline="" so the editor round-trips a CRLF deck byte-for-byte instead of
+    # rewriting its line endings on every save.
+    with open(fpath, "w", encoding="utf-8", errors="surrogateescape", newline="") as fh:
+        fh.write(content)
     return {"saved": filename, "bytes": len(content)}

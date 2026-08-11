@@ -7,7 +7,7 @@ from rich.tree import Tree
 from filefold.core.block import Block
 from filefold.core.parser import parse
 from filefold.core.keywords import Category
-from filefold.core.splitter import SplitSelection, split as split_blocks, split_with_includes
+from filefold.core.splitter import SplitSelection, read_raw, split as split_blocks, split_with_includes
 from filefold.core.workspace import Workspace
 
 app = typer.Typer(help="FileFold — Abaqus .inp file organizer", no_args_is_help=True)
@@ -166,7 +166,7 @@ def workspace_status(
                 current_path.read_bytes()
             ).hexdigest()
             on_disk_hash = __import__("hashlib").sha256(
-                current_path.read_text(encoding="utf-8", errors="surrogateescape")
+                read_raw(current_path)
                 .encode("utf-8", errors="surrogateescape")
             ).hexdigest()
             if on_disk_hash == rec.sha256:
