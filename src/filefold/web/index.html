@@ -1302,16 +1302,18 @@ function renderSplitsTab(data) {
     return;
   }
 
-  // Master toggle. Non-extractable categories are excluded from the count so it
-  // never reports "all selected" for rows it deliberately refuses to touch.
+  // Master toggle. Its id deliberately avoids the "ws-sel-" prefix: applyEditSplits
+  // collects categories with [id^='ws-sel-'] and would otherwise read this box as a
+  // category literally named "all", send it to /extract, and fail the whole batch.
+  // The master is display-only — nothing reads it when building the apply payload.
   const togglable = allCats.filter(c => !NON_EXTRACTABLE.has(c));
   const allOn = togglable.length > 0 && togglable.every(c => !!existingByCategory[c]);
   const masterRow = `
     <div class="split-row" style="background:transparent;border-style:dashed">
       <div class="split-row-header">
-        <input type="checkbox" id="ws-sel-all" ${allOn ? "checked" : ""}
+        <input type="checkbox" id="ws-master-cats" ${allOn ? "checked" : ""}
                onchange="wsToggleAllCategories()">
-        <label for="ws-sel-all" style="cursor:pointer;user-select:none;font-weight:600">
+        <label for="ws-master-cats" style="cursor:pointer;user-select:none;font-weight:600">
           Select all categories
         </label>
         <span class="text-muted text-sm" style="margin-left:8px">${togglable.length} available</span>
@@ -1338,7 +1340,7 @@ function renderSplitsTab(data) {
         <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
           <span>Split into sub-files:</span>
           <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">
-            <input type="checkbox" id="ws-sub-all-${cat}" ${allSubsOn ? "checked" : ""}
+            <input type="checkbox" id="ws-submaster-${cat}" ${allSubsOn ? "checked" : ""}
                    ${isExtracted ? "" : "disabled"}
                    onchange="wsToggleAllSubOptions('${cat}')">
             <span>all</span>
@@ -1396,6 +1398,7 @@ function wsToggleSplitRow(cat) {
   row.classList.toggle("selected", checked);
   fnInput.disabled = !checked;
   fnInput.style.opacity = checked ? "1" : ".4";
+  _syncMasterCatBox();  // unchecking any single category must clear "select all"
   const subPanel = document.getElementById(`ws-sub-opts-${cat}`);
   if (!subPanel) return;
   if (!checked) {
@@ -1425,9 +1428,11 @@ function wsToggleSubOption(cat, subCat) {
 }
 
 // Keep a category's "all" box in sync when its sub-options are toggled one by one,
-// so it never claims everything is selected when it isn't.
+// so it never claims everything is selected when it isn't. Derived state only —
+// applyEditSplits reads the individual ws-sub-<cat>-<subcat> boxes by explicit id
+// and never consults this one.
 function _syncSubAllBox(cat) {
-  const master = document.getElementById(`ws-sub-all-${cat}`);
+  const master = document.getElementById(`ws-submaster-${cat}`);
   const panel  = document.getElementById(`ws-sub-opts-${cat}`);
   if (!master || !panel) return;
   const boxes = [...panel.querySelectorAll("input[type=checkbox]")].filter(b => b !== master);
@@ -1435,7 +1440,7 @@ function _syncSubAllBox(cat) {
 }
 
 function wsToggleAllSubOptions(cat) {
-  const master = document.getElementById(`ws-sub-all-${cat}`);
+  const master = document.getElementById(`ws-submaster-${cat}`);
   const panel  = document.getElementById(`ws-sub-opts-${cat}`);
   if (!master || !panel) return;
   const on = master.checked;
@@ -1445,15 +1450,25 @@ function wsToggleAllSubOptions(cat) {
     const subCat = cb.id.slice(`ws-sub-${cat}-`.length);
     wsToggleSubOption(cat, subCat);
   });
-  master.checked = on;  // wsToggleSubOption re-syncs; restore the intended state
+  _syncSubAllBox(cat);  // re-derive rather than assert: disabled rows may not have moved
+}
+
+// The master box is derived state, never an input to apply. Recompute it from the
+// individual rows so unchecking any one category clears it, and it can never claim
+// a state the rows don't actually have.
+function _syncMasterCatBox() {
+  const master = document.getElementById("ws-master-cats");
+  if (!master) return;
+  const rows = [...document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']")]
+    .filter(cb => !NON_EXTRACTABLE.has(cb.id.slice("ws-sel-".length)));
+  master.checked = rows.length > 0 && rows.every(cb => cb.checked);
 }
 
 function wsToggleAllCategories() {
-  const master = document.getElementById("ws-sel-all");
+  const master = document.getElementById("ws-master-cats");
   if (!master) return;
   const on = master.checked;
   document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
-    if (cb.id === "ws-sel-all") return;
     const cat = cb.id.slice("ws-sel-".length);
     // Never flip a category the server refuses to extract; unchecking one is a
     // permanent fold-back, so leave those rows entirely under manual control.
@@ -1486,8 +1501,17 @@ async function applyEditSplits() {
     (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
   );
 
+  // Only real categories. Any master/decorative checkbox that ends up matching this
+  // selector must never reach the server as a category name — that fails the whole
+  // batch and the refresh afterwards looks like the selection silently resetting.
+  const knownCats = new Set([
+    ...(data.available_categories || []),
+    ...data.selections.map(s => s.category),
+  ]);
+
   document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
     const cat = cb.id.slice("ws-sel-".length);
+    if (!knownCats.has(cat)) return;
     const isChecked = cb.checked;
     const wasExtracted = !!existingByCategory[cat];
 
@@ -1683,13 +1707,33 @@ function renderSplitConfig(blocks) {
   blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) cats.add(b.category); });
 
   const el = document.getElementById("split-config");
-  el.innerHTML = [...cats].map(cat => {
+  if (!cats.size) { el.innerHTML = `<p class="text-muted">No categories available.</p>`; return; }
+
+  // Same master toggle as the edit menu. Ids avoid the "sel-"/"sub-" prefixes that
+  // createWorkspace uses to find real rows, and nothing reads these when building
+  // the selections payload — they are purely a time-saver for ticking everything.
+  const masterRow = `
+    <div class="split-row" style="background:transparent;border-style:dashed">
+      <label style="cursor:pointer;user-select:none;font-weight:600">
+        <input type="checkbox" id="master-cats" onchange="toggleAllCategories()">
+        Select all categories
+      </label>
+      <span class="text-muted text-sm">${cats.size} available</span>
+    </div>`;
+
+  el.innerHTML = masterRow + [...cats].map(cat => {
     const c = CAT_COLORS[cat] ?? "#7D8590";
     const id = `sel-${cat}`;
     const subOpts = state.subOptions[cat] ?? [];
     const subPanel = subOpts.length ? `
       <div class="sub-options" id="sub-opts-${cat}">
-        <div class="text-muted text-sm" style="margin-bottom:4px">Split into sub-files:</div>
+        <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
+          <span>Split into sub-files:</span>
+          <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="submaster-${cat}" onchange="toggleAllSubOptions('${cat}')">
+            <span>all</span>
+          </label>
+        </div>
         ${subOpts.map(opt => `
           <div class="sub-option-row">
             <label>
@@ -1718,6 +1762,7 @@ function toggleSplitRow(cat) {
   row.classList.toggle("selected", checked);
   fnInput.disabled = !checked;
   fnInput.style.opacity = checked ? "1" : ".4";
+  _syncCreateMasterCats();  // unchecking one category clears "select all"
 
   const subPanel = document.getElementById(`sub-opts-${cat}`);
   if (subPanel) {
@@ -1739,6 +1784,53 @@ function toggleSubOption(cat, subCat) {
   if (!inp) return;
   inp.disabled = !cb.checked;
   inp.style.opacity = cb.checked ? "1" : ".4";
+  _syncCreateSubMaster(cat);
+}
+
+// ── Create-menu select-all (mirrors the edit menu; derived state only) ───────
+function _syncCreateSubMaster(cat) {
+  const master = document.getElementById(`submaster-${cat}`);
+  const panel  = document.getElementById(`sub-opts-${cat}`);
+  if (!master || !panel) return;
+  const boxes = [...panel.querySelectorAll("input[type=checkbox]")].filter(b => b !== master);
+  master.checked = boxes.length > 0 && boxes.every(b => b.checked);
+}
+
+function _syncCreateMasterCats() {
+  const master = document.getElementById("master-cats");
+  if (!master) return;
+  const rows = [...document.querySelectorAll("#split-config input[type=checkbox][id^='sel-']")];
+  master.checked = rows.length > 0 && rows.every(cb => cb.checked);
+}
+
+function toggleAllSubOptions(cat) {
+  const master = document.getElementById(`submaster-${cat}`);
+  const panel  = document.getElementById(`sub-opts-${cat}`);
+  if (!master || !panel) return;
+  // Sub-files only apply to an extracted parent; ticking "all" implies the parent.
+  const parent = document.getElementById(`sel-${cat}`);
+  if (master.checked && parent && !parent.checked) {
+    parent.checked = true;
+    toggleSplitRow(cat);
+  }
+  const on = master.checked;
+  panel.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    if (cb === master) return;
+    cb.checked = on;
+    toggleSubOption(cat, cb.id.slice(`sub-${cat}-`.length));
+  });
+  _syncCreateSubMaster(cat);
+}
+
+function toggleAllCategories() {
+  const master = document.getElementById("master-cats");
+  if (!master) return;
+  const on = master.checked;
+  document.querySelectorAll("#split-config input[type=checkbox][id^='sel-']").forEach(cb => {
+    if (cb.checked === on) return;
+    cb.checked = on;
+    toggleSplitRow(cb.id.slice("sel-".length));
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1754,7 +1846,9 @@ async function createWorkspace() {
   const selections = [];
   if (state.inspectResult) {
     const cats = new Set();
-    state.inspectResult.blocks.forEach(b => { if (b.category !== "unknown") cats.add(b.category); });
+    // Must match renderSplitConfig's filter, or this loop looks for rows that were
+    // never rendered (and the server rejects them anyway).
+    state.inspectResult.blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) cats.add(b.category); });
     cats.forEach(cat => {
       const cb = document.getElementById(`sel-${cat}`);
       if (cb && cb.checked) {
