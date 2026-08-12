@@ -10,96 +10,93 @@
 button, input, select, textarea { font: inherit; }
 
 /* ── Tokens ─────────────────────────────────────────────────────────────────
-   Drafting sheet: ink on paper. Rules carry structure, not shadows or fills.
-   Light is the primary theme; dark is a blueprint (deep cyanotype ground with
-   pale ink), not an inversion of the light palette.
+   Ink on grey. Structure comes from rules, not shadows or fills. The accent is
+   ink itself — the primary button is simply dark — so no hue ever competes with
+   the category colours, which are the only meaningful colour on the page.
+   Light is primary; dark is a warm charcoal, deliberately not a blue-black.
    ------------------------------------------------------------------------- */
 :root {
-  --bg:        #E4E8E7;   /* board the sheet sits on — cool, not cream */
-  --surface:   #F4F6F5;   /* sheet */
-  --surface2:  #E8ECEA;   /* recessed fields */
-  --border:    #A7B2B1;   /* drawn rule */
-  --hairline:  #C7CFCD;   /* faint construction line */
-  --text:      #131A1C;   /* ink */
-  --muted:     #5D6A6B;   /* pencil */
-  --accent:    #B4482C;   /* annotation red — used sparingly */
-  --accent-ink:#FFFFFF;   /* text on accent fills */
-  --blue:      #35607F;   /* drafting blue, dimensions + links */
-  --warn:      #A9720E;
+  --bg:        #D9DBD7;   /* ground */
+  --surface:   #E8E9E5;   /* cards and bars sit a step lighter */
+  --surface2:  #DFE1DC;   /* recessed fields */
+  --border:    #BABDB7;
+  --hairline:  #CBCEC8;
+  --text:      #212523;
+  --muted:     #636763;
+  --accent:    #2A2E2B;   /* ink */
+  --accent-ink:#E8E9E5;   /* text on accent fills */
+  --warn:      #8A6A2A;
   --success:   #3E6B4A;
-  --danger:    #A8331E;
+  --danger:    #8C3A32;
 
-  /* Category hues re-tuned to the drafting palette: muted pigments that hold
-     up as thin chips on paper, still mutually distinguishable. */
-  --cat-mesh:     #35607F;
-  --cat-material: #B4482C;
-  --cat-step:     #6B5B95;
+  /* Muted pigments — distinguishable without any of them shouting. */
+  --cat-mesh:     #4A6B84;
+  --cat-material: #8A5340;
+  --cat-step:     #6B5B85;
   --cat-loads:    #4A7A55;
-  --cat-contact:  #A33F52;
-  --cat-output:   #2F7C86;
-  --cat-model:    #8A6D2F;
-  --cat-section:  #7B5E8C;
-  --cat-unknown:  #7C8687;
+  --cat-contact:  #8A4453;
+  --cat-output:   #3A6E75;
+  --cat-model:    #7A6A3A;
+  --cat-section:  #6E5580;
+  --cat-unknown:  #636763;
 
-  --radius:   2px;        /* drawn corners, not rounded UI */
+  --radius:   2px;
   --sidebar:  220px;
-  --mono:     "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, "SF Mono", Consolas, monospace;
-  --sans:     "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --mono:     ui-monospace, "SF Mono", Menlo, "JetBrains Mono", Consolas, monospace;
+  --sans:     "Helvetica Neue", Helvetica, "Segoe UI", Arial, system-ui, sans-serif;
 }
 
-/* Blueprint variant. Only tokens are redefined — every component reads through
-   them, so nothing needs a second rule to work on this ground. */
+/* Warm charcoal. Only tokens are redefined — every component reads through them,
+   so nothing needs a second rule to work on this ground. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:        #0B1620;
-    --surface:   #102331;
-    --surface2:  #0D1C27;
-    --border:    #2F5972;
-    --hairline:  #1E3E52;
-    --text:      #DCE9F0;
-    --muted:     #7FA0B4;
-    --accent:    #E8734F;
-    --accent-ink:#12222C;
-    --blue:      #79B4D8;
-    --warn:      #D6A44A;
-    --success:   #6FB183;
-    --danger:    #E2624A;
+    --bg:        #1B1A18;
+    --surface:   #232220;
+    --surface2:  #1F1E1C;
+    --border:    #35322F;
+    --hairline:  #2B2926;
+    --text:      #E9E6E0;
+    --muted:     #9A9691;
+    --accent:    #D8D4CD;
+    --accent-ink:#1B1A18;
+    --warn:      #C7A768;
+    --success:   #85B394;
+    --danger:    #D98878;
 
-    --cat-mesh:     #79B4D8;
-    --cat-material: #E8734F;
-    --cat-step:     #A99AD6;
-    --cat-loads:    #7FBB8C;
-    --cat-contact:  #E08098;
-    --cat-output:   #6FC3CC;
-    --cat-model:    #D6B463;
-    --cat-section:  #BFA0CE;
-    --cat-unknown:  #8B9BA6;
+    --cat-mesh:     #7FA3C4;
+    --cat-material: #C4866B;
+    --cat-step:     #A294C4;
+    --cat-loads:    #87B397;
+    --cat-contact:  #C98596;
+    --cat-output:   #74AEB5;
+    --cat-model:    #BFAE79;
+    --cat-section:  #B39BC4;
+    --cat-unknown:  #9A9691;
   }
 }
 :root[data-theme="dark"] {
-  --bg:        #0B1620;
-  --surface:   #102331;
-  --surface2:  #0D1C27;
-  --border:    #2F5972;
-  --hairline:  #1E3E52;
-  --text:      #DCE9F0;
-  --muted:     #7FA0B4;
-  --accent:    #E8734F;
-  --accent-ink:#12222C;
-  --blue:      #79B4D8;
-  --warn:      #D6A44A;
-  --success:   #6FB183;
-  --danger:    #E2624A;
+  --bg:        #1B1A18;
+  --surface:   #232220;
+  --surface2:  #1F1E1C;
+  --border:    #35322F;
+  --hairline:  #2B2926;
+  --text:      #E9E6E0;
+  --muted:     #9A9691;
+  --accent:    #D8D4CD;
+  --accent-ink:#1B1A18;
+  --warn:      #C7A768;
+  --success:   #85B394;
+  --danger:    #D98878;
 
-  --cat-mesh:     #79B4D8;
-  --cat-material: #E8734F;
-  --cat-step:     #A99AD6;
-  --cat-loads:    #7FBB8C;
-  --cat-contact:  #E08098;
-  --cat-output:   #6FC3CC;
-  --cat-model:    #D6B463;
-  --cat-section:  #BFA0CE;
-  --cat-unknown:  #8B9BA6;
+  --cat-mesh:     #7FA3C4;
+  --cat-material: #C4866B;
+  --cat-step:     #A294C4;
+  --cat-loads:    #87B397;
+  --cat-contact:  #C98596;
+  --cat-output:   #74AEB5;
+  --cat-model:    #BFAE79;
+  --cat-section:  #B39BC4;
+  --cat-unknown:  #9A9691;
 }
 
 /* ── Base ───────────────────────────────────────────────── */
@@ -137,11 +134,9 @@ body {
   flex-shrink: 0;
 }
 .logo-text {
-  font-family: var(--mono);
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: .2em;
-  text-transform: uppercase;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -.012em;
   color: var(--text);
 }
 .sidebar-body {
@@ -173,14 +168,13 @@ body {
 }
 .ws-item:hover { background: var(--surface2); color: var(--text); }
 .ws-item.active { background: var(--surface2); color: var(--accent); }
-/* A drawn tick rather than a dot — the sidebar reads as an index of sheets. */
 .ws-item .dot {
-  width: 7px; height: 1px;
+  width: 6px; height: 1px;
   background: var(--muted);
   flex-shrink: 0;
 }
-.ws-item.active .dot { background: var(--accent); height: 2px; }
-.ws-item { font-family: var(--mono); font-size: 12px; }
+.ws-item.active .dot { background: var(--text); height: 2px; }
+.ws-item.active { box-shadow: inset 2px 0 0 var(--text); }
 .sidebar-footer {
   padding: 10px 14px;
   border-top: 1px solid var(--border);
@@ -204,15 +198,7 @@ body {
   background: var(--surface);
   flex-shrink: 0;
 }
-/* Screen titles are set like sheet labels: monospaced, spaced-out caps. */
-.topbar h1 {
-  font-family: var(--mono);
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  flex: 1;
-}
+.topbar h1 { font-size: 14.5px; font-weight: 600; letter-spacing: -.012em; flex: 1; }
 .content { padding: 28px 32px; flex: 1; }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -250,45 +236,30 @@ body {
   padding: 20px;
 }
 /* ── Registry sheet ───────────────────────────────────────────────────────
-   The home view is a drawing sheet: registration marks at the corners, a ruled
-   header, and one titled card per deck. ------------------------------------ */
-/* The sheet fills the pane so the area under the cards reads as paper margin
-   rather than empty app background, and the footer anchors the lower edge. */
+   The home view is one sheet: a ruled header, the deck cards, and a footer
+   carrying the totals. No corner marks, no scale label — the rules alone do it.
+   ------------------------------------------------------------------------ */
 .sheet {
-  position: relative; padding: 22px 24px 0;
+  position: relative; padding: 20px 24px 0;
   display: flex; flex-direction: column; min-height: 100%;
 }
-.sheet::before, .sheet::after {
-  content: ""; position: absolute; width: 15px; height: 15px;
-  border: 1.5px solid var(--border); pointer-events: none;
-}
-.sheet::before { top: 0; left: 0; border-right: 0; border-bottom: 0; }
-.sheet::after  { top: 0; right: 0; border-left: 0; border-bottom: 0; }
-.sheet-foot {
-  margin-top: auto; padding: 9px 0 4px;
-  border-top: 1.5px solid var(--text);
-  display: flex; justify-content: space-between;
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
-  text-transform: uppercase; color: var(--muted);
-}
 .sheet-head {
-  display: flex; align-items: baseline; gap: 14px;
-  border-bottom: 1.5px solid var(--text);
-  padding-bottom: 9px; margin-bottom: 20px;
+  display: flex; align-items: baseline; gap: 12px;
+  border-bottom: 1px solid var(--text);
+  padding-bottom: 8px; margin-bottom: 16px;
 }
-.sheet-title {
-  font-family: var(--mono); font-size: 12px; font-weight: 700;
-  letter-spacing: .2em; text-transform: uppercase;
-}
-.sheet-sub {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: .13em;
-  color: var(--blue); text-transform: uppercase; margin-left: auto;
+.sheet-title { font-size: 13px; font-weight: 600; letter-spacing: -.005em; }
+.sheet-foot {
+  margin-top: auto; padding: 9px 0 12px;
+  border-top: 1px solid var(--text);
+  display: flex; justify-content: space-between; gap: 16px;
+  font-size: 11px; color: var(--muted);
 }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+  gap: 12px;
 }
 
 .workspace-card {
@@ -296,73 +267,55 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   display: flex; flex-direction: column;
-  cursor: pointer;                 /* the whole sheet opens — see wsc-body */
+  cursor: pointer;                 /* the whole card opens */
   transition: border-color .12s, box-shadow .12s;
   position: relative;
 }
 .workspace-card:hover,
 .workspace-card:focus-within { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
-.workspace-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.workspace-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.workspace-card.selected { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); background: var(--surface2); }
+.workspace-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
-/* flex:1 so the title block and actions sit on the card's lower edge the way a
-   real drawing's title block does, however tall the grid stretches the row. */
 .wsc-body { padding: 12px 13px 11px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
-.wsc-top  { display: flex; align-items: flex-start; gap: 9px; }
-.wsc-check { flex-shrink: 0; margin-top: 3px; accent-color: var(--accent); cursor: pointer; }
+.wsc-top  { display: flex; align-items: center; gap: 8px; }
+.wsc-check { flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
 .wsc-name {
-  font-family: var(--mono); font-size: 13.5px; font-weight: 700;
-  letter-spacing: .01em; flex: 1; word-break: break-word; line-height: 1.3;
+  font-size: 14.5px; font-weight: 600; letter-spacing: -.012em;
+  flex: 1; word-break: break-word; line-height: 1.3;
 }
-/* Explicit open affordance: previously only the title and the words "Click to
-   open" were clickable, so clicking the card body appeared to do nothing. */
+/* Explicit open affordance: only the title and the words "Click to open" used to
+   be clickable, so clicking the card body appeared to do nothing. */
 .wsc-open {
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em;
-  color: var(--muted); text-transform: uppercase; white-space: nowrap;
+  font-size: 10.5px; color: var(--muted); white-space: nowrap;
   opacity: 0; transition: opacity .12s;
 }
-.workspace-card:hover .wsc-open { opacity: 1; color: var(--text); }
+.workspace-card:hover .wsc-open,
+.workspace-card:focus-within .wsc-open { opacity: 1; }
 
-/* Dimension line — the deck's total size, drawn like a measurement. */
-.wsc-dim { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 9.5px; color: var(--blue); }
-.wsc-dim .rule { flex: 1; border-top: 1px solid var(--blue); position: relative; }
-.wsc-dim .rule::before, .wsc-dim .rule::after {
-  content: ""; position: absolute; top: -3.5px; width: 1px; height: 8px; background: var(--blue);
+/* What is in the deck, without listing sizes for each one. */
+.wsc-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.wsc-chip {
+  font-size: 10px; padding: 1px 6px; border-radius: var(--radius);
+  line-height: 1.5; white-space: nowrap;
 }
-.wsc-dim .rule::before { left: 0; } .wsc-dim .rule::after { right: 0; }
+/* Composition by size — the one graphic, replacing the per-category figures. */
+.wsc-bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--border); }
+.wsc-bar i { display: block; height: 100%; }
+.wsc-meta { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wsc-meta b { color: var(--text); font-weight: 600; }
 
-/* Category composition, proportional to bytes on disk. */
-.wsc-bars { display: flex; height: 7px; border: 1px solid var(--text); overflow: hidden; }
-.wsc-bars i { display: block; height: 100%; }
-.wsc-legend { font-family: var(--mono); font-size: 9.5px; color: var(--muted); line-height: 1.7; }
-.wsc-legend b { color: var(--text); font-weight: 700; }
-
-/* Title block — the strip a real drawing carries at its lower edge. */
-.wsc-block {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--border); font-family: var(--mono); font-size: 10px;
-}
-.wsc-block div { padding: 6px 9px; }
-.wsc-block div + div { border-left: 1px solid var(--border); }
-.wsc-block s {
-  display: block; text-decoration: none; font-size: 8.5px; letter-spacing: .12em;
-  color: var(--muted); text-transform: uppercase; margin-bottom: 1px;
-}
-.wsc-block b { font-weight: 700; font-variant-numeric: tabular-nums; }
-
-/* Actions share the title block's footprint instead of reserving their own row:
-   on hover they cover it. No layout shift, and no dead strip under every card. */
-.wsc-foot { position: relative; }
+/* Actions overlay the card's lower edge on hover. Nothing is reserved, so the
+   card hugs its content and no empty strip sits under every deck. */
 .wsc-actions {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; gap: 4px; padding: 0 8px;
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; gap: 4px; padding: 7px 8px;
   background: var(--surface); border-top: 1px solid var(--border);
   opacity: 0; pointer-events: none; transition: opacity .12s;
 }
 .workspace-card:hover .wsc-actions,
 .workspace-card.selected .wsc-actions,
 .workspace-card:focus-within .wsc-actions { opacity: 1; pointer-events: auto; }
-.wsc-broken { padding: 14px; font-family: var(--mono); font-size: 11px; color: var(--danger); }
+.wsc-broken { padding: 0 13px 12px; font-size: 11.5px; color: var(--danger); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip {
   font-size: 11px;
@@ -815,7 +768,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
       <div class="sheet">
         <div class="sheet-head">
           <span class="sheet-title">Deck registry</span>
-          <span class="sheet-sub" id="sheet-sub"></span>
         </div>
         <div id="home-cards" class="card-grid"></div>
         <div class="sheet-foot">
@@ -1186,8 +1138,6 @@ function renderHome() {
     return;
   }
   const n = state.workspaces.length;
-  const sub = document.getElementById("sheet-sub");
-  if (sub) sub.textContent = `${n} ${n === 1 ? "sheet" : "sheets"} · scale 1:1`;
   const footR = document.getElementById("sheet-foot-right");
   if (footR) {
     const bytes = Object.values(state.wsSummary).reduce((a, s) => a + (s.bytes || 0), 0);
@@ -1201,24 +1151,32 @@ function renderHome() {
 
     if (!s || s.broken) {
       return `<div class="workspace-card" data-ws="${esc(name)}" onclick="openWorkspace('${sn}')">
-        <div class="wsc-body"><div class="wsc-top">
-          <span class="wsc-name">${esc(name)}</span>
-        </div></div>
-        <div class="wsc-broken">manifest unreadable</div>
+        <div class="wsc-body">
+          <div class="wsc-top"><span class="wsc-name">${esc(name)}</span></div>
+          <div class="wsc-broken">manifest unreadable</div>
+        </div>
       </div>`;
     }
 
-    // Composition bar: share of bytes per category, floored so a tiny category
-    // still draws as a visible sliver instead of vanishing.
+    // Composition by size. Each slice is floored so a category that is a rounding
+    // error of the deck still draws as a sliver rather than disappearing.
     const total = Math.max(1, s.categories.reduce((a, c) => a + c.bytes, 0));
-    const bars = s.categories.map(c => {
-      const pct = Math.max(1.5, (c.bytes / total) * 100);
-      return `<i style="background:${CAT_COLORS[c.category] ?? "#7C8687"};width:${pct}%"
-                 title="${esc(c.category)} — ${fmtBytes(c.bytes)}"></i>`;
-    }).join("");
+    const bar = s.categories.map(c =>
+      `<i style="background:${CAT_COLORS[c.category] ?? "var(--cat-unknown)"};width:${Math.max(1.5, (c.bytes / total) * 100)}%"
+          title="${esc(c.category)} — ${fmtBytes(c.bytes)}"></i>`).join("");
 
-    const legend = s.categories.slice(0, 3)
-      .map(c => `${esc(c.category)} ${fmtBytes(c.bytes)}`).join("  ·  ");
+    // Cap the chips so a deck with six categories cannot stretch the card; the
+    // remainder collapses into a +N.
+    const SHOWN = 3;
+    const shown = s.categories.slice(0, SHOWN);
+    const extra = s.categories.length - shown.length;
+    const chips = shown.map(c => {
+      const col = CAT_COLORS[c.category] ?? "var(--cat-unknown)";
+      return `<span class="wsc-chip" style="background:color-mix(in srgb, ${col} 16%, transparent);color:${col}">${esc(c.category)}</span>`;
+    }).join("") + (extra > 0
+      ? `<span class="wsc-chip" style="background:color-mix(in srgb, var(--muted) 14%, transparent);color:var(--muted)"
+               title="${esc(s.categories.slice(SHOWN).map(c => c.category).join(", "))}">+${extra}</span>`
+      : "");
 
     return `<div class="workspace-card${sel ? " selected" : ""}" data-ws="${esc(name)}"
                  tabindex="0" role="button" aria-label="Open workspace ${esc(name)}"
@@ -1230,26 +1188,16 @@ function renderHome() {
                  aria-label="Select ${esc(name)}"
                  onchange="toggleWsSelect('${sn}', this)" onclick="event.stopPropagation()">
           <span class="wsc-name">${esc(name)}</span>
-          <span class="wsc-open">Open ▸</span>
+          <span class="wsc-open">Open</span>
         </div>
-        <div class="wsc-dim">0<span class="rule"></span>${fmtBytes(s.bytes)}</div>
-        <div class="wsc-bars">${bars}</div>
-        <div class="wsc-legend">
-          <b>${s.file_count}</b> files &nbsp;·&nbsp; <b>${s.split_count}</b> splits${
-            s.sub_count ? ` &nbsp;·&nbsp; <b>${s.sub_count}</b> sub` : ""}<br>${legend}
-        </div>
+        <div class="wsc-chips">${chips}</div>
+        <div class="wsc-bar">${bar}</div>
+        <div class="wsc-meta"><b>${s.file_count}</b> files · <b>${fmtBytes(s.bytes)}</b> · ${fmtCardDate(s.updated_at)}</div>
       </div>
-      <div class="wsc-foot">
-        <div class="wsc-block">
-          <div><s>Source</s><b>${esc((s.source_name || "").replace(/\.inp$/i, "")).slice(0, 11)}</b></div>
-          <div><s>Files</s><b>${s.file_count}</b></div>
-          <div><s>Updated</s><b>${fmtSheetDate(s.updated_at)}</b></div>
-        </div>
-        <div class="wsc-actions" onclick="event.stopPropagation()">
+      <div class="wsc-actions" onclick="event.stopPropagation()">
           <button class="btn btn-ghost btn-sm" onclick="renameWorkspace('${sn}')" title="Rename">Rename</button>
           <button class="btn btn-ghost btn-sm" onclick="exportWsCard('${sn}')" title="Export ZIP">Export</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteWsCard('${sn}')" title="Delete">Delete</button>
-        </div>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteWsCard('${sn}')" title="Delete">Delete</button>
       </div>
     </div>`;
   }).join("");
@@ -1262,13 +1210,16 @@ function fmtBytes(n) {
   return `${(n / 1048576).toFixed(1)} MB`;
 }
 
-// Drawing sheets date as DD MMM YY — short, unambiguous, and monospaced.
-function fmtSheetDate(iso) {
+// Short date for the card meta line: "7 Aug", with the year only when it is not
+// the current one, so last year's decks are never ambiguous.
+function fmtCardDate(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d)) return "—";
-  const M = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-  return `${String(d.getDate()).padStart(2, "0")} ${M[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+  const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const now = new Date();
+  const year = d.getFullYear() === now.getFullYear() ? "" : ` ${d.getFullYear()}`;
+  return `${d.getDate()} ${M[d.getMonth()]}${year}`;
 }
 
 // ── Workspace selection ───────────────────────────────────────────────────────
