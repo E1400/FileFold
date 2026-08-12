@@ -115,7 +115,53 @@ async def get_sub_options():
 
 @app.get("/api/workspaces")
 async def list_all_workspaces():
-    return {"workspaces": list_workspaces()}
+    """Workspace names plus a cheap summary for the registry cards.
+
+    Everything here comes from the manifest and os.stat — never from reading file
+    contents. A mesh deck can run to six figures of lines, and the home screen
+    must not pay that cost on every load just to show a size.
+    """
+    names = list_workspaces()
+    summaries = []
+    for name in names:
+        ws_dir = workspace_path(name)
+        try:
+            ws = Workspace.load(ws_dir)
+        except (FileNotFoundError, KeyError, ValueError):
+            summaries.append({"name": name, "broken": True})
+            continue
+
+        def _size(fn: str) -> int:
+            p = ws_dir / fn
+            try:
+                return p.stat().st_size
+            except OSError:
+                return 0
+
+        by_cat: dict[str, int] = {}
+        sub_count = 0
+        for sel in ws.selections:
+            by_cat[sel.category.value] = by_cat.get(sel.category.value, 0) + _size(sel.filename)
+            for ss in sel.sub_selections:
+                if (ws_dir / ss.filename).exists():
+                    sub_count += 1
+                    by_cat[sel.category.value] = by_cat.get(sel.category.value, 0) + _size(ss.filename)
+
+        present = [fn for fn in ws.file_records if (ws_dir / fn).exists()]
+        summaries.append({
+            "name": name,
+            "source_name": ws.source_name,
+            "updated_at": ws.updated_at,
+            "file_count": len(present),
+            "split_count": len(ws.selections),
+            "sub_count": sub_count,
+            "bytes": sum(_size(fn) for fn in present),
+            "categories": [
+                {"category": c, "bytes": b}
+                for c, b in sorted(by_cat.items(), key=lambda kv: -kv[1])
+            ],
+        })
+    return {"workspaces": names, "summaries": summaries}
 
 
 @app.post("/api/workspaces")
