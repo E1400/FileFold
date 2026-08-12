@@ -40,6 +40,14 @@ button, input, select, textarea { font: inherit; }
   --cat-section:  #6E5580;
   --cat-unknown:  #636763;
 
+  /* Type scale. Four steps only — the previous sprawl of ten sizes and three
+     weights is what made the page read as inconsistent. Weights are 400 and 600;
+     nothing else. */
+  --fs-micro: 11px;   /* uppercase labels, footer, badges */
+  --fs-sm:    12px;   /* secondary and meta text */
+  --fs-base:  13px;   /* default UI text */
+  --fs-lg:    15px;   /* titles: card names, screen titles, logo */
+
   --radius:   2px;
   --sidebar:  220px;
   --mono:     ui-monospace, "SF Mono", Menlo, "JetBrains Mono", Consolas, monospace;
@@ -104,7 +112,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: var(--fs-lg);
   line-height: 1.5;
   display: flex;
   height: 100vh;
@@ -134,7 +142,7 @@ body {
   flex-shrink: 0;
 }
 .logo-text {
-  font-size: 14.5px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   letter-spacing: -.012em;
   color: var(--text);
@@ -146,7 +154,7 @@ body {
 }
 .sidebar-section {
   padding: 6px 14px 4px;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -161,7 +169,7 @@ body {
   border-radius: 0;
   transition: background .1s;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-base);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -198,7 +206,7 @@ body {
   background: var(--surface);
   flex-shrink: 0;
 }
-.topbar h1 { font-size: 14.5px; font-weight: 600; letter-spacing: -.012em; flex: 1; }
+.topbar h1 { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.012em; flex: 1; }
 .content { padding: 28px 32px; flex: 1; }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -209,8 +217,8 @@ body {
   padding: 6px 14px;
   border-radius: var(--radius);
   border: 1px solid transparent;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-base);
+  font-weight: 600;
   cursor: pointer;
   transition: opacity .15s, background .15s;
   text-decoration: none;
@@ -225,7 +233,7 @@ body {
 .btn-ghost:hover { background: var(--surface2); }
 .btn-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
 .btn-danger:hover { background: var(--danger); color: #fff; }
-.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-sm { padding: 4px 10px; font-size: var(--fs-sm); }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── Cards ──────────────────────────────────────────────── */
@@ -248,12 +256,12 @@ body {
   border-bottom: 1px solid var(--text);
   padding-bottom: 8px; margin-bottom: 16px;
 }
-.sheet-title { font-size: 13px; font-weight: 600; letter-spacing: -.005em; }
+.sheet-title { font-size: var(--fs-base); font-weight: 600; letter-spacing: -.005em; }
 .sheet-foot {
   margin-top: auto; padding: 9px 0 12px;
   border-top: 1px solid var(--text);
   display: flex; justify-content: space-between; gap: 16px;
-  font-size: 11px; color: var(--muted);
+  font-size: var(--fs-micro); color: var(--muted);
 }
 
 .card-grid {
@@ -280,13 +288,13 @@ body {
 .wsc-top  { display: flex; align-items: center; gap: 8px; }
 .wsc-check { flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
 .wsc-name {
-  font-size: 14.5px; font-weight: 600; letter-spacing: -.012em;
+  font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.012em;
   flex: 1; word-break: break-word; line-height: 1.3;
 }
 /* Explicit open affordance: only the title and the words "Click to open" used to
    be clickable, so clicking the card body appeared to do nothing. */
 .wsc-open {
-  font-size: 10.5px; color: var(--muted); white-space: nowrap;
+  font-size: var(--fs-micro); color: var(--muted); white-space: nowrap;
   opacity: 0; transition: opacity .12s;
 }
 .workspace-card:hover .wsc-open,
@@ -295,13 +303,14 @@ body {
 /* What is in the deck, without listing sizes for each one. */
 .wsc-chips { display: flex; gap: 4px; flex-wrap: wrap; }
 .wsc-chip {
-  font-size: 10px; padding: 1px 6px; border-radius: var(--radius);
-  line-height: 1.5; white-space: nowrap;
+  font-size: var(--fs-micro); padding: 1px 6px; border-radius: var(--radius);
+  line-height: 1.5; white-space: nowrap; font-weight: 600;
+  border: 1px solid transparent;   /* colour set inline, per category */
 }
 /* Composition by size — the one graphic, replacing the per-category figures. */
 .wsc-bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--border); }
 .wsc-bar i { display: block; height: 100%; }
-.wsc-meta { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wsc-meta { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .wsc-meta b { color: var(--text); font-weight: 600; }
 
 /* Actions overlay the card's lower edge on hover. Nothing is reserved, so the
@@ -315,14 +324,16 @@ body {
 .workspace-card:hover .wsc-actions,
 .workspace-card.selected .wsc-actions,
 .workspace-card:focus-within .wsc-actions { opacity: 1; pointer-events: auto; }
-.wsc-broken { padding: 0 13px 12px; font-size: 11.5px; color: var(--danger); }
+.wsc-broken { padding: 0 13px 12px; font-size: var(--fs-sm); color: var(--danger); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-family: var(--mono);
   padding: 2px 7px;
-  border-radius: 4px;
-  font-weight: 500;
+  border-radius: var(--radius);
+  font-weight: 600;
+  border: 1px solid transparent;   /* colour set inline, per category */
+  line-height: 1.45;
 }
 
 /* ── Drop zone ──────────────────────────────────────────── */
@@ -341,13 +352,13 @@ body {
   color: var(--text);
 }
 .drop-zone .icon { font-size: 28px; margin-bottom: 8px; }
-.drop-zone p { font-size: 13px; }
-.drop-zone .hint { font-size: 11px; margin-top: 4px; color: var(--muted); }
+.drop-zone p { font-size: var(--fs-base); }
+.drop-zone .hint { font-size: var(--fs-micro); margin-top: 4px; color: var(--muted); }
 
 /* ── Block inspector tree ───────────────────────────────── */
 .inspector-tree {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.7;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -368,16 +379,16 @@ body {
 }
 .tree-node-header:hover { background: var(--surface2); }
 .tree-toggle { width: 14px; text-align: center; color: var(--muted); flex-shrink: 0; }
-.tree-kw { font-weight: 700; }
+.tree-kw { font-weight: 600; }
 .tree-cat {
-  font-size: 10px;
+  font-size: var(--fs-micro);
   padding: 1px 5px;
   border-radius: 3px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .04em;
 }
-.tree-lines { color: var(--muted); font-size: 10px; }
+.tree-lines { color: var(--muted); font-size: var(--fs-micro); }
 .tree-children { padding-left: 14px; display: none; }
 .tree-children.open { display: block; }
 
@@ -413,12 +424,12 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .sub-option-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.sub-option-row input[type="text"] { font-size: 11px; padding: 4px 8px; width: 160px; }
-.tree-indent { width: 20px; flex-shrink: 0; color: var(--muted); font-family: var(--mono); font-size: 12px; text-align: center; }
+.sub-option-row input[type="text"] { font-size: var(--fs-micro); padding: 4px 8px; width: 160px; }
+.tree-indent { width: 20px; flex-shrink: 0; color: var(--muted); font-family: var(--mono); font-size: var(--fs-sm); text-align: center; }
 .filename-cell { display: flex; align-items: center; }
 input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 input[type="text"] {
@@ -428,7 +439,7 @@ input[type="text"] {
   padding: 5px 8px;
   color: var(--text);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   width: 100%;
 }
 input[type="text"]:focus { outline: none; border-color: var(--accent); }
@@ -438,7 +449,7 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
 .file-table th {
   text-align: left;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -448,12 +459,18 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
 .file-table td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--fs-base);
   vertical-align: middle;
 }
 .file-table tr:last-child td { border-bottom: none; }
 .file-table tr:hover td { background: var(--surface2); }
-.file-table .filename { font-family: var(--mono); font-size: 12px; }
+.file-table .filename { font-family: var(--mono); font-size: var(--fs-sm); }
+/* Filenames read as floating text without a baseline to sit on. */
+.file-table .filename .filename-cell > span:last-child,
+.file-table .filename-text {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1px;
+}
 
 /* ── Status badges ──────────────────────────────────────── */
 .badge {
@@ -462,19 +479,27 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
   gap: 4px;
   padding: 2px 8px;
   border-radius: 10px;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
 }
-.badge-ok      { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
-.badge-warn    { background: color-mix(in srgb, var(--warn) 15%, transparent);    color: var(--warn); }
-.badge-danger  { background: color-mix(in srgb, var(--danger) 15%, transparent);  color: var(--danger); }
-.badge-muted   { background: var(--surface2); color: var(--muted); }
+.badge-ok      { background: color-mix(in srgb, var(--success) 22%, transparent); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 40%, transparent); }
+.badge-warn    { background: color-mix(in srgb, var(--warn) 22%, transparent);    color: var(--warn);    border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.badge-danger  { background: color-mix(in srgb, var(--danger) 22%, transparent);  color: var(--danger);  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
+.badge-muted   { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
 .badge-accent  { background: color-mix(in srgb, var(--accent) 15%, transparent);  color: var(--accent); }
+/* Sub-children previously carried an inline "var(--accent)33" background, which
+   is a variable glued to an alpha suffix — invalid, so it rendered with no
+   bubble at all. Give it its own class and a visible fill. */
+.badge-sub {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--text) 24%, transparent);
+}
 
 /* ── Reimport sections ──────────────────────────────────── */
 .reimport-section { margin-bottom: 20px; }
 .reimport-section h3 {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -496,11 +521,11 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
 }
 .reimport-row.pending { border-color: var(--warn); }
 .reimport-row.safe    { border-color: color-mix(in srgb, var(--success) 30%, transparent); }
-.reimport-row .fname  { font-family: var(--mono); font-size: 12px; flex: 1; }
+.reimport-row .fname  { font-family: var(--mono); font-size: var(--fs-sm); flex: 1; }
 
 /* ── Dividers & layout helpers ──────────────────────────── */
 .section-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .07em;
@@ -513,7 +538,7 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
 .spacer { flex: 1; }
 hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .text-muted { color: var(--muted); }
-.text-sm { font-size: 12px; }
+.text-sm { font-size: var(--fs-sm); }
 .mono { font-family: var(--mono); }
 
 /* ── Views (shown/hidden) ───────────────────────────────── */
@@ -559,7 +584,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--fs-base);
   min-width: 240px;
   box-shadow: 0 4px 16px rgba(0,0,0,.4);
   animation: slide-in .2s ease;
@@ -585,8 +610,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* ── Workspace name input on new-workspace ──────────────── */
 .field { display: flex; flex-direction: column; gap: 4px; }
-.field label { font-size: 12px; font-weight: 500; color: var(--muted); }
-.field input[type="text"] { font-size: 13px; padding: 8px 10px; }
+.field label { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); }
+.field input[type="text"] { font-size: var(--fs-base); padding: 8px 10px; }
 
 /* ── Empty state ────────────────────────────────────────── */
 .empty {
@@ -595,7 +620,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   color: var(--muted);
 }
 .empty .icon { font-size: 40px; margin-bottom: 12px; }
-.empty p { font-size: 14px; margin-bottom: 16px; }
+.empty p { font-size: var(--fs-lg); margin-bottom: 16px; }
 
 .modal-loading {
   display: flex;
@@ -604,7 +629,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   gap: 10px;
   padding: 40px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 /* ── Code editor ─────────────────────────────────────────── */
 .editor-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
@@ -612,7 +637,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .header-find { display: flex; align-items: center; gap: 4px; }
 .header-find-wrap { position: relative; display: flex; align-items: center; }
 .header-find input {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   width: 150px;
   padding: 4px 50px 4px 8px;
   background: var(--surface2);
@@ -627,7 +652,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   position: absolute;
   right: 8px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--muted);
   pointer-events: none;
   white-space: nowrap;
@@ -637,7 +662,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 #chunk-hint {
   margin-left: 12px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--muted);
   pointer-events: none;
   white-space: nowrap;
@@ -658,7 +683,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   top: 0; right: 0; left: 0;
   padding: 16px 6px 16px 0;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--muted);
   text-align: right;
@@ -672,7 +697,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   padding: 16px;
   margin: 0;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   white-space: pre;
   tab-size: 4;
@@ -686,7 +711,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   inset: 0;
   padding: 16px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   white-space: pre;
   tab-size: 4;
@@ -740,7 +765,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   </div>
   <div class="sidebar-footer">
     <button class="btn btn-primary btn-sm" style="flex:1" onclick="showView('new-workspace')">+ New</button>
-    <a class="btn btn-ghost btn-sm" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener" title="Download desktop app" style="gap:5px;font-size:11px">
+    <a class="btn btn-ghost btn-sm" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener" title="Download desktop app" style="gap:5px">
       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v13M7 10l5 5 5-5"/><path d="M3 20h18"/></svg>
       Desktop App
     </a>
@@ -938,7 +963,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
     <div class="topbar">
       <button class="btn btn-ghost btn-sm" onclick="closeEditor()">← Back</button>
       <span class="unsaved-dot" id="unsaved-dot"></span>
-      <span id="editor-filename" class="mono" style="font-size:13px;font-weight:600"></span>
+      <span id="editor-filename" class="mono" style="font-weight:600"></span>
       <span class="spacer"></span>
       <div class="header-find" id="header-find">
         <div class="header-find-wrap">
@@ -1007,26 +1032,23 @@ const state = {
   },
 };
 
-const CAT_COLORS = {
-  mesh:     "#58A6FF",
-  material: "#F0883E",
-  step:     "#BC8CFF",
-  loads:    "#56D364",
-  contact:  "#FF7B72",
-  output:   "#79C0FF",
-  model:    "#E3B341",
-  section:  "#D2A8FF",
-  unknown:  "#7D8590",
-};
-
-// Mirrors NON_EXTRACTABLE in api/main.py — the server rejects these outright.
-// "model" owns *INCLUDE, so extracting it swallows the mother's own include lines
-// and re-parents every other child underneath it.
-const NON_EXTRACTABLE = new Set(["unknown", "model"]);
+// Category colour lives in CSS (--cat-*) and nowhere else. Returning a var()
+// reference rather than a hex means chips follow the theme automatically — the
+// previous JS table held the old palette, so retuning the tokens changed nothing
+// on screen and the two sets had silently diverged.
+const CAT_NAMES = new Set([
+  "mesh", "material", "step", "loads", "contact", "output", "model", "section", "unknown",
+]);
+function CAT_COLORS_var(cat) {
+  return `var(--cat-${CAT_NAMES.has(cat) ? cat : "unknown"})`;
+}
+// Back-compat alias for the places that read a colour for a category.
+const CAT_COLORS = new Proxy({}, { get: (_, k) => CAT_COLORS_var(String(k)) });
 
 function catChip(cat) {
-  const c = CAT_COLORS[cat] ?? "#7D8590";
-  return `<span class="chip" style="background:${c}22;color:${c}">${cat}</span>`;
+  const c = CAT_COLORS_var(cat);
+  return `<span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);` +
+         `border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1162,7 +1184,7 @@ function renderHome() {
     // error of the deck still draws as a sliver rather than disappearing.
     const total = Math.max(1, s.categories.reduce((a, c) => a + c.bytes, 0));
     const bar = s.categories.map(c =>
-      `<i style="background:${CAT_COLORS[c.category] ?? "var(--cat-unknown)"};width:${Math.max(1.5, (c.bytes / total) * 100)}%"
+      `<i style="background:${CAT_COLORS_var(c.category)};width:${Math.max(1.5, (c.bytes / total) * 100)}%"
           title="${esc(c.category)} — ${fmtBytes(c.bytes)}"></i>`).join("");
 
     // Cap the chips so a deck with six categories cannot stretch the card; the
@@ -1171,10 +1193,11 @@ function renderHome() {
     const shown = s.categories.slice(0, SHOWN);
     const extra = s.categories.length - shown.length;
     const chips = shown.map(c => {
-      const col = CAT_COLORS[c.category] ?? "var(--cat-unknown)";
-      return `<span class="wsc-chip" style="background:color-mix(in srgb, ${col} 16%, transparent);color:${col}">${esc(c.category)}</span>`;
+      const col = CAT_COLORS_var(c.category);
+      return `<span class="wsc-chip" style="background:color-mix(in srgb, ${col} 26%, transparent);` +
+             `border-color:color-mix(in srgb, ${col} 45%, transparent);color:${col}">${esc(c.category)}</span>`;
     }).join("") + (extra > 0
-      ? `<span class="wsc-chip" style="background:color-mix(in srgb, var(--muted) 14%, transparent);color:var(--muted)"
+      ? `<span class="wsc-chip" style="background:color-mix(in srgb, var(--muted) 22%, transparent);border-color:color-mix(in srgb, var(--muted) 40%, transparent);color:var(--muted)"
                title="${esc(s.categories.slice(SHOWN).map(c => c.category).join(", "))}">+${extra}</span>`
       : "");
 
@@ -1252,7 +1275,7 @@ function renameWorkspace(name) {
   const input = document.createElement("input");
   input.type = "text";
   input.value = name;
-  input.style.cssText = "font-size:14px;font-weight:600;width:100%;background:transparent;border:none;border-bottom:1px solid var(--accent);outline:none;color:var(--text);padding:0";
+  input.style.cssText = "font-size:var(--fs-lg);font-weight:600;width:100%;background:transparent;border:none;border-bottom:1px solid var(--accent);outline:none;color:var(--text);padding:0";
   let committed = false;
   const finish = async () => {
     if (committed) return;
@@ -1390,7 +1413,7 @@ function renderDetail(data) {
     const roleBadge = f.role === "mother"
       ? `<span class="badge badge-muted">mother</span>`
       : f.role === "grandchild"
-        ? `<span class="badge" style="background:var(--accent)33;color:var(--accent);font-size:10px">sub-child</span>`
+        ? `<span class="badge badge-sub">sub-child</span>`
         : `<span class="badge badge-accent">child</span>`;
 
     const lineCount = f.line_count != null
@@ -1402,7 +1425,7 @@ function renderDetail(data) {
       : "";
 
     return `<tr>
-      <td class="filename"><div class="filename-cell">${indent}${esc(f.filename)}</div></td>
+      <td class="filename"><div class="filename-cell">${indent}<span class="filename-text">${esc(f.filename)}</span></div></td>
       <td>${roleBadge}</td>
       <td>${f.category ? catChip(f.category) : "—"}</td>
       <td>${lineCount}</td>
@@ -1496,7 +1519,7 @@ function renderSplitsTab(data) {
     </div>`;
 
   el.innerHTML = masterRow + allCats.map(cat => {
-    const c = CAT_COLORS[cat] ?? "#7D8590";
+    const c = CAT_COLORS_var(cat);
     const existing = existingByCategory[cat];
     const isExtracted = !!existing;
     const defaultFn = isExtracted ? existing.filename : `${cat}.inp`;
@@ -1552,9 +1575,9 @@ function renderSplitsTab(data) {
         <input type="checkbox" id="ws-sel-${cat}" ${isExtracted ? "checked" : ""}
                onchange="wsToggleSplitRow('${cat}')">
         <label for="ws-sel-${cat}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
-          <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
-          ${isExtracted ? `<span class="badge badge-accent" style="font-size:10px">extracted</span>` : ""}
-          ${oneWay ? `<span class="badge" style="font-size:10px;background:#E3B34122;color:#E3B341"
+          <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
+          ${isExtracted ? `<span class="badge badge-accent">extracted</span>` : ""}
+          ${oneWay ? `<span class="badge badge-warn"
                             title="${cat} owns the *INCLUDE directives. Unchecking folds it back into the mother permanently — it cannot be re-extracted.">can't re-split</span>` : ""}
         </label>
       </div>
@@ -1860,13 +1883,13 @@ function renderInspector(blocks) {
 }
 
 function treeNodeHTML(b, depth) {
-  const c = CAT_COLORS[b.category] ?? "#7D8590";
+  const c = CAT_COLORS_var(b.category);
   const hasChildren = b.children && b.children.length > 0;
   return `<div class="tree-node">
     <div class="tree-node-header">
       <span class="tree-toggle">${hasChildren ? "▸" : " "}</span>
       <span class="tree-kw" style="color:${c}">*${esc(b.keyword)}</span>
-      <span class="tree-cat" style="background:${c}22;color:${c}">${esc(b.category)}</span>
+      <span class="tree-cat" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${esc(b.category)}</span>
       <span class="tree-lines">${b.line_start}–${b.line_end}</span>
     </div>
     ${hasChildren ? `<div class="tree-children">${b.children.map(ch => treeNodeHTML(ch, depth+1)).join("")}</div>` : ""}
@@ -1897,7 +1920,7 @@ function renderSplitConfig(blocks) {
     </div>`;
 
   el.innerHTML = masterRow + [...cats].map(cat => {
-    const c = CAT_COLORS[cat] ?? "#7D8590";
+    const c = CAT_COLORS_var(cat);
     const id = `sel-${cat}`;
     const subOpts = state.subOptions[cat] ?? [];
     const subPanel = subOpts.length ? `
@@ -1921,7 +1944,7 @@ function renderSplitConfig(blocks) {
     return `<div class="split-row" id="row-${cat}">
       <label>
         <input type="checkbox" id="${id}" onchange="toggleSplitRow('${cat}')">
-        <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
+        <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
       </label>
       <input type="text" id="fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
       <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
@@ -2176,11 +2199,11 @@ function renderReimpNewCats(blocks) {
 
   section.style.display = "";
   el.innerHTML = newCats.map(cat => {
-    const c = CAT_COLORS[cat] ?? "#7D8590";
+    const c = CAT_COLORS_var(cat);
     return `<div class="split-row" id="reimp-row-${cat}">
       <label>
         <input type="checkbox" id="reimp-sel-${cat}" onchange="toggleReimpNewCat('${cat}')">
-        <span class="chip" style="background:${c}22;color:${c}">${cat}</span>
+        <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
       </label>
       <input type="text" id="reimp-fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
       <span class="text-muted text-sm mono">new</span>
