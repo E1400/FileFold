@@ -5,8 +5,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, UploadFile
 
-from filefold.core.keywords import CATEGORY_SUB_KEYWORDS, CATEGORY_SUB_OPTIONS
+from filefold.core.keywords import CATEGORY_SUB_OPTIONS, Category
 from filefold.core.parser import parse
+from filefold.core.subsplits import discover_options
 
 router = APIRouter()
 
@@ -22,37 +23,29 @@ async def inspect_file(file: UploadFile = File(...)):
 
     try:
         blocks = parse(tmp_path)
+        opts = _sub_options_json(blocks)
         return {
             "filename": file.filename,
             "blocks": _blocks_to_json(blocks),
-            "sub_cats": _present_sub_cats(blocks),
+            "sub_options": opts,
+            "sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in opts.items()},
         }
     finally:
         tmp_path.unlink(missing_ok=True)
 
 
-def _present_sub_cats(blocks) -> dict[str, list[str]]:
-    """Per extractable category, the sub-categories that actually occur in these blocks.
+def _sub_options_json(blocks) -> dict[str, list[dict[str, str]]]:
+    """Per category, the sub-split options that would actually produce a file.
 
-    The create menu must not offer a sub-split (e.g. "Ties") for a deck that has no
-    such blocks: it would be a checkbox that creates nothing.
+    The create menu must not offer a sub-split (e.g. "Ties", or a material that is not
+    in the deck) that would create nothing. Includes name-based options such as one
+    per material, step, part and element type.
     """
-    out: dict[str, list[str]] = {}
-    for cat, kw_map in CATEGORY_SUB_KEYWORDS.items():
-        found: set[str] = set()
-        def scan(bs):
-            # Only descend into blocks of this category (e.g. *PART for mesh). A
-            # *BOUNDARY inside a *STEP travels with its step and can never be
-            # sub-split, so it must not make "boundary" look available.
-            for b in bs:
-                if b.category == cat:
-                    sc = kw_map.get(b.keyword)
-                    if sc:
-                        found.add(sc)
-                    scan(b.children)
-        scan(blocks)
-        if found:
-            out[cat.value] = sorted(found)
+    out: dict[str, list[dict[str, str]]] = {}
+    for cat in Category:
+        opts = discover_options(cat, blocks)
+        if opts:
+            out[cat.value] = [o.as_dict() for o in opts]
     return out
 
 

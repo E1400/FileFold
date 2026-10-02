@@ -6,9 +6,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from filefold.core.keywords import CATEGORY_SUB_KEYWORDS, Category
+from filefold.core.keywords import Category
 from filefold.core.parser import parse
 from filefold.core.splitter import read_raw
+from filefold.core.subsplits import discover_options, option_from_key
 from filefold.core.workspace import Workspace
 
 from ..common import (
@@ -153,44 +154,33 @@ async def get_workspace(name: str):
         if v not in _SKIP:
             available_cats.add(v)
 
-    # Compute which sub-categories exist per category.
-    # If the category is already extracted, scan the child file (handles *PART nesting).
-    # If still in the mother, scan only the top-level blocks of that category.
-    def _scan_sub_cats(blocks, kw_map, found):
-        for b in blocks:
-            sc = kw_map.get(b.keyword)
-            if sc:
-                found.add(sc)
-            _scan_sub_cats(b.children, kw_map, found)
-
-    available_sub_cats: dict[str, list[str]] = {}
+    # Sub-split options per category, from what is actually in the deck.
+    # Already extracted: scan the child file (handles *PART nesting). Still in the
+    # mother: scan only that category's top-level blocks.
+    sub_options: dict[str, list[dict[str, str]]] = {}
     sel_by_cat = {s.category.value: s for s in ws.selections}
-    for cat_str in available_cats:
+    for cat_str in sorted(available_cats):
         try:
             cat_enum = Category(cat_str)
         except ValueError:
             continue
-        kw_map = CATEGORY_SUB_KEYWORDS.get(cat_enum)
-        if not kw_map:
-            continue
-        found: set[str] = set()
         sel = sel_by_cat.get(cat_str)
         if sel and (ws_dir / sel.filename).exists():
-            _scan_sub_cats(parse(ws_dir / sel.filename), kw_map, found)
+            opts = discover_options(cat_enum, parse(ws_dir / sel.filename))
             # A sub-category that has already been extracted no longer appears in
             # the child file (its blocks live in the grandchild), so the scan above
-            # cannot see it. Seed it from the recorded sub-selections — same rule
-            # as case (a) for available_cats — otherwise the UI drops the row and
-            # the user can neither uncheck it nor keep it across an apply.
+            # cannot see it. Seed it from the recorded sub-selections, otherwise the
+            # UI drops the row and the user can neither uncheck it nor keep it
+            # across an apply.
+            seen = {o.sub_category for o in opts}
             for ss in sel.sub_selections:
-                if (ws_dir / ss.filename).exists():
-                    found.add(ss.sub_category)
+                if (ws_dir / ss.filename).exists() and ss.sub_category not in seen:
+                    opts.append(option_from_key(cat_enum, ss.sub_category))
         else:
-            for b in mother_blocks:
-                if b.category == cat_enum:
-                    _scan_sub_cats([b], kw_map, found)
-        if found:
-            available_sub_cats[cat_str] = sorted(found)
+            opts = discover_options(cat_enum, [b for b in mother_blocks if b.category == cat_enum])
+        if opts:
+            sub_options[cat_str] = [o.as_dict() for o in opts]
+    available_sub_cats = {c: [o["sub_category"] for o in os_] for c, os_ in sub_options.items()}
 
     return {
         "name": ws.name,
@@ -207,6 +197,7 @@ async def get_workspace(name: str):
         "files": files,
         "available_categories": sorted(available_cats),
         "available_sub_cats": available_sub_cats,
+        "sub_options": sub_options,
     }
 
 

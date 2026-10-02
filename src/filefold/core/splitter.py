@@ -8,8 +8,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .block import Block, emit
-from .keywords import CATEGORY_SUB_KEYWORDS, Category
+from .keywords import Category
 from .parser import CONTAINER_KEYWORDS
+from .subsplits import KeyState, candidate_keys
 
 # Maps category -> output filename for non-STEP top-level blocks
 CATEGORY_FILES: dict[Category, str] = {
@@ -152,7 +153,7 @@ def compute_split(
     child_lines: dict[str, list[str]] = {}   # filename -> line list
     cat_inserted: set[Category] = set()       # categories already *INCLUDEd in mother
     sub_inserted: dict[str, set[str]] = {}    # parent_filename -> set of sub_cats inserted
-    last_sub: dict[Category, str | None] = {}  # category -> sub_category of the previous block
+    key_state: dict[Category, KeyState] = {}   # per-category routing state, in file order
 
     def _route_sub(block: Block, sel: SplitSelection) -> None:
         """Route one block into sel's child file or its sub-files.
@@ -163,14 +164,12 @@ def compute_split(
         parent child file; only the inner keyword blocks are re-routed.
         """
         sub_map = {ss.sub_category: ss for ss in sel.sub_selections}
-        kw_map = CATEGORY_SUB_KEYWORDS.get(sel.category, {})
-        block_sub_cat = kw_map.get(block.keyword)
-        if block_sub_cat is None and block.inherited:
-            # Unregistered option of the block above: it goes wherever its parent went.
-            block_sub_cat = last_sub.get(sel.category)
-        last_sub[sel.category] = block_sub_cat
+        # Candidate keys are most-specific first (name-based before keyword group);
+        # take the first one the user actually selected.
+        keys = candidate_keys(sel.category, block, key_state.setdefault(sel.category, KeyState()))
+        block_sub_cat = next((k for k in keys if k in sub_map), None)
 
-        if block_sub_cat and block_sub_cat in sub_map:
+        if block_sub_cat:
             ss = sub_map[block_sub_cat]
             child_lines.setdefault(ss.filename, []).extend(emit(block))
             parent_inserts = sub_inserted.setdefault(sel.filename, set())
