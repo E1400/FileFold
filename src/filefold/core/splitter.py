@@ -18,6 +18,8 @@ CATEGORY_FILES: dict[Category, str] = {
     Category.SECTION: "sections.inp",
     Category.MATERIAL: "materials.inp",
     Category.CONTACT: "contact.inp",
+    Category.CONSTRAINT: "constraints.inp",
+    Category.INITIAL: "initial.inp",
     Category.LOADS: "loads.inp",
     Category.OUTPUT: "output.inp",
     Category.STEP: "steps_misc.inp",  # top-level step-type keywords outside a STEP container

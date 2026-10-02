@@ -30,6 +30,14 @@ class Block:
     line_start: int = 0
     line_end: int = 0
 
+    # True when the keyword is not in the registry and the category was inherited
+    # from the preceding block (Abaqus options always follow their parent keyword).
+    inherited: bool = False
+
+    # Keywords of the containers open when this block started, outermost first,
+    # e.g. ("ASSEMBLY", "INSTANCE") or ("PART",). Empty at file top level.
+    context: tuple[str, ...] = ()
+
 
 def emit(block: Block) -> list[str]:
     """Return all verbatim lines for a block and its children, in order."""

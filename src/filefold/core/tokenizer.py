@@ -41,9 +41,27 @@ def tokenize(path: Path) -> Iterator[TokenizedLine]:
 def keyword_of(line: str) -> str:
     """Extract normalized keyword name from a keyword line.
 
-    '*solid section,elset=box' -> 'SOLID SECTION'
+    '*solid  section,elset=box' -> 'SOLID SECTION'
     """
-    return line.lstrip().lstrip("*").partition(",")[0].strip().upper() # Assigns keywords and handles commas
+    name = line.lstrip().lstrip("*").partition(",")[0]
+    return " ".join(name.upper().split())  # also collapses runs of spaces/tabs
+
+
+def _split_commas(text: str) -> list[str]:
+    """Split on commas that are not inside double quotes."""
+    parts: list[str] = []
+    buf: list[str] = []
+    in_quotes = False
+    for ch in text:
+        if ch == '"':
+            in_quotes = not in_quotes
+        if ch == "," and not in_quotes:
+            parts.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    parts.append("".join(buf))
+    return parts
 
 
 def parse_params(line: str) -> dict[str, str | None]:
@@ -51,9 +69,11 @@ def parse_params(line: str) -> dict[str, str | None]:
 
     '*step,inc=100,nlgeom,name=foo' -> {'INC': '100', 'NLGEOM': None, 'NAME': 'foo'}
 
-    Bare flags (no =) get None as their value.
+    Bare flags (no =) get None as their value. Commas inside double quotes belong
+    to the value. Pass the joined text of all continuation lines (see
+    ends_with_continuation) to get the full parameter list of a wrapped keyword.
     """
-    parts = line.strip().split(",")
+    parts = _split_commas(line.strip())
     params: dict[str, str | None] = {}
     for part in parts[1:]:  # parts[0] is the *KEYWORD itself, parts[1:] are parameters
         part = part.strip()
@@ -65,3 +85,8 @@ def parse_params(line: str) -> dict[str, str | None]:
         else:
             params[part.upper()] = None
     return params
+
+
+def ends_with_continuation(line: str) -> bool:
+    """True if a keyword/continuation line ends in a comma, so the next line continues it."""
+    return line.rstrip().endswith(",")

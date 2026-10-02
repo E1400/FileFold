@@ -39,6 +39,8 @@ button, input, select, textarea { font: inherit; }
   --cat-model:    #7A6A3A;
   --cat-section:  #6E5580;
   --cat-unknown:  #636763;
+  --cat-constraint: #6B7F2F;
+  --cat-initial:  #A06A2A;
 
   /* Type scale. Four steps only — the previous sprawl of ten sizes and three
      weights is what made the page read as inconsistent. Weights are 400 and 600;
@@ -80,6 +82,8 @@ button, input, select, textarea { font: inherit; }
     --cat-model:    #BFAE79;
     --cat-section:  #B39BC4;
     --cat-unknown:  #9A9691;
+    --cat-constraint: #AFC278;
+    --cat-initial:  #D6A46A;
   }
 }
 :root[data-theme="dark"] {
@@ -105,6 +109,8 @@ button, input, select, textarea { font: inherit; }
   --cat-model:    #BFAE79;
   --cat-section:  #B39BC4;
   --cat-unknown:  #9A9691;
+  --cat-constraint: #AFC278;
+  --cat-initial:  #D6A46A;
 }
 
 /* ── Base ───────────────────────────────────────────────── */
@@ -1037,7 +1043,7 @@ const state = {
 // previous JS table held the old palette, so retuning the tokens changed nothing
 // on screen and the two sets had silently diverged.
 const CAT_NAMES = new Set([
-  "mesh", "material", "step", "loads", "contact", "output", "model", "section", "unknown",
+  "mesh", "material", "step", "loads", "contact", "constraint", "initial", "output", "model", "section", "unknown",
 ]);
 function CAT_COLORS_var(cat) {
   return `var(--cat-${CAT_NAMES.has(cat) ? cat : "unknown"})`;
