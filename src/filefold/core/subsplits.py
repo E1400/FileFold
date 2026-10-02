@@ -96,11 +96,9 @@ def option_from_key(category: Category, key: str, name: str | None = None) -> Su
             return SubOption(key, opt["label"], opt["default_filename"])
     axis, _, tail = key.partition(".")
     shown = name or tail
-    return SubOption(
-        key,
-        f"{_AXIS_LABEL.get(axis, axis.title())}: {shown}",
-        f"{_AXIS_FILE.get(axis, axis)}-{tail}.inp",
-    )
+    prefix = _AXIS_FILE.get(axis, axis)
+    stem = tail if tail.startswith(prefix) else f"{prefix}-{tail}"   # "step-1", not "step-step-1"
+    return SubOption(key, f"{_AXIS_LABEL.get(axis, axis.title())}: {shown}", f"{stem}.inp")
 
 
 def _display_name(key: str, block: Block) -> str | None:

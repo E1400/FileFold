@@ -108,3 +108,12 @@ def test_unselected_names_stay_in_parent(tmp_path):
     _, files = _split(_blocks(tmp_path), Category.STEP, ["step.load"])
     assert "step.2.inp" not in files
     assert files["p.inp"].count("*STEP") == 1
+
+
+def test_default_filenames_do_not_repeat_the_axis_word():
+    from filefold.core.subsplits import option_from_key
+    assert option_from_key(Category.STEP, "step.step-1").default_filename == "step-1.inp"
+    assert option_from_key(Category.STEP, "step.2").default_filename == "step-2.inp"
+    assert option_from_key(Category.MATERIAL, "material.steel").default_filename == "material-steel.inp"
+    assert option_from_key(Category.MESH, "part.part-1").default_filename == "part-1.inp"
+    assert option_from_key(Category.MESH, "etype.c3d8r").default_filename == "elements-c3d8r.inp"

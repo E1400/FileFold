@@ -21,15 +21,11 @@ function showView(name) {
 // ═══════════════════════════════════════════════════════════════════════════════
 async function loadWorkspaces() {
   try {
-    const [wsData, subOpts] = await Promise.all([
-      api("GET", "/api/workspaces"),
-      api("GET", "/api/sub-options").catch(() => ({})),
-    ]);
+    const wsData = await api("GET", "/api/workspaces");
     state.workspaces = wsData.workspaces ?? [];
     // Summaries drive the registry cards; keyed by name so renderHome can look
     // one up without caring about ordering.
     state.wsSummary = Object.fromEntries((wsData.summaries ?? []).map(s => [s.name, s]));
-    state.subOptions = subOpts;
     renderSidebar();
     renderHome();
   } catch (e) {

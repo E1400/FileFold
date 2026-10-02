@@ -8,7 +8,6 @@ const state = {
   wsData: null,         // full detail response for the open workspace
   inspectResult: null,  // { filename, blocks }
   uploadedFile: null,   // File object
-  subOptions: {},       // { [category]: [{sub_category, label, default_filename}] }
   wsSummary: {},        // { [name]: {file_count, split_count, bytes, categories[]} }
   selectedWs: new Set(), // workspace names selected on home page
   reimp: {

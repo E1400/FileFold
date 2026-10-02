@@ -58,10 +58,7 @@ function renderSplitsTab(data) {
     const existing = existingByCategory[cat];
     const isExtracted = !!existing;
     const defaultFn = isExtracted ? existing.filename : `${cat}.inp`;
-    const availSubs = data.available_sub_cats?.[cat];
-    const subOpts = (state.subOptions[cat] ?? []).filter(
-      opt => !availSubs || availSubs.includes(opt.sub_category)
-    );
+    const subOpts = data.sub_options?.[cat] ?? [];  // per-deck: only what exists
     const existingSubs = {};
     if (existing) existing.sub_selections.forEach(ss => { existingSubs[ss.sub_category] = ss.filename; });
 
@@ -256,10 +253,7 @@ async function applyEditSplits() {
     } else if (!wasExtracted && isChecked) {
       // Extract a brand-new category from the mother file
       const fn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || `${cat}.inp`;
-      const availSubs = data.available_sub_cats?.[cat];
-      const subOpts = (state.subOptions[cat] ?? []).filter(
-        opt => !availSubs || availSubs.includes(opt.sub_category)
-      );
+      const subOpts = data.sub_options?.[cat] ?? [];  // per-deck: only what exists
       const sub_selections = subOpts
         .filter(opt => document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked)
         .map(opt => ({
@@ -278,10 +272,7 @@ async function applyEditSplits() {
       }
 
       // Check sub-split checkbox and filename changes
-      const availSubs = data.available_sub_cats?.[cat];
-      const subOpts = (state.subOptions[cat] ?? []).filter(
-        opt => !availSubs || availSubs.includes(opt.sub_category)
-      );
+      const subOpts = data.sub_options?.[cat] ?? [];  // per-deck: only what exists
       if (!subOpts.length) return;  // no sub-options for this category
 
       const existingSubMap = {};

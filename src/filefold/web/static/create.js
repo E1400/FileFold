@@ -106,9 +106,9 @@ function renderSplitConfig(blocks) {
   el.innerHTML = masterRow + [...cats].map(cat => {
     const c = CAT_COLORS_var(cat);
     const id = `sel-${cat}`;
-    // Only offer sub-splits whose blocks exist in this deck (reported by /api/inspect).
-    const presentSubs = new Set(state.inspectResult?.sub_cats?.[cat] ?? []);
-    const subOpts = (state.subOptions[cat] ?? []).filter(o => presentSubs.has(o.sub_category));
+    // Only offer sub-splits that would create a file for this deck, including
+    // name-based ones (one per material, step, part, element type); /api/inspect decides.
+    const subOpts = state.inspectResult?.sub_options?.[cat] ?? [];
     const subPanel = subOpts.length ? `
       <div class="sub-options" id="sub-opts-${cat}">
         <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
@@ -238,7 +238,7 @@ async function createWorkspace() {
       if (cb && cb.checked) {
         const fn = document.getElementById(`fn-${cat}`).value.trim() || `${cat}.inp`;
         const sub_selections = [];
-        const subOpts = state.subOptions[cat] ?? [];
+        const subOpts = state.inspectResult?.sub_options?.[cat] ?? [];
         subOpts.forEach(opt => {
           const subCb = document.getElementById(`sub-${cat}-${opt.sub_category}`);
           if (subCb && subCb.checked) {

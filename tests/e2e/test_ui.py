@@ -30,6 +30,11 @@ def create(page: Page) -> None:
     expect(page.locator("#view-detail")).to_be_visible(timeout=30_000)
 
 
+def detail_filenames(page: Page) -> list[str]:
+    expect(page.locator("#detail-files tr").first).to_be_visible()
+    return [t.strip() for t in page.locator("#detail-files .filename-text").all_inner_texts()]
+
+
 def detail_files(page: Page) -> list[str]:
     expect(page.locator("#detail-files tr").first).to_be_visible()  # table fills async
     return page.locator("#detail-files tr").all_inner_texts()
@@ -209,8 +214,7 @@ def test_contact_only_offers_what_mmxmn_contains(app):
 def test_category_with_no_sub_options_has_no_sub_panel(app):
     open_new_workspace(app)
     upload(app, "Job-1.inp")
-    expect(app.locator("#sub-opts-material")).to_have_count(0)  # materials have no static sub-splits
-    expect(app.locator("#sub-opts-section")).to_have_count(0)
+    expect(app.locator("#sub-opts-section")).to_have_count(0)  # no static or name-based groups for sections
 
 
 def test_selecting_all_subs_creates_every_offered_file(app):
@@ -222,3 +226,62 @@ def test_selecting_all_subs_creates_every_offered_file(app):
     files = "\n".join(detail_files(app))
     assert "contact-pairs.inp" in files and "contact-interactions.inp" in files
     assert "contact-general.inp" not in files
+
+
+# --- name-based sub-splits through the UI -----------------------------------
+
+def _dynamic_ids(page: Page, cat: str, axis: str) -> list[str]:
+    return [i.get_attribute("id") for i in page.locator(f"input[id^='sub-{cat}-{axis}.']").all()]
+
+
+def test_each_material_is_offered_by_name_and_split_into_its_own_file(app):
+    open_new_workspace(app)
+    upload(app, "fempy_example.inp")
+    app.locator("#sel-material").check()
+    ids = _dynamic_ids(app, "material", "material")
+    assert len(ids) > 3, "expected one option per material in the deck"
+    labels = [t.strip() for t in app.locator("#sub-opts-material .sub-option-row label").all_text_contents()]
+    assert labels and all(l.startswith("Material:") for l in labels), labels
+    app.locator("#submaster-material").check()
+    create(app)
+    expect(app.locator("#detail-files .badge-sub")).to_have_count(len(ids))
+    subs = [n for n in detail_filenames(app) if n.startswith("material-")]
+    assert len(subs) == len(ids), subs
+
+
+def test_steps_split_by_name(app):
+    open_new_workspace(app)
+    upload(app, "Job-1.inp")
+    app.locator("#sel-step").check()
+    ids = _dynamic_ids(app, "step", "step")
+    assert ids, "Job-1 has a step"
+    app.locator(f"[id=\"{ids[0]}\"]").check()
+    create(app)
+    assert "step-1.inp" in detail_filenames(app)
+
+
+def test_mesh_offers_parts_and_element_types(app):
+    open_new_workspace(app)
+    upload(app, "fempy_example.inp")
+    app.locator("#sel-mesh").check()
+    assert _dynamic_ids(app, "mesh", "part"), "fempy_example is built from *PART blocks"
+    assert _dynamic_ids(app, "mesh", "etype"), "and has *ELEMENT, TYPE= blocks"
+
+
+def test_dynamic_sub_split_from_the_splits_tab(app):
+    make_workspace_for_dynamic(app)
+    app.locator("#tab-btn-splits").click()
+    ids = [i.get_attribute("id") for i in app.locator("input[id^='ws-sub-material-material.']").all()]
+    assert ids
+    app.locator(f"[id=\"{ids[0]}\"]").check()
+    app.locator("#ws-splits-apply-btn").click()
+    app.locator("#tab-btn-files").click()
+    expect(app.locator("#detail-files .badge-sub").first).to_be_visible()
+
+
+def make_workspace_for_dynamic(page: Page) -> None:
+    open_new_workspace(page)
+    upload(page, "Job-1.inp")
+    page.locator("#sel-material").check()
+    create(page)
+    expect(page.locator("#detail-files tr").first).to_be_visible()

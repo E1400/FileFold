@@ -419,6 +419,8 @@ body {
   gap: 6px;
 }
 .sub-options.visible { display: flex; }
+/* Name-based sub-splits can number in the dozens (one per material): scroll, don't stretch the page. */
+.sub-options { max-height: 260px; overflow-y: auto; }
 .sub-option-row {
   display: flex;
   align-items: center;
