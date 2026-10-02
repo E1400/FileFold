@@ -183,3 +183,42 @@ def test_export_zip_contains_mother_and_children(app):
 def test_js_and_server_agree_on_non_extractable_categories(app):
     from filefold.api.main import NON_EXTRACTABLE
     assert set(app.evaluate("[...NON_EXTRACTABLE]")) == set(NON_EXTRACTABLE)
+
+
+# --- create menu only offers sub-splits that exist in the uploaded deck -----
+
+def _offered_subs(page: Page, cat: str) -> list[str]:
+    page.locator(f"#sel-{cat}").check()
+    return [i.get_attribute("value") for i in page.locator(f"#sub-opts-{cat} input[type=checkbox][id^='sub-{cat}-']").all()]
+
+
+def test_constraint_only_offers_rigid_for_job1(app):
+    open_new_workspace(app)
+    upload(app, "Job-1.inp")  # only *RIGID BODY present, no ties/couplings/equations
+    assert _offered_subs(app, "constraint") == ["rigid"]
+
+
+def test_contact_only_offers_what_mmxmn_contains(app):
+    open_new_workspace(app)
+    upload(app, "mmxmn.inp")  # contact pairs + interactions, no general contact
+    assert _offered_subs(app, "contact") == ["pairs", "interactions"]
+    app.locator("#sel-loads").check()
+    assert [i.get_attribute("value") for i in app.locator("#sub-opts-loads input[id^='sub-loads-']").all()] == ["amplitudes"]
+
+
+def test_category_with_no_sub_options_has_no_sub_panel(app):
+    open_new_workspace(app)
+    upload(app, "Job-1.inp")
+    expect(app.locator("#sub-opts-material")).to_have_count(0)  # materials have no static sub-splits
+    expect(app.locator("#sub-opts-section")).to_have_count(0)
+
+
+def test_selecting_all_subs_creates_every_offered_file(app):
+    open_new_workspace(app)
+    upload(app, "mmxmn.inp")
+    app.locator("#sel-contact").check()
+    app.locator("#submaster-contact").check()
+    create(app)
+    files = "\n".join(detail_files(app))
+    assert "contact-pairs.inp" in files and "contact-interactions.inp" in files
+    assert "contact-general.inp" not in files

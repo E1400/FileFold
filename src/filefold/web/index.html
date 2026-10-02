@@ -1935,7 +1935,9 @@ function renderSplitConfig(blocks) {
   el.innerHTML = masterRow + [...cats].map(cat => {
     const c = CAT_COLORS_var(cat);
     const id = `sel-${cat}`;
-    const subOpts = state.subOptions[cat] ?? [];
+    // Only offer sub-splits whose blocks exist in this deck (reported by /api/inspect).
+    const presentSubs = new Set(state.inspectResult?.sub_cats?.[cat] ?? []);
+    const subOpts = (state.subOptions[cat] ?? []).filter(o => presentSubs.has(o.sub_category));
     const subPanel = subOpts.length ? `
       <div class="sub-options" id="sub-opts-${cat}">
         <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">

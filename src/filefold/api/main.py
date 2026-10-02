@@ -81,9 +81,38 @@ async def inspect_file(file: UploadFile = File(...)):
 
     try:
         blocks = parse(tmp_path)
-        return {"filename": file.filename, "blocks": _blocks_to_json(blocks)}
+        return {
+            "filename": file.filename,
+            "blocks": _blocks_to_json(blocks),
+            "sub_cats": _present_sub_cats(blocks),
+        }
     finally:
         tmp_path.unlink(missing_ok=True)
+
+
+def _present_sub_cats(blocks) -> dict[str, list[str]]:
+    """Per extractable category, the sub-categories that actually occur in these blocks.
+
+    The create menu must not offer a sub-split (e.g. "Ties") for a deck that has no
+    such blocks: it would be a checkbox that creates nothing.
+    """
+    out: dict[str, list[str]] = {}
+    for cat, kw_map in CATEGORY_SUB_KEYWORDS.items():
+        found: set[str] = set()
+        def scan(bs):
+            # Only descend into blocks of this category (e.g. *PART for mesh). A
+            # *BOUNDARY inside a *STEP travels with its step and can never be
+            # sub-split, so it must not make "boundary" look available.
+            for b in bs:
+                if b.category == cat:
+                    sc = kw_map.get(b.keyword)
+                    if sc:
+                        found.add(sc)
+                    scan(b.children)
+        scan(blocks)
+        if found:
+            out[cat.value] = sorted(found)
+    return out
 
 
 def _blocks_to_json(blocks) -> list[dict]:
