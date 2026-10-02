@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    name: Unit, API, JS lint and browser e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: uv sync --dev
+      - run: uv run playwright install --with-deps chromium
+      # Includes tests/e2e (real server + headless Chromium; fails on any browser
+      # console/page error or failed API call) and tests/test_js_static.py.
+      - run: uv run pytest -q
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: pytest-output
+          path: |
+            test-results/
+          if-no-files-found: ignore

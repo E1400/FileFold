@@ -30,6 +30,7 @@ dev = [
     "httpx>=0.28.1",
     "pyinstaller>=6.21.0",
     "pytest>=9.1.1",
+    "pytest-playwright>=0.7.0",
 ]
 
 [tool.pytest.ini_options]

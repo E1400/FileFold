@@ -1042,6 +1042,10 @@ const state = {
 // reference rather than a hex means chips follow the theme automatically — the
 // previous JS table held the old palette, so retuning the tokens changed nothing
 // on screen and the two sets had silently diverged.
+// Mirrors NON_EXTRACTABLE in api/main.py (the server rejects these outright);
+// tests/e2e/test_ui.py asserts the two stay identical.
+const NON_EXTRACTABLE = new Set(["unknown", "model"]);
+
 const CAT_NAMES = new Set([
   "mesh", "material", "step", "loads", "contact", "constraint", "initial", "output", "model", "section", "unknown",
 ]);
@@ -1117,6 +1121,9 @@ function showView(name) {
   if (name === "home" || name === "new-workspace") {
     state.activeWs = null;
   }
+  // Every visit to "new workspace" starts blank. Resetting only after a successful
+  // create left an abandoned upload on screen the next time the user pressed New.
+  if (name === "new-workspace") resetNewWorkspace();
   if (name === "home") loadWorkspaces();
 }
 
@@ -2770,10 +2777,12 @@ async function saveFile() {
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span>`;
   try {
-    await fetch(
+    const res = await fetch(
       `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(_modalFile)}`,
       { method: "PUT", body: ta.value, headers: { "Content-Type": "text/plain" } }
     );
+    // fetch only rejects on network failure; a 4xx/5xx must not be reported as saved.
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 120)}`);
     _modalOrig = ta.value;
     document.getElementById("unsaved-dot").classList.remove("visible");
     toast(`Saved ${_modalFile}`, "ok");
