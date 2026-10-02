@@ -263,3 +263,38 @@ def test_reimport_apply_adds_new_selection(client, tmp_path):
     detail = client.get("/api/workspaces/ra-add").json()
     filenames = [f["filename"] for f in detail["files"]]
     assert "material.inp" in filenames
+
+
+# ---------------------------------------------------------------------------
+# Contact / loads sub-splits end to end (real deck with contact pairs and BCs)
+# ---------------------------------------------------------------------------
+
+def test_contact_and_loads_subsplits_via_api(client):
+    mmxmn = FIXTURES / "mmxmn.inp"
+    sels = [
+        {"category": "contact", "filename": "contact.inp", "sub_selections": [
+            {"sub_category": "pairs", "filename": "contact-pairs.inp"}]},
+        {"category": "loads", "filename": "loads.inp", "sub_selections": [
+            {"sub_category": "amplitudes", "filename": "loads-amplitudes.inp"}]},
+    ]
+    r = _upload(client, mmxmn, "/api/workspaces",
+                {"name": "sub", "selections": json.dumps(sels)})
+    assert r.status_code == 200, r.text
+    files = set(r.json()["files"])
+    assert {"contact.inp", "contact-pairs.inp", "loads.inp", "loads-amplitudes.inp"} <= files
+
+    detail = client.get("/api/workspaces/sub").json()
+    assert "pairs" in detail["available_sub_cats"]["contact"]
+    assert "amplitudes" in detail["available_sub_cats"]["loads"]
+    assert "contact" in {o for o in client.get("/api/sub-options").json()}
+
+    assert "*contact pair" in client.get("/api/workspaces/sub/files/contact-pairs.inp").text.lower()
+
+
+def test_constraint_category_extractable_and_reported(client):
+    job = FIXTURES / "Job-1.inp"
+    sels = [{"category": "constraint", "filename": "constraints.inp"}]
+    r = _upload(client, job, "/api/workspaces", {"name": "con", "selections": json.dumps(sels)})
+    assert r.status_code == 200, r.text
+    assert "constraints.inp" in r.json()["files"]
+    assert "rigid body" in client.get("/api/workspaces/con/files/constraints.inp").text.lower()

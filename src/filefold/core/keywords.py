@@ -171,6 +171,8 @@ MESH_SUB_KEYWORDS: dict[str, str] = {
     "NODE":    "nodes",
     "NGEN":    "nodes",
     "NCOPY":   "nodes",
+    "NFILL":   "nodes",
+    "NMAP":    "nodes",
     "ELEMENT": "elements",
     "ELGEN":   "elements",
     "ELCOPY":  "elements",
@@ -179,9 +181,69 @@ MESH_SUB_KEYWORDS: dict[str, str] = {
     "SURFACE": "surfaces",
 }
 
+# CONTACT — every registered contact keyword is mapped so that an interaction's
+# options (*FRICTION, *SURFACE BEHAVIOR, ...) always travel with *SURFACE INTERACTION.
+CONTACT_SUB_KEYWORDS: dict[str, str] = {
+    "CONTACT PAIR": "pairs",
+    "CONTACT INTERFERENCE": "pairs",
+    "CLEARANCE": "pairs",
+    "SURFACE INTERACTION": "interactions",
+    "SURFACE BEHAVIOR": "interactions",
+    "FRICTION": "interactions",
+    "COHESIVE BEHAVIOR": "interactions",
+    "GAP CONDUCTANCE": "interactions",
+    "GAP RADIATION": "interactions",
+    "GAP HEAT GENERATION": "interactions",
+    "SURFACE SMOOTHING": "interactions",
+    "CONTACT DAMPING": "interactions",
+    "CONTACT": "general",
+    "CONTACT INCLUSIONS": "general",
+    "CONTACT EXCLUSIONS": "general",
+    "CONTACT PROPERTY ASSIGNMENT": "general",
+    "CONTACT CONTROLS": "general",
+    "CONTACT CONTROLS ASSIGNMENT": "general",
+    "CONTACT FORMULATION": "general",
+    "CONTACT STABILIZATION": "general",
+    "CONTACT CLEARANCE ASSIGNMENT": "general",
+    "CONTACT INITIALIZATION ASSIGNMENT": "general",
+}
+
+CONSTRAINT_SUB_KEYWORDS: dict[str, str] = {
+    "TIE": "ties",
+    "COUPLING": "couplings",
+    "KINEMATIC": "couplings",
+    "DISTRIBUTING": "couplings",
+    "KINEMATIC COUPLING": "couplings",
+    "DISTRIBUTING COUPLING": "couplings",
+    "SHELL TO SOLID COUPLING": "couplings",
+    "RIGID BODY": "rigid",
+    "MPC": "equations",
+    "EQUATION": "equations",
+}
+
+LOADS_SUB_KEYWORDS: dict[str, str] = {
+    "BOUNDARY": "boundary",
+    "AMPLITUDE": "amplitudes",
+    "CLOAD": "applied",
+    "DLOAD": "applied",
+    "DSLOAD": "applied",
+    "TEMPERATURE": "thermal",
+    "DFLUX": "thermal",
+    "CFLUX": "thermal",
+    "FILM": "thermal",
+    "SFILM": "thermal",
+    "CFILM": "thermal",
+    "RADIATE": "thermal",
+    "SRADIATE": "thermal",
+    "CRADIATE": "thermal",
+}
+
 # Maps Category -> {keyword -> sub_category name}
 CATEGORY_SUB_KEYWORDS: dict[Category, dict[str, str]] = {
     Category.MESH: MESH_SUB_KEYWORDS,
+    Category.CONTACT: CONTACT_SUB_KEYWORDS,
+    Category.CONSTRAINT: CONSTRAINT_SUB_KEYWORDS,
+    Category.LOADS: LOADS_SUB_KEYWORDS,
 }
 
 # Available sub-categories per category (ordered for UI display)
@@ -192,5 +254,22 @@ CATEGORY_SUB_OPTIONS: dict[Category, list[dict[str, str]]] = {
         {"sub_category": "nsets",    "label": "Node Sets (*NSET)",     "default_filename": "mesh-nsets.inp"},
         {"sub_category": "elsets",   "label": "Element Sets (*ELSET)", "default_filename": "mesh-elsets.inp"},
         {"sub_category": "surfaces", "label": "Surfaces (*SURFACE)",   "default_filename": "mesh-surfaces.inp"},
+    ],
+    Category.CONTACT: [
+        {"sub_category": "pairs",        "label": "Contact Pairs (*CONTACT PAIR)",          "default_filename": "contact-pairs.inp"},
+        {"sub_category": "interactions", "label": "Interaction Properties (*SURFACE INTERACTION)", "default_filename": "contact-interactions.inp"},
+        {"sub_category": "general",      "label": "General Contact (*CONTACT)",             "default_filename": "contact-general.inp"},
+    ],
+    Category.CONSTRAINT: [
+        {"sub_category": "ties",      "label": "Ties (*TIE)",                      "default_filename": "constraints-ties.inp"},
+        {"sub_category": "couplings", "label": "Couplings (*COUPLING)",            "default_filename": "constraints-couplings.inp"},
+        {"sub_category": "rigid",     "label": "Rigid Bodies (*RIGID BODY)",       "default_filename": "constraints-rigid.inp"},
+        {"sub_category": "equations", "label": "MPCs and Equations (*MPC, *EQUATION)", "default_filename": "constraints-equations.inp"},
+    ],
+    Category.LOADS: [
+        {"sub_category": "boundary",   "label": "Boundary Conditions (*BOUNDARY)",  "default_filename": "loads-boundary.inp"},
+        {"sub_category": "amplitudes", "label": "Amplitudes (*AMPLITUDE)",          "default_filename": "loads-amplitudes.inp"},
+        {"sub_category": "applied",    "label": "Applied Loads (*CLOAD, *DLOAD)",   "default_filename": "loads-applied.inp"},
+        {"sub_category": "thermal",    "label": "Thermal (*TEMPERATURE, *DFLUX)",   "default_filename": "loads-thermal.inp"},
     ],
 }

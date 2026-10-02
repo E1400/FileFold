@@ -152,6 +152,7 @@ def compute_split(
     child_lines: dict[str, list[str]] = {}   # filename -> line list
     cat_inserted: set[Category] = set()       # categories already *INCLUDEd in mother
     sub_inserted: dict[str, set[str]] = {}    # parent_filename -> set of sub_cats inserted
+    last_sub: dict[Category, str | None] = {}  # category -> sub_category of the previous block
 
     def _route_sub(block: Block, sel: SplitSelection) -> None:
         """Route one block into sel's child file or its sub-files.
@@ -164,6 +165,10 @@ def compute_split(
         sub_map = {ss.sub_category: ss for ss in sel.sub_selections}
         kw_map = CATEGORY_SUB_KEYWORDS.get(sel.category, {})
         block_sub_cat = kw_map.get(block.keyword)
+        if block_sub_cat is None and block.inherited:
+            # Unregistered option of the block above: it goes wherever its parent went.
+            block_sub_cat = last_sub.get(sel.category)
+        last_sub[sel.category] = block_sub_cat
 
         if block_sub_cat and block_sub_cat in sub_map:
             ss = sub_map[block_sub_cat]
