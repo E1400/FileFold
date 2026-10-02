@@ -10,7 +10,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .common import NON_EXTRACTABLE  # noqa: F401  (re-exported; tests and the UI mirror it)
+from filefold.service import NON_EXTRACTABLE, ServiceError  # noqa: F401  (NON_EXTRACTABLE re-exported; the UI mirrors it)
+
 from .routes import files, inspect, reimport, splits, workspaces
 from .server import UnsafeName
 
@@ -21,6 +22,11 @@ app = FastAPI(title="FileFold", version="0.1.0")
 async def _unsafe_name_handler(request: Request, exc: UnsafeName) -> JSONResponse:
     """A rejected name is a client error, not a crash."""
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(ServiceError)
+async def _service_error_handler(request: Request, exc: ServiceError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
 
 
 # Serve the web frontend: one HTML page plus CSS/JS under /static
