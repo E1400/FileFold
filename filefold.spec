@@ -26,6 +26,7 @@ a = Analysis(
     datas=[
         # Web assets — must mirror the relative path compute_split uses
         ("src/filefold/web/index.html", "filefold/web"),
+        ("src/filefold/web/static", "filefold/web/static"),
     ],
     hiddenimports=[
         # uvicorn dynamic imports

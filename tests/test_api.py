@@ -1,6 +1,7 @@
 """API endpoint tests using FastAPI TestClient."""
 import io
 import json
+import re
 import zipfile
 from pathlib import Path
 
@@ -17,18 +18,9 @@ FEMPY = FIXTURES / "fempy_example.inp"
 @pytest.fixture(autouse=True)
 def isolated_workspace(tmp_path, monkeypatch):
     """Point WORKSPACE_BASE at a temp dir so tests don't touch ~/.filefold."""
-    monkeypatch.setattr("filefold.api.main.WORKSPACE_BASE", tmp_path)
     monkeypatch.setattr("filefold.api.server.WORKSPACE_BASE", tmp_path)
-    # Also patch the workspace_path helper used inside the app
-    import filefold.api.main as m
-    monkeypatch.setattr(m, "workspace_path", lambda name: tmp_path / name)
-    monkeypatch.setattr(
-        m, "list_workspaces",
-        lambda: sorted(
-            p.name for p in tmp_path.iterdir()
-            if p.is_dir() and (p / ".filefold" / "workspace.json").exists()
-        ) if tmp_path.exists() else [],
-    )
+    # Routes resolve workspaces through filefold.api.server, which reads WORKSPACE_BASE
+    # at call time, so patching it above redirects every route module.
 
 
 @pytest.fixture()
@@ -298,3 +290,23 @@ def test_constraint_category_extractable_and_reported(client):
     assert r.status_code == 200, r.text
     assert "constraints.inp" in r.json()["files"]
     assert "rigid body" in client.get("/api/workspaces/con/files/constraints.inp").text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Static frontend
+# ---------------------------------------------------------------------------
+
+def test_every_asset_linked_from_index_is_served(client):
+    import re
+    html = client.get("/").text
+    assets = re.findall(r'(?:src|href)="(/static/[^"]+)"', html)
+    assert len(assets) >= 8  # app.css + the script files
+    for url in assets:
+        r = client.get(url)
+        assert r.status_code == 200 and len(r.content) > 0, url
+
+
+def test_index_has_no_inline_script_or_style(client):
+    html = client.get("/").text
+    assert "<style" not in html
+    assert not re.search(r"<script(?![^>]*src=)", html)

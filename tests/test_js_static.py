@@ -1,4 +1,4 @@
-"""Static check of the single-page UI's JavaScript: undeclared identifiers fail the build.
+"""Static check of the UI's JavaScript (src/filefold/web/static/*.js): undeclared identifiers fail the build.
 
 Needs Node/npx (present on GitHub runners and dev machines); skipped otherwise.
 """
@@ -16,9 +16,12 @@ INDEX = ROOT.parent / "src" / "filefold" / "web" / "index.html"
 @pytest.mark.skipif(shutil.which("npx") is None, reason="npx not installed")
 def test_ui_javascript_has_no_undeclared_identifiers(tmp_path):
     html = INDEX.read_text(encoding="utf-8")
-    scripts = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, flags=re.S)
-    assert scripts, "no inline script found"
-    (tmp_path / "ui.js").write_text("\n".join(scripts), encoding="utf-8")
+    # The page is a set of classic scripts sharing one global scope, so lint them as
+    # one file, concatenated in the order index.html loads them.
+    srcs = re.findall(r'<script src="/static/([^"]+)"', html)
+    assert srcs, "no script files linked from index.html"
+    code = "\n".join((INDEX.parent / "static" / s).read_text(encoding="utf-8") for s in srcs)
+    (tmp_path / "ui.js").write_text(code, encoding="utf-8")
     result = subprocess.run(
         ["npx", "--yes", "eslint@9", "--no-config-lookup", "-c", str(ROOT / "js" / "eslint.config.mjs"), "ui.js"],
         cwd=tmp_path, capture_output=True, text=True, timeout=180,
