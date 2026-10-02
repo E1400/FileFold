@@ -50,7 +50,7 @@ def test_edit_and_save_marks_file_edited_and_persists(app):
     expect(app.locator(".toast", has_text="Saved mesh.inp")).to_be_visible()
     app.get_by_role("button", name="← Back").last.click()
     expect(row(app, "mesh.inp")).to_contain_text("edited")
-    assert "** edited by e2e\n" in api_text(app, "Job-1", "mesh.inp")
+    assert "** edited by e2e\r\n" in api_text(app, "Job-1", "mesh.inp")  # Job-1 is CRLF; the save keeps it
 
 
 def test_failed_save_is_reported_not_claimed_as_saved(app):
@@ -141,3 +141,125 @@ def test_reimport_flags_manual_edit_conflict(app):
 def test_theme_toggle_does_not_error(app):
     app.get_by_role("button", name="◑").click()
     app.get_by_role("button", name="◑").click()
+
+
+# --- leaving the editor -----------------------------------------------------
+
+def _go_back(page: Page) -> None:
+    page.locator("#view-editor").get_by_role("button", name="← Back").click()
+
+
+def _watch_native_dialogs(page: Page) -> list[str]:
+    """The app must use its own dialog; any native alert/confirm is recorded and accepted."""
+    seen: list[str] = []
+    page.on("dialog", lambda d: seen.append(d.message))
+    return seen
+
+
+def test_back_without_edits_leaves_silently(app):
+    native = _watch_native_dialogs(app)
+    make_workspace(app, "mmxmn.inp")
+    open_file(app, "mesh.inp")
+    _go_back(app)
+    expect(app.locator("#view-detail")).to_be_visible()
+    expect(app.locator("#unsaved-dialog")).not_to_be_visible()
+    assert native == []
+
+
+def test_back_without_edits_leaves_silently_for_crlf_deck(app):
+    """Job-1.inp uses CRLF; a textarea normalises it to LF, which used to look like an edit."""
+    native = _watch_native_dialogs(app)
+    make_workspace(app, "Job-1.inp")
+    open_file(app, "mesh.inp")
+    expect(app.locator("#unsaved-dot")).not_to_have_class(re.compile("visible"))
+    _go_back(app)
+    expect(app.locator("#view-detail")).to_be_visible()
+    expect(app.locator("#unsaved-dialog")).not_to_be_visible()
+    assert native == []
+
+
+def test_back_with_edits_offers_save_discard_and_keep_editing(app):
+    make_workspace(app, "mmxmn.inp")
+    open_file(app, "mesh.inp")
+    app.locator("#editor-ta").click()
+    app.keyboard.type("** unsaved\n")
+    _go_back(app)
+    dialog = app.locator("#unsaved-dialog")
+    expect(dialog).to_be_visible()
+    for name in ("Save and close", "Discard changes", "Keep editing"):
+        expect(dialog.get_by_role("button", name=name)).to_be_visible()
+
+
+def test_back_with_edits_save_and_close_saves(app):
+    make_workspace(app, "mmxmn.inp")
+    open_file(app, "mesh.inp")
+    app.locator("#editor-ta").click()
+    app.keyboard.type("** keep me\n")
+    _go_back(app)
+    app.get_by_role("button", name="Save and close").click()
+    expect(app.locator("#view-detail")).to_be_visible()
+    expect(row(app, "mesh.inp")).to_contain_text("edited")
+    assert "** keep me\n" in api_text(app, "mmxmn", "mesh.inp")
+
+
+def test_back_with_edits_discard_does_not_save(app):
+    make_workspace(app, "mmxmn.inp")
+    open_file(app, "mesh.inp")
+    app.locator("#editor-ta").click()
+    app.keyboard.type("** throw away\n")
+    _go_back(app)
+    app.get_by_role("button", name="Discard changes").click()
+    expect(app.locator("#view-detail")).to_be_visible()
+    expect(row(app, "mesh.inp")).to_contain_text("clean")
+    assert "** throw away" not in api_text(app, "mmxmn", "mesh.inp")
+
+
+def test_back_with_edits_keep_editing_stays_put(app):
+    make_workspace(app, "mmxmn.inp")
+    open_file(app, "mesh.inp")
+    app.locator("#editor-ta").click()
+    app.keyboard.type("** still here\n")
+    _go_back(app)
+    app.get_by_role("button", name="Keep editing").click()
+    expect(app.locator("#view-editor")).to_be_visible()
+    expect(app.locator("#unsaved-dialog")).not_to_be_visible()
+    assert "** still here" in app.locator("#editor-ta").input_value()
+
+
+def test_escape_closes_the_dialog_like_keep_editing(app):
+    make_workspace(app, "mmxmn.inp")
+    open_file(app, "mesh.inp")
+    app.locator("#editor-ta").click()
+    app.keyboard.type("x")
+    _go_back(app)
+    app.keyboard.press("Escape")
+    expect(app.locator("#unsaved-dialog")).not_to_be_visible()
+    expect(app.locator("#view-editor")).to_be_visible()
+
+
+def test_failed_save_from_dialog_keeps_the_editor_open(app):
+    make_workspace(app, "mmxmn.inp")
+    open_file(app, "mesh.inp")
+    app.route("**/api/workspaces/*/files/*", lambda r: r.fulfill(status=500, body="disk full")
+              if r.request.method == "PUT" else r.continue_())
+    app.locator("#editor-ta").click()
+    app.keyboard.type("x")
+    _go_back(app)
+    app.get_by_role("button", name="Save and close").click()
+    expect(app.locator(".toast", has_text="Save failed")).to_be_visible()
+    expect(app.locator("#view-editor")).to_be_visible()  # edits must not be lost
+    app.expected_errors.clear()
+
+
+# --- CRLF decks keep their line endings through an editor save --------------
+
+def test_saving_a_crlf_deck_preserves_crlf(app):
+    make_workspace(app, "Job-1.inp")
+    open_file(app, "mesh.inp")
+    app.locator("#editor-ta").click()
+    app.keyboard.type("** edited\n")
+    app.locator("#editor-save-btn").click()
+    expect(app.locator(".toast", has_text="Saved mesh.inp")).to_be_visible()
+    raw = app.request.get(f"{app.url.rstrip('/')}/api/workspaces/Job-1/files/mesh.inp").body()
+    assert b"\r\n" in raw
+    assert b"\n" not in raw.replace(b"\r\n", b"")  # no bare LF anywhere

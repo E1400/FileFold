@@ -267,6 +267,17 @@
 
 </main>
 
+<!-- Unsaved-changes prompt for leaving the editor -->
+<dialog id="unsaved-dialog" aria-labelledby="unsaved-dialog-title">
+  <h2 id="unsaved-dialog-title">Unsaved changes</h2>
+  <p>You have unsaved edits to <span class="mono" id="unsaved-dialog-file"></span>.</p>
+  <div class="dialog-actions">
+    <button class="btn btn-primary btn-sm" id="unsaved-save-btn" data-choice="save">Save and close</button>
+    <button class="btn btn-danger btn-sm" data-choice="discard">Discard changes</button>
+    <button class="btn btn-ghost btn-sm" data-choice="cancel" autofocus>Keep editing</button>
+  </div>
+</dialog>
+
 <!-- Toast container -->
 <div id="toast-container"></div>
 <script src="/static/core.js"></script>

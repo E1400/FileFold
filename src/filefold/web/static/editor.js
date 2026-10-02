@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 let _modalFile = null;
 let _modalOrig = null;
+let _modalEol = "\n";   // line ending of the loaded file; a textarea always holds LF
 let _findQuery  = "";
 let _findMatches = [];
 let _findIdx    = 0;
@@ -50,7 +51,7 @@ async function viewFile(filename) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
-    _modalOrig = text;
+    _modalEol = text.includes("\r\n") ? "\r\n" : "\n";
 
     const lineCount = (text.match(/\n/g) || []).length + 1;
     if (lineCount > _LARGE_FILE_LINES) {
@@ -58,6 +59,9 @@ async function viewFile(filename) {
     }
 
     _editorTa().value = text;
+    // Baseline is what the textarea holds, not the raw text: a textarea normalises
+    // CRLF to LF, so comparing against the raw text made every CRLF deck look edited.
+    _modalOrig = _editorTa().value;
     loading.style.display = "none";
     body.style.display = "";
 
@@ -443,33 +447,40 @@ function toggleComment() {
 }
 
 // ── Save / discard / close ────────────────────────────────────────────────────
+// Returns true if the file is on the server, false if the save failed (edits kept).
 async function saveFile() {
   const ta  = _editorTa();
   const btn = document.getElementById("editor-save-btn");
-  if (!ta || !_modalFile) return;
+  if (!ta || !_modalFile) return false;
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span>`;
   try {
     const res = await fetch(
       `/api/workspaces/${encodeURIComponent(state.activeWs)}/files/${encodeURIComponent(_modalFile)}`,
-      { method: "PUT", body: ta.value, headers: { "Content-Type": "text/plain" } }
+      { method: "PUT", body: ta.value.replace(/\n/g, _modalEol), headers: { "Content-Type": "text/plain" } }
     );
     // fetch only rejects on network failure; a 4xx/5xx must not be reported as saved.
     if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 120)}`);
-    _modalOrig = ta.value;
-    document.getElementById("unsaved-dot").classList.remove("visible");
-    toast(`Saved ${_modalFile}`, "ok");
-    if (state.wsData) {
-      const data = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
-      state.wsData = data;
-      renderDetail(data);
-    }
   } catch (e) {
     toast("Save failed: " + e.message, "error");
+    return false;
   } finally {
     btn.disabled = false;
     btn.textContent = "Save";
   }
+  _modalOrig = ta.value;
+  document.getElementById("unsaved-dot").classList.remove("visible");
+  toast(`Saved ${_modalFile}`, "ok");
+  if (state.wsData) {
+    try {
+      const data = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+      state.wsData = data;
+      renderDetail(data);
+    } catch (e) {
+      toast("Saved, but could not refresh the file list: " + e.message, "warn");
+    }
+  }
+  return true;
 }
 
 function discardEdits() {
@@ -481,10 +492,35 @@ function discardEdits() {
   document.getElementById("unsaved-dot").classList.remove("visible");
 }
 
-function closeEditor() {
+// Resolves "save" | "discard" | "cancel". Esc and clicking away count as cancel.
+function askUnsavedChoice() {
+  const dlg = document.getElementById("unsaved-dialog");
+  document.getElementById("unsaved-dialog-file").textContent = _modalFile ?? "";
+  return new Promise(resolve => {
+    const done = choice => {
+      dlg.removeEventListener("click", onClick);
+      dlg.removeEventListener("cancel", onCancel);
+      if (dlg.open) dlg.close();
+      resolve(choice);
+    };
+    const onClick = e => {
+      const choice = e.target.closest("[data-choice]")?.dataset.choice;
+      if (choice) done(choice);
+      else if (e.target === dlg) done("cancel");   // click on the backdrop
+    };
+    const onCancel = e => { e.preventDefault(); done("cancel"); };
+    dlg.addEventListener("click", onClick);
+    dlg.addEventListener("cancel", onCancel);
+    dlg.showModal();
+  });
+}
+
+async function closeEditor() {
   const ta = _editorTa();
   if (ta && ta.value !== _modalOrig) {
-    if (!confirm("Close without saving?")) return;
+    const choice = await askUnsavedChoice();
+    if (choice === "cancel") return;
+    if (choice === "save" && !(await saveFile())) return;   // failed save: stay, keep the edits
   }
   if (ta) ta.style.color = "";  // Reset large-file color override
   _modalFile = null; _modalOrig = null;
