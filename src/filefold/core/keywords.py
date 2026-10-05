@@ -21,10 +21,12 @@ class Category(str, Enum):
 # Grouped by category for readability; flattened into KEYWORD_CATEGORIES below.
 # Keywords are normalized: uppercase, no leading asterisk, single spaces.
 #
-# STATUS: compiled from working knowledge of the Abaqus Keywords Reference, not
-# yet cross-checked line by line against the official docs. Anything missing is
-# not a correctness risk: the parser attaches an unmapped keyword to the block
-# before it (see parser.py), so an option can never be separated from its parent.
+# STATUS: compiled from working knowledge of the Abaqus Keywords Reference, plus the
+# names listed in the Abaqus Release Notes (2026 FD04; see _FROM_RELEASE_NOTES). The
+# Release Notes give names and the chapter each belongs to, not levels or data-line
+# formats, so those are not modeled. Anything missing is not a correctness risk: the
+# parser attaches an unmapped keyword to the block before it (see parser.py), so an
+# option can never be separated from its parent.
 # ---------------------------------------------------------------------------
 
 _REGISTRY: dict[Category, tuple[str, ...]] = {
@@ -119,6 +121,45 @@ _REGISTRY: dict[Category, tuple[str, ...]] = {
     ),
 }
 
+# Keywords named in the Abaqus Release Notes (2026 FD04, "Keywords" chapter and the
+# chapters it cross-references) that the table above did not cover. Category follows
+# the chapter the notes file them under (Materials, Interactions, Prescribed
+# Conditions, ...). Names we could not place with confidence are deliberately left out.
+_FROM_RELEASE_NOTES: dict[Category, tuple[str, ...]] = {
+    Category.MESH: ("NORMAL",),
+    Category.SECTION: ("DISCRETE SECTION", "CLUSTER MASS INERTIA TABLE"),
+    Category.MATERIAL: (
+        "COUPLED CONSTITUTIVE RESPONSE", "NEURAL NETWORK", "NEURAL NETWORK DATA", "POTENTIAL",
+        "PARTICLE BEHAVIOR", "PARTICLE SWELLING", "VISCOUS SOFTENING", "MEAN FIELD HOMOGENIZATION",
+        "ELECTRICAL RESISTIVITY", "PIEZORESISTIVITY", "ALLOWABLE STRESS", "USER DEFINED FIELD",
+        "ELECTRIC MACHINE PROPERTY",
+    ),
+    Category.CONTACT: (
+        "SURFACE PROPERTY", "SURFACE PROPERTY ASSIGNMENT", "WEAR SURFACE PROPERTIES",
+        "SURFACE TENSION", "SURFACE TENSION CONTACT ANGLE", "THREADED INTERFACE",
+        "PARTICLE SURFACE DEPOSITION", "CONTACT MASS SCALING",
+    ),
+    Category.INITIAL: ("IMPORT", "IMPORT CONTROLS"),
+    Category.STEP: (
+        "FRACTURE CRITERION", "CO-SIMULATION", "CO-SIMULATION CONTROLS", "ADAPTIVE MESH",
+        "ADAPTIVE REMESH", "ADAPTIVE REMESH RETAIN", "FATIGUE", "REDUCED BASIS GENERATE",
+        "STEP CYCLING", "STEP CYCLING CONTROL", "STEP CONTROL", "DEBOND",
+        "SYMMETRIC RESULTS TRANSFER", "FOURIER TRANSFORM CONTROLS",
+        "COUPLED TEMPERATURE-DISPLACEMENT", "DYNAMIC TEMPERATURE-DISPLACEMENT",
+        "COUPLED THERMAL-ELECTROCHEMICAL",
+    ),
+    Category.LOADS: (
+        "SUBMODEL CUT", "SUBMODEL LINEAR LOAD CASE REFERENCE", "SUBMODEL TIME SYNCHRONIZATION",
+        "SUBMODEL CONDITIONS", "DECURRENT", "DSECURRENT", "RADIATION VIEW FACTOR",
+        "ELECTRIC MACHINE LOAD", "EXTERNAL FIELD",
+    ),
+    Category.OUTPUT: (
+        "CONTOUR INTEGRAL", "ELEMENT USER OUTPUT VARIABLES", "ELEMENT RESPONSE", "NODE RESPONSE",
+        "ELEMENT RECOVERY MATRIX", "OPERATOR OUTPUT", "EQUIVALENT RADIATED SURFACE PROPERTIES",
+    ),
+    Category.MODEL: ("UNIT SYSTEM",),
+}
+
 # Families of keywords that share a prefix (checked only after the explicit table).
 _PREFIX_RULES: tuple[tuple[str, Category], ...] = (
     ("HYPER", Category.MATERIAL),
@@ -133,11 +174,23 @@ _PREFIX_RULES: tuple[tuple[str, Category], ...] = (
     ("CYCLIC ", Category.MATERIAL),
     ("CONNECTOR ", Category.SECTION),
     ("CONTACT ", Category.CONTACT),
+    ("PLY FABRIC ", Category.MATERIAL),
+    ("PAPERBOARD ", Category.MATERIAL),
+    ("CURE ", Category.MATERIAL),
+    ("SURFACE TENSION", Category.CONTACT),
+    ("SUBMODEL ", Category.LOADS),
+    ("ADAPTIVE MESH ", Category.STEP),
+    ("ADAPTIVE REMESH", Category.STEP),
+    ("CO-SIMULATION", Category.STEP),
+    ("IMPORT ", Category.INITIAL),
 )
 
 # Normalized keyword (uppercase, no leading asterisk) -> Category
 KEYWORD_CATEGORIES: dict[str, Category] = {
-    kw: cat for cat, kws in _REGISTRY.items() for kw in kws
+    kw: cat
+    for table in (_REGISTRY, _FROM_RELEASE_NOTES)
+    for cat, kws in table.items()
+    for kw in kws
 }
 
 

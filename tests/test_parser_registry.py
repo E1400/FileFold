@@ -137,3 +137,25 @@ def test_block_context_tracks_containers(tmp_path):
 @pytest.mark.parametrize("path", list(FIXTURES.glob("*.inp")), ids=lambda p: p.name)
 def test_fixture_roundtrip_with_registry(path):
     assert emit_all(parse(path)) == read_raw(path)
+
+
+# --- keywords named in the Abaqus Release Notes -----------------------------
+
+def test_every_keyword_from_the_release_notes_is_recognised():
+    lines = (FIXTURES / "abaqus_release_notes_keywords.txt").read_text().splitlines()
+    names = [l for l in lines if l and not l.startswith("#")]
+    assert len(names) > 100
+    still_unknown = [n for n in names if categorize(n) is Category.UNKNOWN]
+    assert not still_unknown, still_unknown
+
+
+@pytest.mark.parametrize("kw,cat", [
+    ("PAPERBOARD HARDENING", Category.MATERIAL),
+    ("CURE KINETICS", Category.MATERIAL),
+    ("SUBMODEL CUT", Category.LOADS),
+    ("COUPLED TEMPERATURE-DISPLACEMENT", Category.STEP),
+    ("SURFACE PROPERTY ASSIGNMENT", Category.CONTACT),
+    ("CONTOUR INTEGRAL", Category.OUTPUT),
+])
+def test_release_notes_keyword_categories(kw, cat):
+    assert categorize(kw) is cat
