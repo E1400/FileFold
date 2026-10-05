@@ -302,16 +302,48 @@ def test_splits_tab_never_offers_a_sub_split_that_makes_no_file(app, deck):
     expect(app.locator("#detail-files .badge-sub")).to_have_count(len(ticked))
 
 
-def test_element_type_and_all_elements_do_not_both_offer_the_same_block(app):
+def _sub_labels(page: Page, cat: str, prefix: str = "sub") -> list[str]:
+    return [t.strip() for t in page.locator(f"#{prefix}-opts-{cat} .sub-option-row label").all_text_contents()]
+
+
+def test_mesh_menu_for_job1_offers_four_options_and_no_element_type(app):
     open_new_workspace(app)
-    upload(app, "Job-1.inp")  # one element type: "Elements" and "Element type: CPS4R" cover the same block
+    upload(app, "Job-1.inp")
     app.locator("#sel-mesh").check()
-    app.locator("[id=\"sub-mesh-etype.cps4r\"]").check()
-    expect(app.locator("#sub-mesh-elements")).to_be_disabled()
-    app.locator("[id=\"sub-mesh-etype.cps4r\"]").uncheck()
-    expect(app.locator("#sub-mesh-elements")).to_be_enabled()
-    app.locator("#sub-mesh-elements").check()
-    expect(app.locator("[id=\"sub-mesh-etype.cps4r\"]")).to_be_enabled()  # the more specific split still wins
+    labels = _sub_labels(app, "mesh")
+    assert labels == ["Nodes (*NODE)", "Elements (*ELEMENT)", "Node Sets (*NSET)", "Element Sets (*ELSET)"], labels
+
+
+def test_ticking_an_option_never_unticks_another(app):
+    """Parts and the node/element groups are alternative depths for the same blocks; the
+    first choice stays ticked and the conflicting option is disabled, never silently unticked."""
+    open_new_workspace(app)
+    upload(app, "fempy_example.inp")   # all nodes/elements live inside a *PART
+    app.locator("#sel-mesh").check()
+    part = app.locator("[id^='sub-mesh-part.']").first
+    nodes = app.locator("#sub-mesh-nodes")
+    nodes.check()
+    expect(part).to_be_disabled()                      # a whole part would leave "Nodes" empty
+    expect(part).to_have_attribute("title", re.compile("already taken"))
+    expect(nodes).to_be_checked()                      # ...and the earlier choice is untouched
+    nodes.uncheck()
+    expect(part).to_be_enabled()
+    part.check()
+    expect(nodes).to_be_disabled()
+    expect(part).to_be_checked()
+
+
+def test_first_choice_survives_apply_in_the_splits_tab(app):
+    make_workspace(app, "fempy_example.inp", cats=("mesh",))
+    app.locator("#tab-btn-splits").click()
+    app.locator("#ws-sub-mesh-nodes").check()
+    expect(app.locator("[id^='ws-sub-mesh-part.']").first).to_be_disabled()
+    app.locator("#ws-splits-apply-btn").click()
+    app.locator("#tab-btn-files").click()
+    expect(app.locator("#detail-files .badge-sub")).to_have_count(1)     # waits for Apply to finish
+    assert "mesh-nodes.inp" in [n.strip() for n in app.locator("#detail-files .filename-text").all_inner_texts()]
+    app.locator("#tab-btn-splits").click()
+    expect(app.locator("#ws-sub-mesh-nodes")).to_be_checked()
 
 
 def test_javascript_availability_rule_agrees_with_python(app):

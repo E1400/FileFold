@@ -260,12 +260,12 @@ def test_steps_split_by_name(app):
     assert "step-1.inp" in detail_filenames(app)
 
 
-def test_mesh_offers_parts_and_element_types(app):
+def test_mesh_offers_parts_but_not_element_types(app):
     open_new_workspace(app)
     upload(app, "fempy_example.inp")
     app.locator("#sel-mesh").check()
     assert _dynamic_ids(app, "mesh", "part"), "fempy_example is built from *PART blocks"
-    assert _dynamic_ids(app, "mesh", "etype"), "and has *ELEMENT, TYPE= blocks"
+    assert not _dynamic_ids(app, "mesh", "etype"), "element type is too fine-grained to offer"
 
 
 def test_dynamic_sub_split_from_the_splits_tab(app):

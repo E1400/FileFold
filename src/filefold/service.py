@@ -25,7 +25,7 @@ from filefold.core.parser import parse
 from filefold.core.splitter import (
     SplitSelection, SubSplitSelection, read_raw, split_with_includes,
 )
-from filefold.core.subsplits import discover
+from filefold.core.subsplits import discover, option_from_key
 from filefold.core.workspace import Workspace
 
 __all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE"]
@@ -334,6 +334,14 @@ def get_workspace(name: str) -> dict:
         else:
             blocks = [b for b in mother_blocks if b.category == cat_enum]
         opts, claims = discover(cat_enum, blocks)
+        if sel:
+            # A split that already exists stays listed even if the menus no longer offer
+            # that kind of split (e.g. element type), so applying changes never folds it
+            # back by accident.
+            offered = {o.sub_category for o in opts}
+            for ss in sel.sub_selections:
+                if ss.sub_category not in offered and (ws_dir / ss.filename).exists():
+                    opts.append(option_from_key(cat_enum, ss.sub_category))
         if opts:
             sub_options[cat_str] = [o.as_dict() for o in opts]
             sub_claims[cat_str] = claims

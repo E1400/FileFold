@@ -118,34 +118,27 @@ function liveSubKeys(claims, ticked) {
   return live;
 }
 
-// Untick options that a more specific ticked option fully covers, and disable any
-// option that would produce an empty file if ticked now. `ids` maps an option key to
-// its checkbox and filename-input element ids.
+// Decide which sub-split options can be ticked. A choice is never silently unticked:
+// the first choice stays, and an option is disabled when ticking it would give it no
+// blocks or would leave an already-ticked option with none (e.g. "Part: X" and "Nodes"
+// are alternative depths for the same blocks). Mirrors filefold.core.subsplits.can_tick.
+// `ids` maps an option key to its checkbox element id.
 function refreshSubAvailability(claims, options, ids) {
   if (!claims || !claims.length) return;
-  const rows = options.map(opt => ({
+  const known = new Set(claims.flat());
+  // Options the claims know nothing about (an already-extracted split) are left alone.
+  const rows = options.filter(opt => known.has(opt.sub_category)).map(opt => ({
     key: opt.sub_category,
     box: document.getElementById(ids.box(opt.sub_category)),
-    name: document.getElementById(ids.name(opt.sub_category)),
   })).filter(r => r.box);
 
-  const ticked = () => new Set(rows.filter(r => r.box.checked).map(r => r.key));
-
-  // 1. A ticked option with nothing left to take is dropped (the later, more specific
-  //    choice wins).
-  const live = liveSubKeys(claims, ticked());
-  for (const r of rows) {
-    if (r.box.checked && !live.has(r.key)) {
-      r.box.checked = false;
-      if (r.name) { r.name.disabled = true; r.name.style.opacity = ".4"; }
-    }
-  }
-  // 2. An unticked option is only available if ticking it would give it blocks.
-  const now = ticked();
+  const ticked = new Set(rows.filter(r => r.box.checked).map(r => r.key));
   for (const r of rows) {
     if (r.box.checked) { r.box.disabled = false; r.box.title = ""; continue; }
-    const wouldTake = liveSubKeys(claims, new Set([...now, r.key])).has(r.key);
-    r.box.disabled = !wouldTake;
-    r.box.title = wouldTake ? "" : "Nothing left for this option: everything it would match is already taken by another ticked option.";
+    const after = new Set([...ticked, r.key]);
+    const live = liveSubKeys(claims, after);
+    const ok = [...after].every(k => live.has(k));
+    r.box.disabled = !ok;
+    r.box.title = ok ? "" : "Not available with your current choices: the blocks it would split are already taken by another ticked option.";
   }
 }

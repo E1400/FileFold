@@ -19,6 +19,10 @@ from dataclasses import asdict, dataclass
 from .block import Block
 from .keywords import CATEGORY_SUB_KEYWORDS, CATEGORY_SUB_OPTIONS, Category
 
+# Axes the splitter still understands (so existing workspaces keep working) but that the
+# menus do not offer: element type is finer than most people want to manage.
+HIDDEN_AXES = frozenset({"etype"})
+
 _AXIS_LABEL = {"material": "Material", "step": "Step", "part": "Part", "etype": "Element type"}
 _AXIS_FILE = {"material": "material", "step": "step", "part": "part", "etype": "elements"}
 
@@ -147,12 +151,25 @@ def discover(category: Category, blocks: list[Block]) -> tuple[list[SubOption], 
     walk(blocks, ())
     ordered = [option_from_key(category, o["sub_category"])
                for o in CATEGORY_SUB_OPTIONS.get(category, []) if o["sub_category"] in static_found]
-    return ordered + list(dynamic.values()), [list(c) for c in claims]
+    offered = [o for o in dynamic.values() if o.sub_category.partition(".")[0] not in HIDDEN_AXES]
+    return ordered + offered, [list(c) for c in claims]
 
 
 def discover_options(category: Category, blocks: list[Block]) -> list[SubOption]:
     """Just the options (see `discover`)."""
     return discover(category, blocks)[0]
+
+
+def can_tick(claims: list[list[str]], ticked: set[str], key: str) -> bool:
+    """May `key` be ticked on top of `ticked` without emptying anything?
+
+    True when ticking it gives it at least one block and leaves every already-ticked option
+    with at least one block. The UI uses this so a choice is never silently unticked: the
+    first choice stays, and the option that would conflict with it is disabled instead.
+    Mirrors the JavaScript `refreshSubAvailability`.
+    """
+    after = ticked | {key}
+    return after <= live_keys(claims, after)
 
 
 def live_keys(claims: list[list[str]], ticked: set[str]) -> set[str]:

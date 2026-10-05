@@ -50,7 +50,8 @@ def test_discovery_lists_names_present_in_the_deck(tmp_path):
     assert discover_options(Category.MATERIAL, b)[1].label == "Material: Alu 6061"
     assert [o.sub_category for o in discover_options(Category.STEP, b)] == ["step.load", "step.2"]
     mesh = [o.sub_category for o in discover_options(Category.MESH, b)]
-    assert {"part.bracket", "part.plate", "etype.c3d8r", "etype.s4r", "nodes", "elements"} <= set(mesh)
+    assert {"part.bracket", "part.plate", "nodes", "elements"} <= set(mesh)
+    assert not any(k.startswith("etype.") for k in mesh)      # supported by the splitter, not offered
     assert mesh.index("nodes") < mesh.index("part.bracket")  # static options first
 
 

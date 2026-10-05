@@ -48,3 +48,32 @@ def test_live_keys_match_the_files_the_splitter_actually_writes(deck):
             assert produced == live_keys(claims, ticked), (deck, cat.value, sorted(ticked))
             checked += 1
     assert checked > 5
+
+
+def test_can_tick_never_allows_a_choice_that_empties_another():
+    from filefold.core.subsplits import can_tick
+    inside_part = [["part.x"], ["part.x", "nodes"], ["part.x", "elements"]]   # everything is inside part.x
+    assert can_tick(inside_part, set(), "part.x") and can_tick(inside_part, set(), "nodes")
+    assert not can_tick(inside_part, {"nodes"}, "part.x")    # would leave "nodes" with nothing
+    assert not can_tick(inside_part, {"part.x"}, "nodes")    # nothing left for "nodes"
+    assert can_tick(inside_part, {"nodes"}, "elements")      # independent groups combine freely
+    mixed = inside_part + [["nodes"]]                         # some nodes also live outside any part
+    assert can_tick(mixed, {"part.x"}, "nodes")              # so "nodes" still has blocks to take
+
+
+@pytest.mark.parametrize("deck", ["Job-1.inp", "test_2.inp", "mmxmn.inp", "fempy_example.inp"])
+def test_choosing_in_any_order_with_can_tick_always_makes_every_file(deck):
+    """Greedy first-choice-wins selection (what the UI does) never leaves an empty option."""
+    from filefold.core.subsplits import can_tick
+    blocks = parse(FIXTURES / deck)
+    for cat in Category:
+        options, claims = discover(cat, [b for b in blocks if b.category is cat])
+        keys = [o.sub_category for o in options]
+        for order in (keys, keys[::-1]):
+            ticked: set[str] = set()
+            for k in order:
+                if can_tick(claims, ticked, k):
+                    ticked.add(k)
+            sel = SplitSelection(cat, "parent.out", [SubSplitSelection(k, f"{k}.out") for k in sorted(ticked)])
+            _, files = compute_split(blocks, [sel]) if ticked else (None, {})
+            assert {k for k in keys if f"{k}.out" in files} == ticked, (deck, cat.value, order)
