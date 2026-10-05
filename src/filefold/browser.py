@@ -122,3 +122,25 @@ def handle(
             return 200, result.content_type, result.headers, result.body
         return as_json(200, result)
     return as_json(405 if path_matched else 404, {"detail": "Method Not Allowed" if path_matched else "Not Found"})
+
+
+def handle_js(method, path, json_text, fields_text, file_name, file_bytes, body):
+    """Entry point called from the Pyodide worker (JavaScript values in and out).
+
+    Arguments are strings or Uint8Array (None when absent); the result is a JS array
+    [status, content_type, headers_json, body_bytes].
+    """
+    from pyodide.ffi import jsnull, to_js  # only importable inside Pyodide
+
+    def as_bytes(value) -> bytes:
+        if value is None or value is jsnull:   # JS null/undefined arrive as jsnull/None
+            return b""
+        return value.to_bytes() if hasattr(value, "to_bytes") else bytes(value)
+
+    status, ctype, headers, out = handle(
+        method, path,
+        json.loads(json_text) if json_text else None,
+        json.loads(fields_text) if fields_text else None,
+        file_name or "", as_bytes(file_bytes), as_bytes(body),
+    )
+    return to_js([status, ctype, json.dumps(headers), out])

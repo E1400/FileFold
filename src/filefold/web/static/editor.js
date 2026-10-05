@@ -30,8 +30,22 @@ async function viewFile(filename) {
   const discBtn = document.getElementById("editor-discard-btn");
   const dot     = document.getElementById("unsaved-dot");
 
-  dlBtn.href = url;
-  dlBtn.download = filename;
+  // Download through fetch rather than a direct link, so it also works where /api/ is
+  // served from inside the page (static build) instead of by a real server.
+  dlBtn.href = "#";
+  dlBtn.onclick = async ev => {
+    ev.preventDefault();
+    try {
+      const blob = await (await fetch(url)).blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      toast("Download failed: " + err.message, "error");
+    }
+  };
   saveBtn.style.display = "none";
   discBtn.style.display = "none";
   dot.classList.remove("visible");

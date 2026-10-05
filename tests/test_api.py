@@ -299,7 +299,7 @@ def test_constraint_category_extractable_and_reported(client):
 def test_every_asset_linked_from_index_is_served(client):
     import re
     html = client.get("/").text
-    assets = re.findall(r'(?:src|href)="(/static/[^"]+)"', html)
+    assets = re.findall(r'(?:src|href)="(static/[^"]+)"', html)
     assert len(assets) >= 8  # app.css + the script files
     for url in assets:
         r = client.get(url)
