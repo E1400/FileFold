@@ -43,7 +43,16 @@ def workspace_dir(tmp_path_factory) -> Path:
     return tmp_path_factory.mktemp("e2e-workspaces")
 
 
-def _wait_for(url: str, proc: subprocess.Popen, what: str) -> None:
+def _spawn(cmd: list[str], log: Path, env: dict | None = None) -> subprocess.Popen:
+    """Start a server with its output going to a file.
+
+    Never PIPE a long-lived server's output without draining it: http.server logs every
+    request, the pipe buffer fills after a few hundred, and the server then blocks.
+    """
+    return subprocess.Popen(cmd, env=env, stdout=open(log, "wb"), stderr=subprocess.STDOUT)
+
+
+def _wait_for(url: str, proc: subprocess.Popen, log: Path, what: str) -> None:
     deadline = time.time() + 60
     while time.time() < deadline:
         try:
@@ -51,10 +60,10 @@ def _wait_for(url: str, proc: subprocess.Popen, what: str) -> None:
             return
         except OSError:
             if proc.poll() is not None:
-                raise RuntimeError(proc.stdout.read().decode())
+                raise RuntimeError(log.read_text())
             time.sleep(0.2)
     proc.kill()
-    raise RuntimeError(f"{what} did not start")
+    raise RuntimeError(f"{what} did not start:\n{log.read_text()}")
 
 
 @pytest.fixture(scope="session")
@@ -64,25 +73,22 @@ def base_url(workspace_dir, tmp_path_factory) -> str:
         import build_pages
         site = build_pages.build(tmp_path_factory.mktemp("site") / "site")
         port = _free_port()
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", str(site)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        )
+        log = site.parent / "static-server.log"
+        proc = _spawn([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+                       "--directory", str(site)], log)
         url = f"http://127.0.0.1:{port}/app/"
-        _wait_for(url, proc, "static file server")
+        _wait_for(url, proc, log, "static file server")
         yield url
         proc.terminate()
         proc.wait(timeout=10)
         return
     port = _free_port()
     env = {**os.environ, "FILEFOLD_WORKSPACE_DIR": str(workspace_dir)}
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "filefold.api.main:app",
-         "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"],
-        env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-    )
+    log = workspace_dir.parent / "uvicorn.log"
+    proc = _spawn([sys.executable, "-m", "uvicorn", "filefold.api.main:app",
+                   "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"], log, env)
     url = f"http://127.0.0.1:{port}"
-    _wait_for(url, proc, "FileFold server")
+    _wait_for(url, proc, log, "FileFold server")
     yield url
     proc.terminate()
     proc.wait(timeout=10)

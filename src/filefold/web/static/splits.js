@@ -119,6 +119,8 @@ function renderSplitsTab(data) {
       ${subPanel}
     </div>`;
   }).join("");
+  // Apply availability to extracted categories as rendered (their sub-files start ticked).
+  allCats.forEach(cat => { if (document.getElementById(`ws-sel-${cat}`)?.checked) _refreshWsSubs(cat); });
 }
 
 function wsToggleSplitRow(cat) {
@@ -145,6 +147,7 @@ function wsToggleSplitRow(cat) {
       inp.disabled = !on;
       inp.style.opacity = on ? "1" : ".4";
     });
+    _refreshWsSubs(cat);   // disable options that would produce no file
   }
 }
 
@@ -154,7 +157,16 @@ function wsToggleSubOption(cat, subCat) {
   if (!inp) return;
   inp.disabled = !cb.checked;
   inp.style.opacity = cb.checked ? "1" : ".4";
+  _refreshWsSubs(cat);
   _syncSubAllBox(cat);
+}
+
+function _refreshWsSubs(cat) {
+  const data = state.wsData;
+  refreshSubAvailability(data?.sub_claims?.[cat], data?.sub_options?.[cat] ?? [], {
+    box: key => `ws-sub-${cat}-${key}`,
+    name: key => `ws-subfn-${cat}-${key}`,
+  });
 }
 
 // Keep a category's "all" box in sync when its sub-options are toggled one by one,
@@ -165,7 +177,7 @@ function _syncSubAllBox(cat) {
   const master = document.getElementById(`ws-submaster-${cat}`);
   const panel  = document.getElementById(`ws-sub-opts-${cat}`);
   if (!master || !panel) return;
-  const boxes = [...panel.querySelectorAll("input[type=checkbox]")].filter(b => b !== master);
+  const boxes = [...panel.querySelectorAll("input[type=checkbox]")].filter(b => b !== master && !b.disabled);
   master.checked = boxes.length > 0 && boxes.every(b => b.checked);
 }
 
@@ -180,6 +192,7 @@ function wsToggleAllSubOptions(cat) {
     const subCat = cb.id.slice(`ws-sub-${cat}-`.length);
     wsToggleSubOption(cat, subCat);
   });
+  _refreshWsSubs(cat);
   _syncSubAllBox(cat);  // re-derive rather than assert: disabled rows may not have moved
 }
 

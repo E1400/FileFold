@@ -261,3 +261,69 @@ def test_saving_a_crlf_deck_preserves_crlf(app):
     raw = api_text(app, "Job-1", "mesh.inp")
     assert "\r\n" in raw
     assert "\n" not in raw.replace("\r\n", "")  # no bare LF anywhere
+
+
+# --- an offered sub-split must produce a file --------------------------------
+
+import pytest as _pytest
+
+_DECKS = ["Job-1.inp", "mmxmn.inp", "fempy_example.inp", "test_2.inp"]
+
+
+def _ticked_subs(page: Page, prefix: str) -> list[str]:
+    """ids of sub-split checkboxes that are ticked (the 'all' master boxes excluded)."""
+    return page.evaluate("""p => [...document.querySelectorAll(`input[type=checkbox][id^='${p}-']`)]
+        .filter(cb => cb.checked && !cb.id.startsWith(p.replace('sub', 'submaster') + '-')).map(cb => cb.id)""", prefix)
+
+
+@_pytest.mark.parametrize("deck", _DECKS)
+def test_create_menu_never_offers_a_sub_split_that_makes_no_file(app, deck):
+    open_new_workspace(app)
+    upload(app, deck)
+    app.locator("#master-cats").check()
+    for m in app.locator("#split-config input[id^='submaster-']").all():
+        m.check()
+    ticked = _ticked_subs(app, "sub")
+    ticked = [i for i in ticked if not i.startswith("submaster-")]
+    create(app)
+    expect(app.locator("#detail-files .badge-sub")).to_have_count(len(ticked))
+
+
+@_pytest.mark.parametrize("deck", _DECKS)
+def test_splits_tab_never_offers_a_sub_split_that_makes_no_file(app, deck):
+    make_workspace(app, deck, cats=())
+    app.locator("#tab-btn-splits").click()
+    app.locator("#ws-master-cats").check()
+    for m in app.locator("#ws-split-config input[id^='ws-submaster-']").all():
+        m.check()
+    ticked = [i for i in _ticked_subs(app, "ws-sub") if not i.startswith("ws-submaster-")]
+    app.locator("#ws-splits-apply-btn").click()
+    app.locator("#tab-btn-files").click()
+    expect(app.locator("#detail-files .badge-sub")).to_have_count(len(ticked))
+
+
+def test_element_type_and_all_elements_do_not_both_offer_the_same_block(app):
+    open_new_workspace(app)
+    upload(app, "Job-1.inp")  # one element type: "Elements" and "Element type: CPS4R" cover the same block
+    app.locator("#sel-mesh").check()
+    app.locator("[id=\"sub-mesh-etype.cps4r\"]").check()
+    expect(app.locator("#sub-mesh-elements")).to_be_disabled()
+    app.locator("[id=\"sub-mesh-etype.cps4r\"]").uncheck()
+    expect(app.locator("#sub-mesh-elements")).to_be_enabled()
+    app.locator("#sub-mesh-elements").check()
+    expect(app.locator("[id=\"sub-mesh-etype.cps4r\"]")).to_be_enabled()  # the more specific split still wins
+
+
+def test_javascript_availability_rule_agrees_with_python(app):
+    from filefold.core.subsplits import live_keys
+    cases = [
+        ([["etype.a", "elements"], ["etype.b", "elements"], ["nodes"]], set()),
+        ([["etype.a", "elements"], ["etype.b", "elements"], ["nodes"]], {"elements"}),
+        ([["etype.a", "elements"], ["etype.b", "elements"], ["nodes"]], {"etype.a", "elements"}),
+        ([["etype.a", "elements"], ["etype.b", "elements"], ["nodes"]], {"etype.a", "etype.b", "elements", "nodes"}),
+        ([["part.x"], ["part.x", "nodes"], ["part.x", "elements"]], {"part.x", "nodes", "elements"}),
+        ([["part.x"], ["part.x", "nodes"], ["nodes"]], {"nodes"}),
+    ]
+    for claims, ticked in cases:
+        js = set(app.evaluate("([c, t]) => [...liveSubKeys(c, new Set(t))]", [claims, sorted(ticked)]))
+        assert js == live_keys(claims, ticked), (claims, ticked)

@@ -11,6 +11,7 @@ UnsafeName (a client error, status 400).
 from __future__ import annotations
 
 import io
+import re
 import shutil
 import tempfile
 import zipfile
@@ -22,7 +23,7 @@ from filefold.core.parser import parse
 from filefold.core.splitter import (
     SplitSelection, SubSplitSelection, _sha256, read_raw, split_with_includes,
 )
-from filefold.core.subsplits import discover_options, option_from_key
+from filefold.core.subsplits import discover
 from filefold.core.workspace import Workspace
 
 __all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE"]
@@ -127,19 +128,22 @@ def blocks_to_json(blocks) -> list[dict]:
     ]
 
 
-def sub_options_json(blocks) -> dict[str, list[dict[str, str]]]:
-    """Per category, the sub-split options that would actually produce a file.
+def sub_split_info(blocks) -> tuple[dict[str, list[dict[str, str]]], dict[str, list[list[str]]]]:
+    """Per category: the sub-split options that exist in the deck, and their block claims.
 
     The create menu must not offer a sub-split (e.g. "Ties", or a material that is not
-    in the deck) that would create nothing. Includes name-based options such as one
-    per material, step, part and element type.
+    in the deck) that would create nothing, and the UI uses the claims to disable options
+    whose blocks are already taken by another selected option. Includes name-based
+    options such as one per material, step, part and element type.
     """
-    out: dict[str, list[dict[str, str]]] = {}
+    options: dict[str, list[dict[str, str]]] = {}
+    claims: dict[str, list[list[str]]] = {}
     for cat in Category:
-        opts = discover_options(cat, blocks)
+        opts, cl = discover(cat, blocks)
         if opts:
-            out[cat.value] = [o.as_dict() for o in opts]
-    return out
+            options[cat.value] = [o.as_dict() for o in opts]
+            claims[cat.value] = cl
+    return options, claims
 
 
 # ---------------------------------------------------------------------------
@@ -151,11 +155,12 @@ def inspect(filename: str, data: bytes) -> dict:
     tmp_path, tmpdir = _parse_upload(filename, data)
     try:
         blocks = parse(tmp_path)
-        opts = sub_options_json(blocks)
+        opts, claims = sub_split_info(blocks)
         return {
             "filename": filename,
             "blocks": blocks_to_json(blocks),
             "sub_options": opts,
+            "sub_claims": claims,
             "sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in opts.items()},
         }
     finally:
@@ -281,9 +286,11 @@ def get_workspace(name: str) -> dict:
             available_cats.add(b.category.value)
 
     # Sub-split options per category, from what is actually in the deck.
-    # Already extracted: scan the child file (handles *PART nesting). Still in the
-    # mother: scan only that category's top-level blocks.
+    # Already extracted: scan the child with its sub-files folded back in, which is exactly
+    # what "Apply changes" re-splits (recombine, then split again). Still in the mother:
+    # scan only that category's top-level blocks.
     sub_options: dict[str, list[dict[str, str]]] = {}
+    sub_claims: dict[str, list[list[str]]] = {}
     sel_by_cat = {s.category.value: s for s in ws.selections}
     for cat_str in sorted(available_cats):
         try:
@@ -292,20 +299,13 @@ def get_workspace(name: str) -> dict:
             continue
         sel = sel_by_cat.get(cat_str)
         if sel and (ws_dir / sel.filename).exists():
-            opts = discover_options(cat_enum, parse(ws_dir / sel.filename))
-            # A sub-category that has already been extracted no longer appears in
-            # the child file (its blocks live in the grandchild), so the scan above
-            # cannot see it. Seed it from the recorded sub-selections, otherwise the
-            # UI drops the row and the user can neither uncheck it nor keep it
-            # across an apply.
-            seen = {o.sub_category for o in opts}
-            for ss in sel.sub_selections:
-                if (ws_dir / ss.filename).exists() and ss.sub_category not in seen:
-                    opts.append(option_from_key(cat_enum, ss.sub_category))
+            blocks = _blocks_with_subfiles_folded_back(ws_dir, sel)
         else:
-            opts = discover_options(cat_enum, [b for b in mother_blocks if b.category == cat_enum])
+            blocks = [b for b in mother_blocks if b.category == cat_enum]
+        opts, claims = discover(cat_enum, blocks)
         if opts:
             sub_options[cat_str] = [o.as_dict() for o in opts]
+            sub_claims[cat_str] = claims
 
     return {
         "name": ws.name,
@@ -323,7 +323,34 @@ def get_workspace(name: str) -> dict:
         "available_categories": sorted(available_cats),
         "available_sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in sub_options.items()},
         "sub_options": sub_options,
+        "sub_claims": sub_claims,
     }
+
+
+def _blocks_with_subfiles_folded_back(ws_dir: Path, sel: SplitSelection):
+    """Parse a child file as it would look after recombining its sub-files."""
+    sub_files = {ss.filename for ss in sel.sub_selections}
+
+    def expand(path: Path) -> str:
+        text = read_raw(path)
+
+        def inline(m: re.Match) -> str:
+            name = m.group(1)
+            target = ws_dir / name
+            if name not in sub_files or not target.is_file():
+                return m.group(0)
+            body = expand(target)
+            return body if body.endswith("\n") else body + "\n"
+
+        return re.sub(r"^\*INCLUDE,[ \t]*INPUT=(\S+?)[ \t]*\r?\n", inline, text, flags=re.M | re.I)
+
+    tmpdir = Path(tempfile.mkdtemp())
+    try:
+        folded = tmpdir / sel.filename
+        folded.write_text(expand(ws_dir / sel.filename), encoding="utf-8", errors="surrogateescape", newline="")
+        return parse(folded)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def rename_workspace(name: str, new_name: str) -> dict:

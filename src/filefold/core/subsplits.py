@@ -110,29 +110,60 @@ def _display_name(key: str, block: Block) -> str | None:
     return None
 
 
-def discover_options(category: Category, blocks: list[Block]) -> list[SubOption]:
-    """Sub-split options that would actually produce a file for these blocks.
+def discover(category: Category, blocks: list[Block]) -> tuple[list[SubOption], list[list[str]]]:
+    """Sub-split options for these blocks, and which options claim which blocks.
 
-    Static groups come first (in UI order), then name-based ones in file order.
+    options: the options that exist in the deck. Static groups first (in UI order), then
+             name-based ones in file order.
+    claims:  one entry per distinct kind of block: the keys that could receive it, in the
+             order the splitter tries them (an enclosing container's key first, then the
+             block's own name-based key, then its static group). Whichever of these keys
+             is ticked first gets the block, so an option that is first for no block
+             under the current ticks would produce an empty file. The UI uses this to
+             disable such options instead of offering a checkbox that creates nothing.
+
     Only descends into containers of the same category (e.g. *PART for mesh): blocks
     nested in a *STEP travel with the step and can never be split on their own.
     """
     state = KeyState()
     static_found: set[str] = set()
     dynamic: dict[str, SubOption] = {}
+    claims: dict[tuple[str, ...], None] = {}
 
-    def walk(bs: list[Block]) -> None:
+    def walk(bs: list[Block], ancestors: tuple[str, ...]) -> None:
         for b in bs:
             if b.category is not category:
                 continue
-            for key in candidate_keys(category, b, state):
+            keys = candidate_keys(category, b, state)
+            for key in keys:
                 if "." in key:
                     dynamic.setdefault(key, option_from_key(category, key, _display_name(key, b)))
                 else:
                     static_found.add(key)
-            walk(b.children)
+            if keys:
+                claims.setdefault(ancestors + tuple(keys), None)
+            walk(b.children, ancestors + tuple(keys))
 
-    walk(blocks)
+    walk(blocks, ())
     ordered = [option_from_key(category, o["sub_category"])
                for o in CATEGORY_SUB_OPTIONS.get(category, []) if o["sub_category"] in static_found]
-    return ordered + list(dynamic.values())
+    return ordered + list(dynamic.values()), [list(c) for c in claims]
+
+
+def discover_options(category: Category, blocks: list[Block]) -> list[SubOption]:
+    """Just the options (see `discover`)."""
+    return discover(category, blocks)[0]
+
+
+def live_keys(claims: list[list[str]], ticked: set[str]) -> set[str]:
+    """Keys that would receive at least one block if exactly `ticked` were selected.
+
+    Mirrors the splitter's rule (first ticked key among a block's candidates wins) and
+    the JavaScript `liveSubKeys` used by the UI; a test keeps the two in agreement.
+    """
+    live: set[str] = set()
+    for pattern in claims:
+        owner = next((k for k in pattern if k in ticked), None)
+        if owner:
+            live.add(owner)
+    return live

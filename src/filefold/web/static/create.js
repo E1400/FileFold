@@ -170,6 +170,7 @@ function toggleSplitRow(cat) {
       inp.disabled = true;
       inp.style.opacity = ".4";
     });
+    _refreshCreateSubs(cat);
   }
 }
 
@@ -179,7 +180,16 @@ function toggleSubOption(cat, subCat) {
   if (!inp) return;
   inp.disabled = !cb.checked;
   inp.style.opacity = cb.checked ? "1" : ".4";
+  _refreshCreateSubs(cat);
   _syncCreateSubMaster(cat);
+}
+
+function _refreshCreateSubs(cat) {
+  const info = state.inspectResult;
+  refreshSubAvailability(info?.sub_claims?.[cat], info?.sub_options?.[cat] ?? [], {
+    box: key => `sub-${cat}-${key}`,
+    name: key => `subfn-${cat}-${key}`,
+  });
 }
 
 // ── Create-menu select-all (mirrors the edit menu; derived state only) ───────
@@ -187,7 +197,8 @@ function _syncCreateSubMaster(cat) {
   const master = document.getElementById(`submaster-${cat}`);
   const panel  = document.getElementById(`sub-opts-${cat}`);
   if (!master || !panel) return;
-  const boxes = [...panel.querySelectorAll("input[type=checkbox]")].filter(b => b !== master);
+  // Options that cannot produce a file are disabled; "all" means all the available ones.
+  const boxes = [...panel.querySelectorAll("input[type=checkbox]")].filter(b => b !== master && !b.disabled);
   master.checked = boxes.length > 0 && boxes.every(b => b.checked);
 }
 
@@ -210,10 +221,11 @@ function toggleAllSubOptions(cat) {
   }
   const on = master.checked;
   panel.querySelectorAll("input[type=checkbox]").forEach(cb => {
-    if (cb === master) return;
+    if (cb === master || cb.disabled) return;   // disabled: would produce an empty file
     cb.checked = on;
     toggleSubOption(cat, cb.id.slice(`sub-${cat}-`.length));
   });
+  _refreshCreateSubs(cat);
   _syncCreateSubMaster(cat);
 }
 

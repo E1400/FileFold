@@ -97,3 +97,55 @@ function esc(s) {
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+
+
+// ── Sub-split availability ───────────────────────────────────────────────────
+// Several sub-split options can claim the same block (the "Elements" group and an
+// "Element type: X" split both want an *ELEMENT; a part wants everything inside it).
+// The splitter gives each block to the most specific ticked option, so a ticked option
+// can end up with nothing and no file is made. The server reports, per kind of block,
+// the keys that could receive it in the splitter's order ("claims"); from that we know
+// exactly which options would produce a file and keep the rest from being offered.
+
+// Keys that would receive at least one block if exactly `ticked` were selected.
+// Mirrors filefold.core.subsplits.live_keys (a test keeps them in agreement).
+function liveSubKeys(claims, ticked) {
+  const live = new Set();
+  for (const pattern of claims) {
+    const owner = pattern.find(key => ticked.has(key));
+    if (owner) live.add(owner);
+  }
+  return live;
+}
+
+// Untick options that a more specific ticked option fully covers, and disable any
+// option that would produce an empty file if ticked now. `ids` maps an option key to
+// its checkbox and filename-input element ids.
+function refreshSubAvailability(claims, options, ids) {
+  if (!claims || !claims.length) return;
+  const rows = options.map(opt => ({
+    key: opt.sub_category,
+    box: document.getElementById(ids.box(opt.sub_category)),
+    name: document.getElementById(ids.name(opt.sub_category)),
+  })).filter(r => r.box);
+
+  const ticked = () => new Set(rows.filter(r => r.box.checked).map(r => r.key));
+
+  // 1. A ticked option with nothing left to take is dropped (the later, more specific
+  //    choice wins).
+  const live = liveSubKeys(claims, ticked());
+  for (const r of rows) {
+    if (r.box.checked && !live.has(r.key)) {
+      r.box.checked = false;
+      if (r.name) { r.name.disabled = true; r.name.style.opacity = ".4"; }
+    }
+  }
+  // 2. An unticked option is only available if ticking it would give it blocks.
+  const now = ticked();
+  for (const r of rows) {
+    if (r.box.checked) { r.box.disabled = false; r.box.title = ""; continue; }
+    const wouldTake = liveSubKeys(claims, new Set([...now, r.key])).has(r.key);
+    r.box.disabled = !wouldTake;
+    r.box.title = wouldTake ? "" : "Nothing left for this option: everything it would match is already taken by another ticked option.";
+  }
+}
