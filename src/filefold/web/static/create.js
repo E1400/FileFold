@@ -13,8 +13,19 @@ function setupDropZone(zoneId, handler) {
   });
 }
 
+// In the static (in-browser) build the whole deck is held in browser memory. Decks up to
+// 100 MB are tested end to end; beyond that the tab can run out of memory.
+const STATIC_MAX_TESTED_BYTES = 100 * 1024 * 1024;
+function staticSizeWarning(bytes) {
+  if (!window.FILEFOLD_STATIC || bytes <= STATIC_MAX_TESTED_BYTES) return null;
+  return `This deck is ${Math.round(bytes / 1048576)} MB. The in-browser version is tested up to 100 MB ` +
+         `and may run out of memory; use the desktop app for larger models.`;
+}
+
 async function handleUpload(file) {
   if (!file) return;
+  const sizeWarning = staticSizeWarning(file.size);
+  if (sizeWarning) toast(sizeWarning, "warn");
   state.uploadedFile = file;
 
   // Default workspace name from filename

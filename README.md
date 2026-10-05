@@ -8,7 +8,7 @@ Workspace manager for Abaqus `.inp` files. Split large FEA models by category, t
 
 | | |
 |---|---|
-| **Web app** | https://filefold-production.up.railway.app |
+| **Web app** (runs in your browser) | https://e1400.github.io/FileFold/app/ |
 | **Landing page** | https://e1400.github.io/FileFold |
 | **Desktop downloads** | https://github.com/E1400/FileFold/releases |
 
@@ -39,7 +39,11 @@ Abaqus `.inp` files grow large and become difficult to manage — mesh, material
 
 ### Online (no install)
 
-Go to **https://filefold-production.up.railway.app** — upload a file and use it directly in the browser.
+Go to **https://e1400.github.io/FileFold/app/** — upload a file and use it directly in the browser.
+
+This is a static site: FileFold's Python runs inside your browser (via [Pyodide](https://pyodide.org)), so your model **never leaves your machine** and there is no server. Workspaces are stored in the browser (IndexedDB) on that device; use **Export ZIP** to take them elsewhere. First load downloads about 13 MB of runtime, then it is cached.
+
+Size: decks up to **100 MB** are tested end to end (about 7 s to inspect, 15 s to create). A 200 MB deck did not finish creating in the browser, so use the desktop app for models that large.
 
 ### Desktop app
 
@@ -107,9 +111,17 @@ uv run filefold workspace reimport ./my-workspace updated_model.inp
 uv sync --dev
 ```
 
-**Run tests:**
+**Run tests** (unit, API, JS lint, and headless-browser end-to-end against the real server):
 ```bash
+uv run playwright install chromium   # once
 uv run pytest
+FILEFOLD_E2E_TARGET=static uv run pytest tests/e2e   # same browser tests against the static build
+```
+
+**Build the static site** (landing page + in-browser app) into `site/`:
+```bash
+python scripts/build_pages.py
+python -m http.server --directory site 8080   # then open http://localhost:8080/app/
 ```
 
 **Build the desktop app (requires icons first):**

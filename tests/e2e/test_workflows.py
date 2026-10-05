@@ -7,7 +7,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page, expect
 
-from .conftest import fixture_path
+from .conftest import fail_file_saves, fetch_text, fixture_path
 from .test_ui import create, detail_files, open_new_workspace, upload
 
 
@@ -33,7 +33,7 @@ def open_file(page: Page, filename: str) -> None:
 
 
 def api_text(page: Page, ws: str, filename: str) -> str:
-    return page.request.get(f"{page.url.split('#')[0].rstrip('/')}/api/workspaces/{ws}/files/{filename}").text()
+    return fetch_text(page, f"/api/workspaces/{ws}/files/{filename}")
 
 
 # --- editor -----------------------------------------------------------------
@@ -56,8 +56,7 @@ def test_edit_and_save_marks_file_edited_and_persists(app):
 def test_failed_save_is_reported_not_claimed_as_saved(app):
     make_workspace(app, "Job-1.inp")
     open_file(app, "mesh.inp")
-    app.route("**/api/workspaces/*/files/*", lambda r: r.fulfill(status=500, body="disk full")
-              if r.request.method == "PUT" else r.continue_())
+    fail_file_saves(app)
     app.locator("#editor-ta").click()
     app.keyboard.type("x")
     app.locator("#editor-save-btn").click()
@@ -240,8 +239,7 @@ def test_escape_closes_the_dialog_like_keep_editing(app):
 def test_failed_save_from_dialog_keeps_the_editor_open(app):
     make_workspace(app, "mmxmn.inp")
     open_file(app, "mesh.inp")
-    app.route("**/api/workspaces/*/files/*", lambda r: r.fulfill(status=500, body="disk full")
-              if r.request.method == "PUT" else r.continue_())
+    fail_file_saves(app)
     app.locator("#editor-ta").click()
     app.keyboard.type("x")
     _go_back(app)
@@ -260,6 +258,6 @@ def test_saving_a_crlf_deck_preserves_crlf(app):
     app.keyboard.type("** edited\n")
     app.locator("#editor-save-btn").click()
     expect(app.locator(".toast", has_text="Saved mesh.inp")).to_be_visible()
-    raw = app.request.get(f"{app.url.rstrip('/')}/api/workspaces/Job-1/files/mesh.inp").body()
-    assert b"\r\n" in raw
-    assert b"\n" not in raw.replace(b"\r\n", b"")  # no bare LF anywhere
+    raw = api_text(app, "Job-1", "mesh.inp")
+    assert "\r\n" in raw
+    assert "\n" not in raw.replace("\r\n", "")  # no bare LF anywhere

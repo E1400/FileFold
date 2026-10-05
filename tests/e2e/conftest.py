@@ -4,8 +4,14 @@ Same rule as the barnes-maze-pipeline suite: every test fails on ANY console err
 uncaught page exception, or failed /api call, so a regression like a deleted JS
 constant cannot slip through just because the test happened to assert something else.
 
-Runs against a real uvicorn process (the same entry point `filefold serve` uses)
-with an isolated workspace directory, driven by headless Chromium.
+Two targets, selected with FILEFOLD_E2E_TARGET (default "server"):
+
+* server — a real uvicorn process (the entry point `filefold serve` uses) with an
+  isolated workspace directory.
+* static — the GitHub Pages build (scripts/build_pages.py) served over plain HTTP, with
+  FileFold's Python running in the browser under Pyodide.
+
+The same tests run against both; headless Chromium drives either.
 """
 from __future__ import annotations
 
@@ -21,6 +27,9 @@ from pathlib import Path
 import pytest
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
+ROOT = Path(__file__).resolve().parents[2]
+TARGET = os.environ.get("FILEFOLD_E2E_TARGET", "server")
+assert TARGET in {"server", "static"}, f"FILEFOLD_E2E_TARGET must be server or static, got {TARGET!r}"
 
 
 def _free_port() -> int:
@@ -34,8 +43,37 @@ def workspace_dir(tmp_path_factory) -> Path:
     return tmp_path_factory.mktemp("e2e-workspaces")
 
 
+def _wait_for(url: str, proc: subprocess.Popen, what: str) -> None:
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        try:
+            urllib.request.urlopen(url, timeout=1)
+            return
+        except OSError:
+            if proc.poll() is not None:
+                raise RuntimeError(proc.stdout.read().decode())
+            time.sleep(0.2)
+    proc.kill()
+    raise RuntimeError(f"{what} did not start")
+
+
 @pytest.fixture(scope="session")
-def base_url(workspace_dir) -> str:
+def base_url(workspace_dir, tmp_path_factory) -> str:
+    if TARGET == "static":
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import build_pages
+        site = build_pages.build(tmp_path_factory.mktemp("site") / "site")
+        port = _free_port()
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", str(site)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+        url = f"http://127.0.0.1:{port}/app/"
+        _wait_for(url, proc, "static file server")
+        yield url
+        proc.terminate()
+        proc.wait(timeout=10)
+        return
     port = _free_port()
     env = {**os.environ, "FILEFOLD_WORKSPACE_DIR": str(workspace_dir)}
     proc = subprocess.Popen(
@@ -44,18 +82,7 @@ def base_url(workspace_dir) -> str:
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
     )
     url = f"http://127.0.0.1:{port}"
-    deadline = time.time() + 30
-    while time.time() < deadline:
-        try:
-            urllib.request.urlopen(url, timeout=1)
-            break
-        except OSError:
-            if proc.poll() is not None:
-                raise RuntimeError(proc.stdout.read().decode())
-            time.sleep(0.2)
-    else:
-        proc.kill()
-        raise RuntimeError("FileFold server did not start")
+    _wait_for(url, proc, "FileFold server")
     yield url
     proc.terminate()
     proc.wait(timeout=10)
@@ -75,12 +102,16 @@ def app(page, base_url):
     errors: list[str] = []
     page.on("console", lambda m: errors.append(f"console.error: {m.text}") if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
+    # Real HTTP errors (server target). The static build has no network /api; its fetch
+    # shim logs the same failures as console errors, which are captured above.
     page.on("response", lambda r: errors.append(f"HTTP {r.status} {r.request.method} {r.url}")
-            if r.url.startswith(base_url + "/api") and r.status >= 400 else None)
+            if r.url.startswith(base_url.rstrip("/") + "/api") and r.status >= 400 else None)
     page.on("dialog", lambda d: d.accept())
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(base_url)
     page.wait_for_load_state("networkidle")
+    if TARGET == "static":   # Python is starting in a worker; the banner goes away when ready
+        page.wait_for_selector("#static-banner", state="detached", timeout=90_000)
     page.expected_errors = errors  # tests that deliberately provoke an error clear this
     yield page
     assert errors == [], "browser-side errors:\n" + "\n".join(errors)
@@ -88,3 +119,18 @@ def app(page, base_url):
 
 def fixture_path(name: str) -> Path:
     return FIXTURES / name
+
+
+def fetch_text(page, path: str) -> str:
+    """GET an /api path from inside the page, so it works for both targets."""
+    return page.evaluate("p => fetch(p).then(r => r.text())", path)
+
+
+def fail_file_saves(page) -> None:
+    """Make every file save (PUT .../files/...) fail with a 500, in either target."""
+    page.evaluate("""() => {
+      const real = window.fetch;
+      window.fetch = (url, init) => (init && init.method === "PUT" && /\\/files\\//.test(String(url)))
+        ? Promise.resolve(new Response("disk full", { status: 500 }))
+        : real(url, init);
+    }""")

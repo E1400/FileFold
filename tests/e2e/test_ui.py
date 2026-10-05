@@ -285,3 +285,24 @@ def make_workspace_for_dynamic(page: Page) -> None:
     page.locator("#sel-material").check()
     create(page)
     expect(page.locator("#detail-files tr").first).to_be_visible()
+
+
+# --- static (in-browser) build only -----------------------------------------
+
+import os as _os
+
+@pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
+def test_static_build_warns_about_decks_over_100mb(app):
+    assert app.evaluate("staticSizeWarning(50 * 1024 * 1024)") is None
+    assert "desktop app" in app.evaluate("staticSizeWarning(150 * 1024 * 1024)")
+
+
+@pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
+def test_static_build_keeps_workspaces_across_reload(app):
+    open_new_workspace(app)
+    upload(app, "Job-1.inp")
+    app.locator("#sel-mesh").check()
+    create(app)
+    app.reload()
+    app.wait_for_selector("#static-banner", state="detached", timeout=90_000)
+    expect(app.locator(".ws-item", has_text="Job-1")).to_be_visible()

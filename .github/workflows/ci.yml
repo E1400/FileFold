@@ -20,9 +20,14 @@ jobs:
           node-version: "22"
       - run: uv sync --dev
       - run: uv run playwright install --with-deps chromium
-      # Includes tests/e2e (real server + headless Chromium; fails on any browser
-      # console/page error or failed API call) and tests/test_js_static.py.
+      # Includes tests/e2e against the real server (headless Chromium; fails on any
+      # browser console/page error or failed API call) and tests/test_js_static.py.
       - run: uv run pytest -q
+      # The same browser tests against the GitHub Pages build (Python running in the
+      # browser under Pyodide).
+      - run: uv run pytest tests/e2e -q
+        env:
+          FILEFOLD_E2E_TARGET: static
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
