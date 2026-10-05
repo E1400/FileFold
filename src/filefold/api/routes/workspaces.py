@@ -8,6 +8,8 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 
 from filefold import service
 
+from ..uploads import staged_upload
+
 router = APIRouter()
 
 
@@ -24,7 +26,8 @@ async def create_workspace(
 ):
     """Create a new workspace from an uploaded mother file."""
     sel_data = json.loads(selections) if selections else []
-    return service.create_workspace(name, file.filename or "upload.inp", await file.read(), sel_data)
+    async with staged_upload(file) as path:
+        return service.create_workspace(name, file.filename or "upload.inp", path, sel_data)
 
 
 @router.get("/api/workspaces/{name}")

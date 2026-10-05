@@ -5,13 +5,16 @@ from fastapi import APIRouter, File, UploadFile
 
 from filefold import service
 
+from ..uploads import staged_upload
+
 router = APIRouter()
 
 
 @router.post("/api/inspect")
 async def inspect_file(file: UploadFile = File(...)):
     """Parse an uploaded .inp file and return its block tree."""
-    return service.inspect(file.filename or "upload.inp", await file.read())
+    async with staged_upload(file) as path:
+        return service.inspect(file.filename or "upload.inp", path)
 
 
 @router.get("/api/sub-options")

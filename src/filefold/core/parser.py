@@ -18,7 +18,7 @@ END_KEYWORD_MAP: dict[str, str] = {
 }
 
 
-def parse(path: Path) -> list[Block]:
+def parse(path: Path, keep_lines: bool = True) -> list[Block]:
     """Parse an Abaqus .inp file into a list of top-level Blocks.
 
     Nesting: *STEP ... *END STEP blocks carry their children in Block.children.
@@ -30,6 +30,10 @@ def parse(path: Path) -> list[Block]:
     option of the keyword above it, so it must travel with its parent when split.
     A keyword line ending in a comma continues onto the following line(s); their
     parameters are merged into Block.params.
+
+    keep_lines=False is for read-only inspection of very large decks: it keeps the
+    structure (keywords, params, categories, line ranges, context) but drops the data
+    lines, so memory no longer scales with the file. Such blocks cannot be emitted.
     """
     top: list[Block] = []
     stack: list[Block] = []   # nesting stack; stack[-1] is the open container
@@ -76,14 +80,16 @@ def parse(path: Path) -> list[Block]:
         if tok.kind != LineType.KEYWORD: 
             if current is not None:
                 # Trailing data/comment/blank on the in-progress block
-                current.raw_lines.append(tok.text)
+                if keep_lines:
+                    current.raw_lines.append(tok.text)
                 current.line_end = tok.line_no
             elif stack:
                 container = stack[-1]
                 if not container.children:
                     # Before first child — safe to attach to container's own lines
                     # (e.g. the step-title data line right after *STEP)
-                    container.raw_lines.append(tok.text)
+                    if keep_lines:
+                        container.raw_lines.append(tok.text)
                     container.line_end = tok.line_no
                 else:
                     # After a child container was closed (e.g. after *END INSTANCE).
@@ -92,10 +98,12 @@ def parse(path: Path) -> list[Block]:
                     last = container.children[-1]
                     while last.children:
                         last = last.children[-1]
-                    last.raw_lines.append(tok.text)
+                    if keep_lines:
+                        last.raw_lines.append(tok.text)
                     last.line_end = tok.line_no
             else:
-                orphans.append(tok.text)
+                if keep_lines:
+                    orphans.append(tok.text)
             continue
 
         kw = keyword_of(tok.text)

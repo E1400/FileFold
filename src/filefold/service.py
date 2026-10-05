@@ -10,18 +10,20 @@ UnsafeName (a client error, status 400).
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import re
 import shutil
 import tempfile
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from filefold.api.server import UnsafeName, child_path, list_workspaces, safe_segment, workspace_path
 from filefold.core.keywords import CATEGORY_SUB_OPTIONS, Category
 from filefold.core.parser import parse
 from filefold.core.splitter import (
-    SplitSelection, SubSplitSelection, _sha256, read_raw, split_with_includes,
+    SplitSelection, SubSplitSelection, read_raw, split_with_includes,
 )
 from filefold.core.subsplits import discover
 from filefold.core.workspace import Workspace
@@ -106,12 +108,48 @@ def _load(name: str) -> tuple[Path, Workspace]:
         raise ServiceError(404, f"Workspace '{name}' not found")
 
 
-def _parse_upload(filename: str, data: bytes):
-    """Parse uploaded bytes (the parser reads from a path). Returns (blocks, tmp_path, tmpdir)."""
+def safe_upload_name(filename: str) -> str:
+    """The leaf of a client-supplied filename. Uploads are staged as <tmpdir>/<name>, so a
+    name like '../../x.inp' must never be able to leave the temp directory."""
+    leaf = (filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+    return leaf if leaf not in ("", ".", "..") else "upload.inp"
+
+
+@contextmanager
+def _staged(filename: str, data: bytes | Path):
+    """Yield a path to the uploaded deck (the parser reads from a path).
+
+    `data` is either bytes (the browser build) or a Path already on disk under the
+    right name (the server, which streams uploads to disk instead of holding a
+    500 MB deck in memory two or three times over).
+    """
+    if isinstance(data, Path):
+        yield data
+        return
     tmpdir = Path(tempfile.mkdtemp())
-    tmp_path = tmpdir / (filename or "upload.inp")
-    tmp_path.write_bytes(data)
-    return tmp_path, tmpdir
+    try:
+        path = tmpdir / safe_upload_name(filename)
+        path.write_bytes(data)
+        yield path
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _file_stats(path: Path) -> tuple[str, int]:
+    """(sha256, line count) of a workspace file, streamed so memory does not scale with it.
+
+    The hash is over the raw bytes, which equals filefold.core.splitter._sha256 of the
+    text because every read in FileFold round-trips bytes exactly (surrogateescape).
+    """
+    digest = hashlib.sha256()
+    lines = 0
+    with open(path, "rb") as fh:
+        while chunk := fh.read(1024 * 1024):
+            digest.update(chunk)
+    with open(path, encoding="utf-8", errors="surrogateescape", newline="") as fh:
+        for _ in fh:
+            lines += 1
+    return digest.hexdigest(), lines
 
 
 def blocks_to_json(blocks) -> list[dict]:
@@ -150,11 +188,10 @@ def sub_split_info(blocks) -> tuple[dict[str, list[dict[str, str]]], dict[str, l
 # Inspect
 # ---------------------------------------------------------------------------
 
-def inspect(filename: str, data: bytes) -> dict:
+def inspect(filename: str, data: bytes | Path) -> dict:
     """Parse an uploaded .inp file and return its block tree."""
-    tmp_path, tmpdir = _parse_upload(filename, data)
-    try:
-        blocks = parse(tmp_path)
+    with _staged(filename, data) as tmp_path:
+        blocks = parse(tmp_path, keep_lines=False)
         opts, claims = sub_split_info(blocks)
         return {
             "filename": filename,
@@ -163,8 +200,6 @@ def inspect(filename: str, data: bytes) -> dict:
             "sub_claims": claims,
             "sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in opts.items()},
         }
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def static_sub_options() -> dict:
@@ -225,7 +260,7 @@ def list_all_workspaces() -> dict:
     return {"workspaces": names, "summaries": summaries}
 
 
-def create_workspace(name: str, filename: str, data: bytes, sel_data: list[dict]) -> dict:
+def create_workspace(name: str, filename: str, data: bytes | Path, sel_data: list[dict]) -> dict:
     """Create a new workspace from an uploaded mother file."""
     ws_name = safe_segment(name.strip() or Path(filename or "model").stem, "workspace name")
     ws_dir = workspace_path(ws_name)
@@ -238,11 +273,8 @@ def create_workspace(name: str, filename: str, data: bytes, sel_data: list[dict]
 
     # Write to a temp dir using the original filename so Workspace.create
     # records the right source_name in the manifest from the start.
-    tmp_path, tmpdir = _parse_upload(filename, data)
-    try:
+    with _staged(filename, data) as tmp_path:
         ws = Workspace.create(ws_dir, tmp_path, sel_list)
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
     return {"workspace": ws_name, "files": list(ws.file_records.keys())}
 
 
@@ -254,9 +286,8 @@ def get_workspace(name: str) -> dict:
     for fname, rec in ws.file_records.items():
         fpath = ws_dir / fname
         if fpath.exists():
-            text = read_raw(fpath)
-            edited = bool(rec.sha256) and _sha256(text) != rec.sha256
-            line_count = len(text.splitlines())
+            current_sha, line_count = _file_stats(fpath)
+            edited = bool(rec.sha256) and current_sha != rec.sha256
         else:
             edited = False
             line_count = None
@@ -280,7 +311,7 @@ def get_workspace(name: str) -> dict:
         if rec.role == "child" and rec.category and rec.category not in NON_EXTRACTABLE:
             available_cats.add(rec.category)
     mother_path = ws_dir / ws.source_name
-    mother_blocks = parse(mother_path) if mother_path.exists() else []
+    mother_blocks = parse(mother_path, keep_lines=False) if mother_path.exists() else []
     for b in mother_blocks:
         if b.category.value not in NON_EXTRACTABLE:
             available_cats.add(b.category.value)
@@ -348,7 +379,7 @@ def _blocks_with_subfiles_folded_back(ws_dir: Path, sel: SplitSelection):
     try:
         folded = tmpdir / sel.filename
         folded.write_text(expand(ws_dir / sel.filename), encoding="utf-8", errors="surrogateescape", newline="")
-        return parse(folded)
+        return parse(folded, keep_lines=False)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -483,12 +514,11 @@ def _status_json(s) -> dict:
     }
 
 
-def reimport_preview(name: str, filename: str, data: bytes) -> dict:
+def reimport_preview(name: str, filename: str, data: bytes | Path) -> dict:
     """Upload a new mother file and get a preview of what would change."""
     _, ws = _load(name)
-    tmp_path, tmpdir = _parse_upload(filename, data)
-    try:
-        blocks = parse(tmp_path)
+    with _staged(filename, data) as tmp_path:
+        blocks = parse(tmp_path, keep_lines=False)
         preview = ws.reimport_preview(tmp_path)
         return {
             "filename": filename or "upload.inp",
@@ -497,11 +527,9 @@ def reimport_preview(name: str, filename: str, data: bytes) -> dict:
             "needs_attention": [_status_json(s) for s in preview.needs_attention],
             "unchanged": [_status_json(s) for s in preview.unchanged],
         }
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def reimport_apply(name: str, filename: str, data: bytes, to_update: list[str], added_data: list[dict]) -> dict:
+def reimport_apply(name: str, filename: str, data: bytes | Path, to_update: list[str], added_data: list[dict]) -> dict:
     """Apply a reimport: update approved children, add new selections, refresh mother."""
     _, ws = _load(name)
     update_set = set(to_update)
@@ -511,12 +539,9 @@ def reimport_apply(name: str, filename: str, data: bytes, to_update: list[str], 
         validate_selection_filenames(added_data)
         added = [SplitSelection(parse_category(s["category"]), s["filename"]) for s in added_data]
 
-    tmp_path, tmpdir = _parse_upload(filename, data)
-    try:
+    with _staged(filename, data) as tmp_path:
         preview = ws.reimport_preview(tmp_path)
         ws.reimport_apply(tmp_path, preview, update_set, added_selections=added)
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
     return {"updated": list(update_set), "workspace": ws.name}
 
 

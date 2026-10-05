@@ -8,13 +8,16 @@ from fastapi import APIRouter, File, Form, UploadFile
 
 from filefold import service
 
+from ..uploads import staged_upload
+
 router = APIRouter()
 
 
 @router.post("/api/workspaces/{name}/reimport/preview")
 async def reimport_preview(name: str, file: UploadFile = File(...)):
     """Upload a new mother file and get a preview of what would change."""
-    return service.reimport_preview(name, file.filename or "upload.inp", await file.read())
+    async with staged_upload(file) as path:
+        return service.reimport_preview(name, file.filename or "upload.inp", path)
 
 
 @router.post("/api/workspaces/{name}/reimport/apply")
@@ -25,8 +28,9 @@ async def reimport_apply(
     added_selections: Annotated[str, Form()] = "",  # JSON: [{"category":"step","filename":"step.inp"}]
 ):
     """Apply a reimport: update approved children, add new selections, refresh mother."""
-    return service.reimport_apply(
-        name, file.filename or "upload.inp", await file.read(),
-        json.loads(filenames) if filenames else [],
-        json.loads(added_selections) if added_selections else [],
-    )
+    async with staged_upload(file) as path:
+        return service.reimport_apply(
+            name, file.filename or "upload.inp", path,
+            json.loads(filenames) if filenames else [],
+            json.loads(added_selections) if added_selections else [],
+        )

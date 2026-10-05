@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      # Fails if pyproject.toml and uv.lock disagree (the Docker image installs --frozen).
+      - run: uv lock --check
       - run: uv sync --dev
       - run: uv run playwright install --with-deps chromium
       # Includes tests/e2e against the real server (headless Chromium; fails on any
@@ -35,3 +37,12 @@ jobs:
           path: |
             test-results/
           if-no-files-found: ignore
+
+  # The production path (Railway or any container host) must keep working even while the
+  # app is served as a static site from GitHub Pages during development.
+  docker:
+    name: Production image builds and serves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/docker_smoke.sh filefold:ci

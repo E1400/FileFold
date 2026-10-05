@@ -12,3 +12,8 @@ tests/
 filefold.spec
 parse-tests.ipynb
 node_modules/
+site/
+docs/
+notebooks/
+scripts/
+bugs/
