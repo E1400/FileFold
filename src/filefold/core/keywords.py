@@ -1,5 +1,7 @@
 from enum import Enum
 
+from .keyword_reference import FACTS as _REFERENCE
+
 
 class Category(str, Enum):
     MESH = "mesh"
@@ -72,24 +74,24 @@ _REGISTRY: dict[Category, tuple[str, ...]] = {
 
     # Initial state of the model
     Category.INITIAL: (
-        "INITIAL CONDITIONS", "FIELD",
+        "INITIAL CONDITIONS",
     ),
 
     # Analysis step containers and procedure keywords
     Category.STEP: (
-        "STEP", "END STEP", "STATIC", "DYNAMIC", "DYNAMIC EXPLICIT", "VISCO",
-        "FREQUENCY", "BUCKLE", "HEAT TRANSFER", "COUPLED TEMP-DISPLACEMENT",
+        "STEP", "END STEP", "STATIC", "DYNAMIC", "VISCO",
+        "FREQUENCY", "BUCKLE", "HEAT TRANSFER",
         "MASS DIFFUSION", "MODAL DYNAMIC", "STEADY STATE DYNAMICS", "RANDOM RESPONSE",
         "RESPONSE SPECTRUM", "COMPLEX FREQUENCY", "DIRECT CYCLIC", "GEOSTATIC", "SOILS",
         "ANNEAL", "SUBSTRUCTURE GENERATE", "SELECT EIGENMODES", "CONTROLS",
-        "SOLVER CONTROLS", "INERTIA RELIEF", "STEP CONTROLS",
+        "SOLVER CONTROLS", "INERTIA RELIEF",
     ),
 
     # Applied loads, boundary conditions, and their time curves
     Category.LOADS: (
         "BOUNDARY", "CLOAD", "DLOAD", "DSLOAD", "DFLUX", "CFLUX", "TEMPERATURE",
         "AMPLITUDE", "FILM", "SFILM", "CFILM", "RADIATE", "SRADIATE", "CRADIATE",
-        "PRESSURE PENETRATION", "IMPERFECTION", "BUOYANCY",
+        "PRESSURE PENETRATION", "IMPERFECTION", "FIELD",
     ),
 
     # Contact pairs, general contact, interactions, and interference
@@ -160,6 +162,92 @@ _FROM_RELEASE_NOTES: dict[Category, tuple[str, ...]] = {
     Category.MODEL: ("UNIT SYSTEM",),
 }
 
+# Decisions for keywords of the Abaqus Keywords Reference that the rules in
+# _derive_from_reference cannot place (or place wrongly). Reviewed by hand against each
+# keyword's page. MODEL means "leave it in the mother file": specialist keywords with no
+# clear extractable group, and anything FileFold should never move.
+_REFERENCE_OVERRIDES: dict[Category, tuple[str, ...]] = {
+    Category.MODEL: (
+        "ACOUSTIC WAVE FORMULATION", "DESIGN PARAMETER", "DESIGN GRADIENT", "PARAMETER DEPENDENCE",
+        "PARAMETER SHAPE VARIATION", "PERIODIC MEDIA", "SUBCYCLING", "SYMMETRIC MODEL GENERATION",
+        "DOMAIN DECOMPOSITION", "MATRIX", "MATRIX ASSEMBLE", "MATRIX INPUT", "DSA CONTROLS",
+        "SUBSTRUCTURE COPY", "SUBSTRUCTURE DELETE", "SUBSTRUCTURE DIRECTORY", "SUBSTRUCTURE LOAD CASE",
+        "SUBSTRUCTURE MATRIX OUTPUT", "SUBSTRUCTURE PATH", "SUBSTRUCTURE PROPERTY",
+        "SUBSTRUCTURE DAMPING", "SUBSTRUCTURE DAMPING CONTROLS", "SUBSTRUCTURE MODAL DAMPING",
+        "ADAPTIVE MESH REFINEMENT",
+    ),
+    Category.LOADS: (
+        "AQUA", "BASELINE CORRECTION", "CONWEP CHARGE PROPERTY", "UNDEX CHARGE PROPERTY",
+        "DETONATION POINT", "IMPEDANCE PROPERTY", "INCIDENT WAVE FLUID PROPERTY",
+        "INCIDENT WAVE INTERACTION PROPERTY", "INCIDENT WAVE PROPERTY", "PSD-DEFINITION", "SPECTRUM",
+        "WAVE", "WIND", "SUBMODEL", "PRE-TENSION SECTION", "FOUNDATION",
+        "CECHARGE", "CECURRENT", "DECHARGE", "DSECHARGE", "DSFLOW", "DFLOW", "CFLOW", "SFLOW",
+        "DSFLUX", "SLOAD", "FLUID FLUX", "FLUID BOUNDARY", "EULERIAN BOUNDARY", "MASS FLOW RATE",
+        "PRESSURE STRESS", "BASE MOTION", "MOTION", "IMPEDANCE", "SIMPEDANCE", "INCIDENT WAVE",
+        "INCIDENT WAVE INTERACTION", "INCIDENT WAVE REFLECTION", "FLUID INFLATOR ACTIVATION",
+        "D EM POTENTIAL", "CONNECTOR LOAD",
+    ),
+    Category.OUTPUT: (
+        "FILTER", "ELEMENT MATRIX OUTPUT", "ELEMENT OPERATOR OUTPUT", "EXTREME ELEMENT VALUE",
+        "EXTREME NODE VALUE", "EXTREME VALUE", "FILE OUTPUT", "MATRIX OUTPUT", "MODAL FILE",
+        "MODAL PRINT", "RADIATION FILE", "RADIATION PRINT", "VIEW FACTOR OUTPUT", "POST OUTPUT",
+    ),
+    Category.CONTACT: (
+        "FLUID CAVITY", "FLUID EXCHANGE", "FLUID EXCHANGE PROPERTY", "FLUID EXCHANGE ACTIVATION",
+        "SLIDE LINE",
+    ),
+    Category.MESH: (
+        "ADJUST", "ASYMMETRIC-AXISYMMETRIC", "INTERFACE", "RIGID SURFACE", "NODAL THICKNESS",
+    ),
+    Category.INITIAL: ("MAP SOLUTION",),
+    Category.SECTION: ("USER ELEMENT", "UEL PROPERTY", "SECTION POINTS", "MASS ADJUST"),
+    Category.STEP: ("DAMPING CONTROLS", "PARTICLE GENERATOR FLOW", "CONTACT RESPONSE"),
+}
+_REFERENCE_OVERRIDE_NAMES = frozenset(kw for kws in _REFERENCE_OVERRIDES.values() for kw in kws)
+
+
+def _derive_from_reference(explicit: dict[str, Category], prefix_of) -> dict[str, Category]:
+    """Categories for Abaqus Reference keywords not in the hand-written tables.
+
+    In order: (1) an option takes the category of the keyword the reference says it
+    belongs with (e.g. *ACOUSTIC MEDIUM -> *MATERIAL, *BLOCKAGE -> *SURFACE INTERACTION);
+    (2) otherwise by the shape the reference documents: step-level history data is a step
+    item, part-level model data is an element/section definition, and model-level model
+    data is a material behaviour. Keywords that fit none of these stay unplaced and
+    inherit from the block before them in the parser.
+    """
+    derived: dict[str, Category] = {}
+
+    def known(name: str) -> Category | None:
+        return explicit.get(name) or prefix_of(name) or derived.get(name)
+
+    changed = True
+    while changed:                                   # (1) parents, until nothing new resolves
+        changed = False
+        for name, (_types, _levels, parents) in _REFERENCE.items():
+            if name in derived or known(name):
+                continue
+            votes: dict[Category, int] = {}
+            for parent in parents:
+                cat = known(parent)
+                if cat:
+                    votes[cat] = votes.get(cat, 0) + 1
+            if votes:
+                derived[name] = max(votes, key=votes.get)
+                changed = True
+
+    for name, (types, levels, _parents) in _REFERENCE.items():   # (2) by documented shape
+        if known(name):
+            continue
+        if types == ("history",) and levels == ("step",):
+            derived[name] = Category.STEP
+        elif types == ("model",) and levels and set(levels) <= {"part", "part instance", "assembly"}:
+            derived[name] = Category.SECTION
+        elif types == ("model",) and levels == ("model",):
+            derived[name] = Category.MATERIAL
+    return derived
+
+
 # Families of keywords that share a prefix (checked only after the explicit table).
 _PREFIX_RULES: tuple[tuple[str, Category], ...] = (
     ("HYPER", Category.MATERIAL),
@@ -188,10 +276,22 @@ _PREFIX_RULES: tuple[tuple[str, Category], ...] = (
 # Normalized keyword (uppercase, no leading asterisk) -> Category
 KEYWORD_CATEGORIES: dict[str, Category] = {
     kw: cat
-    for table in (_REGISTRY, _FROM_RELEASE_NOTES)
+    for table in (_REGISTRY, _FROM_RELEASE_NOTES, _REFERENCE_OVERRIDES)
     for cat, kws in table.items()
     for kw in kws
 }
+
+
+def _prefix_category(kw: str) -> Category | None:
+    for prefix, pcat in _PREFIX_RULES:
+        if kw.startswith(prefix):
+            return pcat
+    return None
+
+
+# Everything in the Abaqus Reference that the tables above do not name (see
+# _derive_from_reference). Consulted last in categorize().
+_DERIVED_FROM_REFERENCE: dict[str, Category] = _derive_from_reference(KEYWORD_CATEGORIES, _prefix_category)
 
 
 def normalize(keyword: str) -> str:
@@ -206,13 +306,8 @@ def categorize(keyword: str) -> Category:
     of the preceding block (see parser.parse) rather than leaving it unknown.
     """
     kw = normalize(keyword)
-    cat = KEYWORD_CATEGORIES.get(kw)
-    if cat is not None:
-        return cat
-    for prefix, pcat in _PREFIX_RULES:
-        if kw.startswith(prefix):
-            return pcat
-    return Category.UNKNOWN
+    cat = KEYWORD_CATEGORIES.get(kw) or _prefix_category(kw) or _DERIVED_FROM_REFERENCE.get(kw)
+    return cat if cat is not None else Category.UNKNOWN
 
 
 # ---------------------------------------------------------------------------

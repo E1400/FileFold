@@ -244,7 +244,7 @@ def test_each_material_is_offered_by_name_and_split_into_its_own_file(app):
     assert labels and all(l.startswith("Material:") for l in labels), labels
     app.locator("#submaster-material").check()
     create(app)
-    expect(app.locator("#detail-files .badge-sub")).to_have_count(len(ids))
+    expect(app.locator("#detail-files .badge-sub")).to_have_count(len(ids), timeout=90_000)
     subs = [n for n in detail_filenames(app) if n.startswith("material-")]
     assert len(subs) == len(ids), subs
 

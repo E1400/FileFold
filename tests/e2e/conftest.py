@@ -114,6 +114,10 @@ def app(page, base_url):
             if r.url.startswith(base_url.rstrip("/") + "/api") and r.status >= 400 else None)
     page.on("dialog", lambda d: d.accept())
     page.set_viewport_size({"width": 1400, "height": 900})
+    if TARGET == "static":
+        # Python runs in the page's own process here, so a loaded machine (the whole suite
+        # running back to back) needs a longer patience than the server target.
+        page.set_default_timeout(60_000)
     page.goto(base_url)
     page.wait_for_load_state("networkidle")
     if TARGET == "static":   # Python is starting in a worker; the banner goes away when ready
