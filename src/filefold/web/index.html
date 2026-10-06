@@ -50,6 +50,65 @@
       <button class="btn btn-primary btn-sm" onclick="showView('new-workspace')">+ New workspace</button>
     </div>
     <div class="content">
+      <!-- Chalkboard: reference notes, not a walkthrough. Always there, collapsible, never blocks anything. -->
+      <section id="notes" class="chalkboard" aria-labelledby="notes-title">
+        <div class="chalk-frame">
+          <button id="notes-toggle" class="chalk-toggle" type="button" aria-expanded="true" aria-controls="notes-body" onclick="toggleNotes()">
+            <span class="chalk-title" id="notes-title">How FileFold works</span>
+            <span class="chalk-hint">notes on the board: read what you need, skip the rest</span>
+            <span class="chalk-caret" aria-hidden="true">▾</span>
+          </button>
+          <div id="notes-body" class="chalk-body">
+            <div class="chalk-grid">
+              <article class="note">
+                <h3>The idea</h3>
+                <p>One big <code>.inp</code> in. A small <b>mother</b> file plus <b>child</b> files out. The mother pulls its children back in with <code>*INCLUDE</code>, so Abaqus reads the model exactly as before.</p>
+                <pre class="chalk-code">*INCLUDE, INPUT=mesh.inp</pre>
+              </article>
+              <article class="note">
+                <h3>Upload and inspect</h3>
+                <p>Drop a <code>.inp</code>, or load a sample below. The block inspector lists every keyword block, coloured by category: mesh, material, step, loads, contact and more. Options always stay with the keyword they belong to.</p>
+              </article>
+              <article class="note">
+                <h3>Choose what to extract</h3>
+                <p>Tick the categories you want in their own files. Model set-up such as <code>*HEADING</code> and <code>*ASSEMBLY</code> stays in the mother. Nothing is created until you press <b>Create workspace</b>.</p>
+              </article>
+              <article class="note">
+                <h3>Go deeper</h3>
+                <p>A category can split further: one file per material, step or part; nodes, elements and sets; contact pairs and interaction properties; ties, couplings and rigid bodies. You only see options that will really make a file. Some are alternatives (a whole part or just its nodes): the one you tick first wins and the other greys out.</p>
+              </article>
+              <article class="note">
+                <h3>Edit freely</h3>
+                <p>Open any file in the editor. <kbd>Ctrl/Cmd+S</kbd> saves, <kbd>Ctrl/Cmd+F</kbd> finds, <kbd>Ctrl/Cmd+G</kbd> selects a line range, <kbd>Ctrl/Cmd+/</kbd> comments a block. FileFold remembers what it wrote, so a changed file shows an <b>edited</b> badge. Windows or Unix line endings are kept as they were.</p>
+              </article>
+              <article class="note">
+                <h3>Re-split any time</h3>
+                <p>The <b>Splits</b> tab lets you change your mind: extract more categories, split further, fold files back into their parent, rename files. Lines are never lost or duplicated, so the pieces always add up to the original model.</p>
+              </article>
+              <article class="note">
+                <h3>Reimport a new version</h3>
+                <p>An updated <code>.inp</code> arrived? Reimport it. Each child is marked <b>safe to update</b>, <b>unchanged</b>, or <b>conflict</b> (changed upstream and edited by you). You decide what gets overwritten.</p>
+              </article>
+              <article class="note">
+                <h3>Take it with you</h3>
+                <p><b>Export ZIP</b> gives the mother plus all its children. The same workspaces can be scripted with the <code>filefold</code> command line. Your files are kept
+                  <span data-mode="static">in this browser, on this device. Nothing is uploaded anywhere.</span>
+                  <span data-mode="server">on the server, in this app's workspace folder.</span></p>
+              </article>
+            </div>
+            <p class="chalk-foot">New here? <button class="chalk-link" type="button" onclick="loadSample('Job-1')">Load the Job-1 sample</button> and follow along. It is small enough to try everything in seconds.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="sheet sample-sheet" id="samples">
+        <div class="sheet-head">
+          <span class="sheet-title">Sample data</span>
+          <span class="text-muted text-sm">Real decks to try every feature on. Loading one starts a new workspace; the sample itself is never changed.</span>
+        </div>
+        <div id="sample-cards" class="card-grid sample-grid"></div>
+      </div>
+
       <div class="sheet">
         <div class="sheet-head">
           <span class="sheet-title">Deck registry</span>
@@ -286,6 +345,7 @@
 <script src="static/create.js"></script>
 <script src="static/reimport.js"></script>
 <script src="static/editor.js"></script>
+<script src="static/samples.js"></script>
 <script src="static/boot.js"></script>
 </body>
 </html>

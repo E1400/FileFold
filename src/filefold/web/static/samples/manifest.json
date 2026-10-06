@@ -1,0 +1,110 @@
+{
+  "samples": [
+    {
+      "id": "Job-1",
+      "file": "Job-1.inp",
+      "title": "Job-1: a small 2D model",
+      "blurb": "A small plane-stress model with one steel material, two rigid bodies and a single loading step. Small enough to try every feature in seconds, which makes it the best place to start.",
+      "try": [
+        "mesh:nodes",
+        "mesh:elements",
+        "constraint:rigid",
+        "material:material.steel",
+        "step:step.step-1"
+      ],
+      "facts": {
+        "bytes": 98762,
+        "lines": 2956,
+        "line_endings": "windows",
+        "blocks": 31,
+        "steps": [
+          "Step-1"
+        ],
+        "materials": 1,
+        "parts": [],
+        "element_types": [
+          "CPS4R"
+        ],
+        "contact_pairs": 0,
+        "categories": {
+          "constraint": 2,
+          "material": 3,
+          "mesh": 16,
+          "model": 2,
+          "section": 1,
+          "step": 1
+        }
+      }
+    },
+    {
+      "id": "mmxmn",
+      "file": "mmxmn.inp",
+      "title": "mmxmn: a contact-heavy axisymmetric model",
+      "blurb": "A 1.8 MB axisymmetric model with four named steps and six contact pairs, each with its own interaction property and friction. Try splitting contact into pairs and interaction properties, or pulling each step into its own file. The deck's own *INCLUDE line is left alone.",
+      "try": [
+        "contact:pairs",
+        "contact:interactions",
+        "step:step.mmxmn_1",
+        "loads:amplitudes"
+      ],
+      "facts": {
+        "bytes": 1888934,
+        "lines": 60293,
+        "line_endings": "unix",
+        "blocks": 115,
+        "steps": [
+          "mmxmn_1",
+          "mmxmn_2",
+          "mmxmn_3",
+          "mmxmn_4"
+        ],
+        "materials": 0,
+        "parts": [],
+        "element_types": [
+          "CAX3",
+          "CAX4"
+        ],
+        "contact_pairs": 6,
+        "categories": {
+          "contact": 18,
+          "loads": 2,
+          "mesh": 17,
+          "model": 3,
+          "section": 2,
+          "step": 4
+        }
+      }
+    },
+    {
+      "id": "fempy_example",
+      "file": "fempy_example.inp",
+      "title": "fempy_example: a 5 MB 3D femur mesh",
+      "blurb": "A large tetrahedral mesh exported from a bone-modelling tool: one part, thirty materials and thirty matching sections. This is the one to try one-file-per-material on, and to see how a part can be moved out whole.",
+      "try": [
+        "material:material.*",
+        "mesh:part.femur",
+        "mesh:nodes"
+      ],
+      "facts": {
+        "bytes": 5509110,
+        "lines": 153444,
+        "line_endings": "unix",
+        "blocks": 163,
+        "steps": [],
+        "materials": 30,
+        "parts": [
+          "femur"
+        ],
+        "element_types": [
+          "C3D4"
+        ],
+        "contact_pairs": 0,
+        "categories": {
+          "material": 90,
+          "mesh": 1,
+          "model": 2
+        }
+      }
+    }
+  ]
+}

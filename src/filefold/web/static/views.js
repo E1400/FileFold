@@ -48,6 +48,7 @@ function renderSidebar() {
 
 function renderHome() {
   const el = document.getElementById("home-cards");
+  applyNotesDefault(state.workspaces.length);
   if (!state.workspaces.length) {
     el.innerHTML = `
       <div class="empty" style="grid-column:1/-1">

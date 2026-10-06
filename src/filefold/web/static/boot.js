@@ -4,6 +4,8 @@
 setupDropZone("upload-zone",   f => handleUpload(f));
 setupDropZone("reimp-drop",    f => handleReimpUpload(f));
 loadWorkspaces();
+applyNotesMode();
+initSamples();
 
 // ── Editor: one-time event setup (elements are static HTML now) ───────────────
 (function _initEditor() {
