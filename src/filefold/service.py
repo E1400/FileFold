@@ -28,7 +28,17 @@ from filefold.core.splitter import (
 from filefold.core.subsplits import discover, option_from_key
 from filefold.core.workspace import Workspace
 
-__all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE"]
+__all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE", "OPERATIONS"]
+
+# Every operation a front end exposes. The web app (api/routes) and the browser build
+# (browser.py) are kept in step by route-parity tests; the command line by a test that
+# maps each of these to a CLI command (cli.main.OPERATION_COMMANDS). Add a new operation
+# here and those tests fail until every front end has it.
+OPERATIONS = (
+    "inspect", "static_sub_options", "list_all_workspaces", "create_workspace", "get_workspace",
+    "rename_workspace", "delete_workspace", "extract_splits", "resplit_child", "rename_file",
+    "recombine", "reimport_preview", "reimport_apply", "export_zip", "read_file", "write_file",
+)
 
 # Categories that must never be extracted into their own file.
 # "model" owns *INCLUDE (see CATEGORY_MAP), so extracting it pulls FileFold's own

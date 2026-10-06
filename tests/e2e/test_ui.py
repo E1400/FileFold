@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 
 import pytest
@@ -306,3 +307,19 @@ def test_static_build_keeps_workspaces_across_reload(app):
     app.reload()
     app.wait_for_selector("#static-banner", state="detached", timeout=90_000)
     expect(app.locator(".ws-item", has_text="Job-1")).to_be_visible()
+
+
+@pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
+def test_landing_page_opens_the_app(app, base_url):
+    """The Pages site root is the landing page; its main button must open the working app."""
+    errors = []
+    app.on("pageerror", lambda e: errors.append(str(e)))
+    app.goto(base_url + "../")
+    expect(app.get_by_role("heading", name="FEA models.")).to_be_visible()
+    for text in ("Split as deep as you need", "Private by design", "Command line included"):
+        expect(app.get_by_text(text)).to_be_visible()
+    app.get_by_role("link", name="Try it online").click()
+    app.wait_for_url(re.compile(r"/app/$"))
+    app.wait_for_selector("#static-banner", state="detached", timeout=90_000)
+    expect(app.locator("#view-home")).to_be_visible()
+    assert errors == []
