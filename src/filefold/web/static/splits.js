@@ -68,7 +68,7 @@ function renderSplitsTab(data) {
     const subPanel = subOpts.length ? `
       <div class="sub-options visible" id="ws-sub-opts-${cat}">
         <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
-          <span>Split into sub-files:</span>
+          <span>Split into sub-files: ${infoBtn("subsplit", "sub-files")}</span>
           <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">
             <input type="checkbox" id="ws-submaster-${cat}" ${allSubsOn ? "checked" : ""}
                    ${isExtracted ? "" : "disabled"}

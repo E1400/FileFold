@@ -22,6 +22,9 @@
   <div class="sidebar-body">
     <div class="sidebar-section">Workspaces</div>
     <div id="ws-list"></div>
+    <div class="sidebar-section" style="margin-top:18px">Help</div>
+    <div id="nav-info" class="ws-item" role="button" tabindex="0" onclick="showView('help')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showView('help')}">Info</div>
   </div>
   <div class="sidebar-footer">
     <button class="btn btn-primary btn-sm" style="flex:1" onclick="showView('new-workspace')">+ New</button>
@@ -50,65 +53,6 @@
       <button class="btn btn-primary btn-sm" onclick="showView('new-workspace')">+ New workspace</button>
     </div>
     <div class="content">
-      <!-- Chalkboard: reference notes, not a walkthrough. Always there, collapsible, never blocks anything. -->
-      <section id="notes" class="chalkboard" aria-labelledby="notes-title">
-        <div class="chalk-frame">
-          <button id="notes-toggle" class="chalk-toggle" type="button" aria-expanded="true" aria-controls="notes-body" onclick="toggleNotes()">
-            <span class="chalk-title" id="notes-title">How FileFold works</span>
-            <span class="chalk-hint">notes on the board: read what you need, skip the rest</span>
-            <span class="chalk-caret" aria-hidden="true">▾</span>
-          </button>
-          <div id="notes-body" class="chalk-body">
-            <div class="chalk-grid">
-              <article class="note">
-                <h3>The idea</h3>
-                <p>One big <code>.inp</code> in. A small <b>mother</b> file plus <b>child</b> files out. The mother pulls its children back in with <code>*INCLUDE</code>, so Abaqus reads the model exactly as before.</p>
-                <pre class="chalk-code">*INCLUDE, INPUT=mesh.inp</pre>
-              </article>
-              <article class="note">
-                <h3>Upload and inspect</h3>
-                <p>Drop a <code>.inp</code>, or load a sample below. The block inspector lists every keyword block, coloured by category: mesh, material, step, loads, contact and more. Options always stay with the keyword they belong to.</p>
-              </article>
-              <article class="note">
-                <h3>Choose what to extract</h3>
-                <p>Tick the categories you want in their own files. Model set-up such as <code>*HEADING</code> and <code>*ASSEMBLY</code> stays in the mother. Nothing is created until you press <b>Create workspace</b>.</p>
-              </article>
-              <article class="note">
-                <h3>Go deeper</h3>
-                <p>A category can split further: one file per material, step or part; nodes, elements and sets; contact pairs and interaction properties; ties, couplings and rigid bodies. You only see options that will really make a file. Some are alternatives (a whole part or just its nodes): the one you tick first wins and the other greys out.</p>
-              </article>
-              <article class="note">
-                <h3>Edit freely</h3>
-                <p>Open any file in the editor. <kbd>Ctrl/Cmd+S</kbd> saves, <kbd>Ctrl/Cmd+F</kbd> finds, <kbd>Ctrl/Cmd+G</kbd> selects a line range, <kbd>Ctrl/Cmd+/</kbd> comments a block. FileFold remembers what it wrote, so a changed file shows an <b>edited</b> badge. Windows or Unix line endings are kept as they were.</p>
-              </article>
-              <article class="note">
-                <h3>Re-split any time</h3>
-                <p>The <b>Splits</b> tab lets you change your mind: extract more categories, split further, fold files back into their parent, rename files. Lines are never lost or duplicated, so the pieces always add up to the original model.</p>
-              </article>
-              <article class="note">
-                <h3>Reimport a new version</h3>
-                <p>An updated <code>.inp</code> arrived? Reimport it. Each child is marked <b>safe to update</b>, <b>unchanged</b>, or <b>conflict</b> (changed upstream and edited by you). You decide what gets overwritten.</p>
-              </article>
-              <article class="note">
-                <h3>Take it with you</h3>
-                <p><b>Export ZIP</b> gives the mother plus all its children. The same workspaces can be scripted with the <code>filefold</code> command line. Your files are kept
-                  <span data-mode="static">in this browser, on this device. Nothing is uploaded anywhere.</span>
-                  <span data-mode="server">on the server, in this app's workspace folder.</span></p>
-              </article>
-            </div>
-            <p class="chalk-foot">New here? <button class="chalk-link" type="button" onclick="loadSample('Job-1')">Load the Job-1 sample</button> and follow along. It is small enough to try everything in seconds.</p>
-          </div>
-        </div>
-      </section>
-
-      <div class="sheet sample-sheet" id="samples">
-        <div class="sheet-head">
-          <span class="sheet-title">Sample data</span>
-          <span class="text-muted text-sm">Real decks to try every feature on. Loading one starts a new workspace; the sample itself is never changed.</span>
-        </div>
-        <div id="sample-cards" class="card-grid sample-grid"></div>
-      </div>
-
       <div class="sheet">
         <div class="sheet-head">
           <span class="sheet-title">Deck registry</span>
@@ -122,11 +66,134 @@
     </div>
   </div>
 
+  <!-- ── INFO / HELP ──────────────────────────────────────────────────────── -->
+  <div id="view-help" class="view">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" onclick="showView('home')">← Back</button>
+      <h1>Info</h1>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="startTour()">Take the tour</button>
+    </div>
+    <div class="content">
+      <div class="help-layout">
+        <nav class="help-toc" aria-label="Info sections">
+          <a href="#help-creating" onclick="helpJump(event,'help-creating')">Creating a workspace</a>
+          <a href="#help-categories" onclick="helpJump(event,'help-categories')">Categories</a>
+          <a href="#help-deeper" onclick="helpJump(event,'help-deeper')">Going deeper</a>
+          <a href="#help-files" onclick="helpJump(event,'help-files')">Files and statuses</a>
+          <a href="#help-editing" onclick="helpJump(event,'help-editing')">Editing files</a>
+          <a href="#help-splits" onclick="helpJump(event,'help-splits')">The Splits tab</a>
+          <a href="#help-reimport" onclick="helpJump(event,'help-reimport')">Reimporting a new version</a>
+          <a href="#help-export" onclick="helpJump(event,'help-export')">Export and command line</a>
+          <a href="#help-parser" onclick="helpJump(event,'help-parser')">How the parser reads your file</a>
+        </nav>
+        <div class="help-body">
+          <p class="help-lead">FileFold splits one large Abaqus <code>.inp</code> file into a small <b>main file</b> plus <b>child files</b>. The main file pulls the children back in with <code>*INCLUDE</code>, so Abaqus reads the model exactly as before. This page describes each function. New to it? <button class="link-btn" type="button" onclick="startTour()">Take the tour</button> or load a deck from <b>Sample data</b> on the New Workspace screen.</p>
+
+          <section id="help-creating">
+            <h2>Creating a workspace</h2>
+            <ol>
+              <li><b>Upload.</b> Drop a <code>.inp</code> file, click to browse, or choose <b>Sample data</b>. Nothing is created yet.</li>
+              <li><b>Inspect.</b> The block inspector lists every keyword block with its line range, coloured by category. A <code>▸</code> opens the blocks nested inside a <code>*STEP</code>, <code>*PART</code> or <code>*ASSEMBLY</code>.</li>
+              <li><b>Choose.</b> Tick the categories that should get their own file, and optionally finer splits (see below). Filenames can be changed.</li>
+              <li><b>Create workspace.</b> The main file keeps an <code>*INCLUDE, INPUT=file</code> line where each extracted block used to be.</li>
+            </ol>
+          </section>
+
+          <section id="help-categories">
+            <h2>Categories</h2>
+            <p>Every keyword belongs to one category. Extracting a category moves all its top-level blocks into one child file.</p>
+            <dl class="help-defs">
+              <dt><span data-cat="mesh"></span></dt><dd>Geometry: <code>*NODE</code>, <code>*ELEMENT</code>, <code>*NSET</code>, <code>*ELSET</code>, <code>*SURFACE</code>, and <code>*PART</code> blocks.</dd>
+              <dt><span data-cat="section"></span></dt><dd>Properties that link elements to materials: <code>*SOLID SECTION</code>, <code>*SHELL SECTION</code>, <code>*BEAM SECTION</code>, <code>*ORIENTATION</code>, connector sections.</dd>
+              <dt><span data-cat="material"></span></dt><dd><code>*MATERIAL</code> with all its options (<code>*ELASTIC</code>, <code>*PLASTIC</code>, <code>*DENSITY</code>, and so on).</dd>
+              <dt><span data-cat="step"></span></dt><dd>Analysis steps, <code>*STEP</code> to <code>*END STEP</code>, with everything inside them (boundary conditions, loads and output requests inside a step stay in the step).</dd>
+              <dt><span data-cat="loads"></span></dt><dd>Loads and boundary conditions defined outside steps: <code>*BOUNDARY</code>, <code>*CLOAD</code>, <code>*DLOAD</code>, <code>*AMPLITUDE</code>, <code>*TEMPERATURE</code>.</dd>
+              <dt><span data-cat="contact"></span></dt><dd>Contact pairs, general contact and interaction properties: <code>*CONTACT PAIR</code>, <code>*CONTACT</code>, <code>*SURFACE INTERACTION</code>, <code>*FRICTION</code>.</dd>
+              <dt><span data-cat="constraint"></span></dt><dd>Ties, couplings and rigid bodies: <code>*TIE</code>, <code>*COUPLING</code>, <code>*MPC</code>, <code>*EQUATION</code>, <code>*RIGID BODY</code>.</dd>
+              <dt><span data-cat="initial"></span></dt><dd>Starting state: <code>*INITIAL CONDITIONS</code>.</dd>
+              <dt><span data-cat="output"></span></dt><dd>Output requests: <code>*OUTPUT</code>, <code>*NODE OUTPUT</code>, <code>*ELEMENT OUTPUT</code>, <code>*RESTART</code>, print and file requests.</dd>
+              <dt><span data-cat="model"></span></dt><dd>Model set-up: <code>*HEADING</code>, <code>*INCLUDE</code>, <code>*ASSEMBLY</code>, <code>*INSTANCE</code>. This always stays in the main file and cannot be extracted.</dd>
+              <dt><span data-cat="unknown"></span></dt><dd>Keywords FileFold does not recognise. They stay with the keyword above them and cannot be extracted on their own.</dd>
+            </dl>
+          </section>
+
+          <section id="help-deeper">
+            <h2>Going deeper</h2>
+            <p>A ticked category can be split into finer files. You only see options that will really produce a file for your deck.</p>
+            <dl class="help-defs">
+              <dt><span data-cat="mesh"></span></dt><dd>Nodes, elements, node sets, element sets, surfaces, or one file per part.</dd>
+              <dt><span data-cat="material"></span></dt><dd>One file per material, each with its options.</dd>
+              <dt><span data-cat="step"></span></dt><dd>One file per step.</dd>
+              <dt><span data-cat="contact"></span></dt><dd>Contact pairs, interaction properties, general contact.</dd>
+              <dt><span data-cat="constraint"></span></dt><dd>Ties, couplings, rigid bodies, MPCs and equations.</dd>
+              <dt><span data-cat="loads"></span></dt><dd>Boundary conditions, amplitudes, applied loads, thermal.</dd>
+            </dl>
+            <p>Some options are alternatives for the same blocks, for example a whole part or just its nodes. The one you tick first wins and the other greys out; untick it to switch.</p>
+          </section>
+
+          <section id="help-files">
+            <h2>Files and statuses</h2>
+            <p>A workspace has a <b>main file</b> (your original name), <b>child</b> files (one per extracted category) and <b>sub-child</b> files (finer splits inside a child). FileFold remembers a fingerprint of everything it wrote.</p>
+            <dl class="help-defs">
+              <dt>clean</dt><dd>The file is exactly as FileFold wrote it.</dd>
+              <dt>edited</dt><dd>The file was changed since, for example in the editor.</dd>
+              <dt>missing</dt><dd>The file is gone from the workspace.</dd>
+            </dl>
+          </section>
+
+          <section id="help-editing">
+            <h2>Editing files</h2>
+            <p><b>View / Edit</b> opens any file. <kbd>Ctrl/Cmd+S</kbd> saves, <kbd>Ctrl/Cmd+F</kbd> finds, <kbd>Ctrl/Cmd+G</kbd> selects a line range, <kbd>Ctrl/Cmd+/</kbd> comments or uncomments the selected lines. Leaving with unsaved changes asks whether to save, discard or keep editing. Windows and Unix line endings are kept as they were.</p>
+          </section>
+
+          <section id="help-splits">
+            <h2>The Splits tab</h2>
+            <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model.</p>
+          </section>
+
+          <section id="help-reimport">
+            <h2>Reimporting a new version</h2>
+            <p>When the original model changes, <b>Re-import</b> the new file. Each existing child is compared with the new version:</p>
+            <dl class="help-defs">
+              <dt>safe to update</dt><dd>Changed upstream, not edited here. Updated by default.</dd>
+              <dt>unchanged</dt><dd>Same in both. Left alone.</dd>
+              <dt>conflict</dt><dd>Changed upstream and edited here. You choose whether to overwrite your edits.</dd>
+            </dl>
+            <p>Categories that are new in the file can be extracted at the same time.</p>
+          </section>
+
+          <section id="help-export">
+            <h2>Export and command line</h2>
+            <p><b>Export ZIP</b> downloads the main file and every child. Everything the app does is also available as <code>filefold</code> commands (<code>inspect</code>, <code>split-partial</code>, <code>workspace create</code>, <code>extract</code>, <code>resplit</code>, <code>recombine</code>, <code>reimport</code>, <code>export</code>), and workspaces are shared with the app. Your files are kept
+              <span data-mode="static">in this browser, on this device; nothing is uploaded anywhere. Decks up to 100 MB are tested here; use the desktop app or command line for larger ones.</span>
+              <span data-mode="server">on the server, in this app's workspace folder.</span></p>
+          </section>
+
+          <section id="help-parser">
+            <h2>How the parser reads your file</h2>
+            <ul>
+              <li><b>Lines.</b> A line starting with <code>*</code> is a keyword, <code>**</code> is a comment, anything else is data. Blank lines, comments and data stay with the keyword above them.</li>
+              <li><b>Wrapped keyword lines.</b> A keyword line ending in a comma continues on the next line; its parameters are merged. Quoted parameters may contain commas.</li>
+              <li><b>Options stay with their parent.</b> <code>*ELASTIC</code> follows its <code>*MATERIAL</code>, <code>*FRICTION</code> its <code>*SURFACE INTERACTION</code>. A keyword FileFold does not know is kept with the block above it, so a split can never separate them.</li>
+              <li><b>Containers.</b> <code>*STEP</code>, <code>*PART</code>, <code>*ASSEMBLY</code> and <code>*INSTANCE</code> own the blocks inside them, which move with the container.</li>
+              <li><b>Keyword coverage.</b> Every keyword in the Abaqus 2016 Keywords Reference is recognised and assigned a category.</li>
+              <li><b>Byte-exact.</b> Reassembling the pieces reproduces your original model exactly: same lines, same line endings.</li>
+              <li><b>Limits.</b> An <code>*INCLUDE</code> that is already in your file is kept as written; its target file is not opened.</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── NEW WORKSPACE ────────────────────────────────────────────────────── -->
   <div id="view-new-workspace" class="view">
     <div class="topbar">
       <button class="btn btn-ghost btn-sm" onclick="showView('home')">← Back</button>
       <h1>New Workspace</h1>
+      <span class="spacer"></span>
+      <button id="tour-btn" class="btn btn-ghost btn-sm" type="button" onclick="startTour()">Take the tour</button>
     </div>
     <div class="content">
       <div class="two-col" style="align-items:start">
@@ -134,17 +201,24 @@
         <!-- left: upload + inspector -->
         <div class="stack">
           <div>
-            <div class="section-title">1 — Upload model</div>
+            <div class="section-title">1 — Upload model <button type="button" class="info-btn" data-info="upload" aria-label="About uploading a model" aria-expanded="false">i</button></div>
             <div id="upload-zone" class="drop-zone" onclick="document.getElementById('upload-input').click()">
               <div class="icon">📂</div>
               <p>Drop <code>.inp</code> file here or click to browse</p>
               <div class="hint">Abaqus input files only</div>
             </div>
             <input type="file" id="upload-input" accept=".inp" style="display:none" onchange="handleUpload(this.files[0])">
+            <div class="upload-alt">
+              <span class="text-muted text-sm">No file handy?</span>
+              <div class="sample-wrap">
+                <button id="sample-btn" class="btn btn-ghost btn-sm" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="sample-menu">Sample data ▾</button>
+                <div id="sample-menu" class="sample-menu" role="menu" aria-label="Sample data" hidden></div>
+              </div>
+            </div>
           </div>
 
           <div id="inspector-section" style="display:none">
-            <div class="section-title">Block inspector</div>
+            <div class="section-title">Block inspector <button type="button" class="info-btn" data-info="inspector" aria-label="About the block inspector" aria-expanded="false">i</button></div>
             <div id="inspector-tree" class="inspector-tree"></div>
           </div>
         </div>
@@ -157,7 +231,7 @@
           </div>
 
           <div id="split-config-section" style="display:none">
-            <div class="section-title">2 — Choose what to extract</div>
+            <div class="section-title">2 — Choose what to extract <button type="button" class="info-btn" data-info="extract" aria-label="About choosing what to extract" aria-expanded="false">i</button></div>
             <div id="split-config" class="split-grid"></div>
           </div>
 
@@ -196,7 +270,7 @@
               <th>Role</th>
               <th>Category</th>
               <th>Lines</th>
-              <th>Status</th>
+              <th>Status <button type="button" class="info-btn" data-info="status" aria-label="About file status" aria-expanded="false">i</button></th>
               <th></th>
             </tr>
           </thead>
@@ -208,6 +282,7 @@
     <div id="tab-content-splits" class="content" style="display:none">
       <p class="text-muted text-sm" style="margin-bottom:16px">
         Check categories to extract them into their own file. Uncheck existing splits to fold them back into the mother file.
+        <button type="button" class="info-btn" data-info="splits" aria-label="About the Splits tab" aria-expanded="false">i</button>
       </p>
       <div id="ws-split-config" class="split-grid"></div>
       <div class="row" style="margin-top:24px">
@@ -227,7 +302,7 @@
 
       <!-- Step 1: upload -->
       <div id="reimp-upload-section">
-        <div class="section-title">Upload new Abaqus export</div>
+        <div class="section-title">Upload new Abaqus export <button type="button" class="info-btn" data-info="reimport" aria-label="About reimporting" aria-expanded="false">i</button></div>
         <div id="reimp-drop" class="drop-zone" onclick="document.getElementById('reimp-input').click()">
           <div class="icon">📤</div>
           <p>Drop updated <code>.inp</code> file here or click to browse</p>
@@ -262,7 +337,7 @@
 
           <!-- right: conflict preview -->
           <div>
-            <div class="section-title">Existing sections</div>
+            <div class="section-title">Existing sections <button type="button" class="info-btn" data-info="reimport-status" aria-label="About the reimport statuses" aria-expanded="false">i</button></div>
             <div id="reimp-results"></div>
           </div>
         </div>
@@ -283,6 +358,7 @@
       <button class="btn btn-ghost btn-sm" onclick="closeEditor()">← Back</button>
       <span class="unsaved-dot" id="unsaved-dot"></span>
       <span id="editor-filename" class="mono" style="font-weight:600"></span>
+      <button type="button" class="info-btn" data-info="editor" aria-label="About editor shortcuts" aria-expanded="false">i</button>
       <span class="spacer"></span>
       <div class="header-find" id="header-find">
         <div class="header-find-wrap">
@@ -345,7 +421,9 @@
 <script src="static/create.js"></script>
 <script src="static/reimport.js"></script>
 <script src="static/editor.js"></script>
+<script src="static/info.js"></script>
 <script src="static/samples.js"></script>
+<script src="static/tour.js"></script>
 <script src="static/boot.js"></script>
 </body>
 </html>

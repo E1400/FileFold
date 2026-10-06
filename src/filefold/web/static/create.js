@@ -52,6 +52,7 @@ async function handleUpload(file) {
     document.getElementById("split-config-section").style.display = "";
     renderSplitConfig(data.blocks);
     document.getElementById("create-btn-row").style.display = "";
+    document.dispatchEvent(new CustomEvent("filefold:upload-ready"));
   } catch (e) {
     zone.innerHTML = `<div class="icon">⚠</div><p>${esc(e.message)}</p>`;
     toast("Parse error: " + e.message, "error");
@@ -123,7 +124,7 @@ function renderSplitConfig(blocks) {
     const subPanel = subOpts.length ? `
       <div class="sub-options" id="sub-opts-${cat}">
         <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
-          <span>Split into sub-files:</span>
+          <span>Split into sub-files: ${infoBtn("subsplit", "sub-files")}</span>
           <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">
             <input type="checkbox" id="submaster-${cat}" onchange="toggleAllSubOptions('${cat}')">
             <span>all</span>
@@ -301,6 +302,7 @@ async function createWorkspace() {
 }
 
 function resetNewWorkspace() {
+  closeSampleMenu(false);
   state.uploadedFile = null;
   state.inspectResult = null;
   document.getElementById("upload-zone").innerHTML = `

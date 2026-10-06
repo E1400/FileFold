@@ -114,6 +114,13 @@ def app(page, base_url):
             if r.url.startswith(base_url.rstrip("/") + "/api") and r.status >= 400 else None)
     page.on("dialog", lambda d: d.accept())
     page.set_viewport_size({"width": 1400, "height": 900})
+    # New visitors are offered a guided tour. Mark it dismissed on the very first load so the
+    # offer does not float over unrelated tests; tour tests remove the key to look like a
+    # first-time visitor (it is not re-seeded on reload).
+    page.add_init_script(
+        "try { if (!localStorage.getItem('ff_seeded')) { localStorage.setItem('ff_seeded', '1');"
+        " localStorage.setItem('filefold.tour', 'dismissed'); } } catch (e) {}"
+    )
     if TARGET == "static":
         # Python runs in the page's own process here, so a loaded machine (the whole suite
         # running back to back) needs a longer patience than the server target.

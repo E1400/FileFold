@@ -12,7 +12,10 @@ function showView(name) {
   }
   // Every visit to "new workspace" starts blank. Resetting only after a successful
   // create left an abandoned upload on screen the next time the user pressed New.
-  if (name === "new-workspace") resetNewWorkspace();
+  if (name === "new-workspace") { resetNewWorkspace(); offerTourIfNew(); }
+  else { endTour(null); removeTourPrompt(); }
+  closeInfoPopover();
+  document.getElementById("nav-info")?.classList.toggle("active", name === "help");
   if (name === "home") loadWorkspaces();
 }
 
@@ -48,7 +51,6 @@ function renderSidebar() {
 
 function renderHome() {
   const el = document.getElementById("home-cards");
-  applyNotesDefault(state.workspaces.length);
   if (!state.workspaces.length) {
     el.innerHTML = `
       <div class="empty" style="grid-column:1/-1">
