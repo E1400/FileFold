@@ -80,7 +80,7 @@ def test_splits_tab_extracts_more_categories(app):
     app.locator("#ws-sel-material").check()
     app.locator("#ws-splits-apply-btn").click()
     app.locator("#tab-btn-files").click()
-    assert "material.inp" in "\n".join(detail_files(app))
+    expect(row(app, "material.inp")).to_be_visible(timeout=30_000)     # wait for Apply to finish
     assert "*INCLUDE" in api_text(app, "Job-1", "Job-1.inp")
 
 
