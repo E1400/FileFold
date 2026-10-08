@@ -78,6 +78,15 @@ function toast(msg, type = "ok") {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Theme toggle
 // ═══════════════════════════════════════════════════════════════════════════════
+// The choice is remembered, and shared with the landing page (same origin, same key).
+const THEME_KEY = "filefold.theme";
+(function applyStoredTheme() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch { /* storage blocked: follow the system setting */ }
+})();
+
 function toggleTheme() {
   const root = document.documentElement;
   const cur = root.dataset.theme;
@@ -87,6 +96,7 @@ function toggleTheme() {
   } else {
     root.dataset.theme = cur === "dark" ? "light" : "dark";
   }
+  try { localStorage.setItem(THEME_KEY, root.dataset.theme); } catch { /* fine */ }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

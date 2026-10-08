@@ -19,7 +19,7 @@ const TOUR_STEPS = [
   { title: "See what's inside", needsFile: true, target: () => document.getElementById("inspector-section"), side: "right",
     text: "Every keyword block in the file, coloured by category." },
   { title: "Choose what to extract", needsFile: true, target: () => document.getElementById("split-config-section"), side: "left",
-    text: "Tick a category to give it its own file. Model set-up always stays in the main file." },
+    text: "Tick a category to give it its own file. Model set-up always stays in the mother file." },
   { title: "Go deeper if you like", needsFile: true,
     target: () => document.querySelector("#split-config .split-row:has(.sub-options)") || document.querySelector("#split-config .split-row"),
     side: "left",

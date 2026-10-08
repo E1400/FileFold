@@ -85,6 +85,7 @@ def build(out: Path) -> Path:
 
     # --- landing page ----------------------------------------------------------
     shutil.copy2(ROOT / "docs" / "index.html", out / "index.html")
+    shutil.copytree(ROOT / "docs" / "img", out / "img")          # screenshots used by the landing page
     (out / ".nojekyll").write_text("")
     return out
 
