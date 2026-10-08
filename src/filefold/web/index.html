@@ -88,7 +88,7 @@
           <a href="#help-parser" onclick="helpJump(event,'help-parser')">How the parser reads your file</a>
         </nav>
         <div class="help-body">
-          <p class="help-lead">FileFold splits one large Abaqus <code>.inp</code> file into a small <b>main file</b> plus <b>child files</b>. The main file pulls the children back in with <code>*INCLUDE</code>, so Abaqus reads the model exactly as before. This page describes each function. New to it? <button class="link-btn" type="button" onclick="startTour()">Take the tour</button> or load a deck from <b>Sample data</b> on the New Workspace screen.</p>
+          <p class="help-lead">FileFold splits one large Abaqus <code>.inp</code> file into a small <b>mother file</b> plus <b>child files</b>. The mother file pulls the children back in with <code>*INCLUDE</code>, so Abaqus reads the model exactly as before. This page describes each function. New to it? <button class="link-btn" type="button" onclick="startTour()">Take the tour</button> or load a deck from <b>Sample data</b> on the New Workspace screen.</p>
 
           <section id="help-creating">
             <h2>Creating a workspace</h2>
@@ -96,7 +96,7 @@
               <li><b>Upload.</b> Drop a <code>.inp</code> file, click to browse, or choose <b>Sample data</b>. Nothing is created yet.</li>
               <li><b>Inspect.</b> The block inspector lists every keyword block with its line range, coloured by category. A <code>▸</code> opens the blocks nested inside a <code>*STEP</code>, <code>*PART</code> or <code>*ASSEMBLY</code>.</li>
               <li><b>Choose.</b> Tick the categories that should get their own file, and optionally finer splits (see below). Filenames can be changed.</li>
-              <li><b>Create workspace.</b> The main file keeps an <code>*INCLUDE, INPUT=file</code> line where each extracted block used to be.</li>
+              <li><b>Create workspace.</b> The mother file keeps an <code>*INCLUDE, INPUT=file</code> line where each extracted block used to be.</li>
             </ol>
           </section>
 
@@ -113,7 +113,7 @@
               <dt><span data-cat="constraint"></span></dt><dd>Ties, couplings and rigid bodies: <code>*TIE</code>, <code>*COUPLING</code>, <code>*MPC</code>, <code>*EQUATION</code>, <code>*RIGID BODY</code>.</dd>
               <dt><span data-cat="initial"></span></dt><dd>Starting state: <code>*INITIAL CONDITIONS</code>.</dd>
               <dt><span data-cat="output"></span></dt><dd>Output requests: <code>*OUTPUT</code>, <code>*NODE OUTPUT</code>, <code>*ELEMENT OUTPUT</code>, <code>*RESTART</code>, print and file requests.</dd>
-              <dt><span data-cat="model"></span></dt><dd>Model set-up: <code>*HEADING</code>, <code>*INCLUDE</code>, <code>*ASSEMBLY</code>, <code>*INSTANCE</code>. This always stays in the main file and cannot be extracted.</dd>
+              <dt><span data-cat="model"></span></dt><dd>Model set-up: <code>*HEADING</code>, <code>*INCLUDE</code>, <code>*ASSEMBLY</code>, <code>*INSTANCE</code>. This always stays in the mother file and cannot be extracted.</dd>
               <dt><span data-cat="unknown"></span></dt><dd>Keywords FileFold does not recognise. They stay with the keyword above them and cannot be extracted on their own.</dd>
             </dl>
           </section>
@@ -134,7 +134,7 @@
 
           <section id="help-files">
             <h2>Files and statuses</h2>
-            <p>A workspace has a <b>main file</b> (your original name), <b>child</b> files (one per extracted category) and <b>sub-child</b> files (finer splits inside a child). FileFold remembers a fingerprint of everything it wrote.</p>
+            <p>A workspace has a <b>mother file</b> (your original name), <b>child</b> files (one per extracted category) and <b>sub-child</b> files (finer splits inside a child). FileFold remembers a fingerprint of everything it wrote.</p>
             <dl class="help-defs">
               <dt>clean</dt><dd>The file is exactly as FileFold wrote it.</dd>
               <dt>edited</dt><dd>The file was changed since, for example in the editor.</dd>
@@ -165,7 +165,7 @@
 
           <section id="help-export">
             <h2>Export and command line</h2>
-            <p><b>Export ZIP</b> downloads the main file and every child. Everything the app does is also available as <code>filefold</code> commands (<code>inspect</code>, <code>split-partial</code>, <code>workspace create</code>, <code>extract</code>, <code>resplit</code>, <code>recombine</code>, <code>reimport</code>, <code>export</code>), and workspaces are shared with the app. Your files are kept
+            <p><b>Export ZIP</b> downloads the mother file and every child. Everything the app does is also available as <code>filefold</code> commands (<code>inspect</code>, <code>split-partial</code>, <code>workspace create</code>, <code>extract</code>, <code>resplit</code>, <code>recombine</code>, <code>reimport</code>, <code>export</code>), and workspaces are shared with the app. Your files are kept
               <span data-mode="static">in this browser, on this device; nothing is uploaded anywhere. Decks up to 100 MB are tested here; use the desktop app or command line for larger ones.</span>
               <span data-mode="server">on the server, in this app's workspace folder.</span></p>
           </section>

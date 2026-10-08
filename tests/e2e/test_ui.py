@@ -314,12 +314,78 @@ def test_landing_page_opens_the_app(app, base_url):
     """The Pages site root is the landing page; its main button must open the working app."""
     errors = []
     app.on("pageerror", lambda e: errors.append(str(e)))
+    app.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     app.goto(base_url + "../")
     expect(app.get_by_role("heading", name="FEA models.")).to_be_visible()
     for text in ("Split as deep as you need", "Private by design", "Command line included"):
         expect(app.get_by_text(text)).to_be_visible()
-    app.get_by_role("link", name="Try it online").click()
+    app.get_by_role("link", name="Open FileFold").first.click()
     app.wait_for_url(re.compile(r"/app/$"))
     app.wait_for_selector("#static-banner", state="detached", timeout=90_000)
     expect(app.locator("#view-home")).to_be_visible()
     assert errors == []
+
+
+@pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
+def test_landing_page_looks_right_and_works(app, base_url):
+    errors = []
+    app.on("pageerror", lambda e: errors.append(str(e)))
+    app.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    app.goto(base_url + "../")
+    # screenshots load, and only the ones for the current theme are shown
+    app.evaluate("document.documentElement.dataset.theme = 'light'")
+    assert app.locator("img.img-light:visible").count() == 2
+    assert app.locator("img.img-dark:visible").count() == 0, "dark screenshots must hide in the light theme"
+    app.wait_for_function("[...document.querySelectorAll('img')].filter(i => i.offsetParent).every(i => i.complete && i.naturalWidth > 0)")
+    app.evaluate("document.documentElement.dataset.theme = 'dark'")
+    assert app.locator("img.img-dark:visible").count() == 2
+    assert app.locator("img.img-light:visible").count() == 0, "light screenshots must hide in the dark theme"
+    # every in-page link goes to a real section
+    for href in app.eval_on_selector_all("a[href^='#']", "els => els.map(e => e.getAttribute('href'))"):
+        if href != "#":
+            assert app.locator(href).count() == 1, f"nav link {href} has no target"
+    # the theme toggle changes the page and is remembered
+    app.evaluate("delete document.documentElement.dataset.theme; localStorage.removeItem('filefold.theme')")
+    app.get_by_role("button", name="Toggle theme").click()
+    first = app.evaluate("document.documentElement.dataset.theme")
+    assert first in {"light", "dark"}
+    app.reload()
+    assert app.evaluate("document.documentElement.dataset.theme") == first
+    # no horizontal scrolling on a phone
+    app.set_viewport_size({"width": 390, "height": 800})
+    assert not app.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+    # skip link is the first thing a keyboard user reaches
+    app.keyboard.press("Tab")
+    assert app.evaluate("document.activeElement.textContent.trim()").lower().startswith("skip")
+    assert errors == []
+
+
+@pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
+def test_theme_choice_made_on_the_landing_page_carries_into_the_app(app, base_url):
+    app.goto(base_url + "../")
+    app.evaluate("localStorage.setItem('filefold.theme', 'dark'); delete document.documentElement.dataset.theme")
+    app.goto(base_url)
+    app.wait_for_selector("#static-banner", state="detached", timeout=90_000)
+    assert app.evaluate("document.documentElement.dataset.theme") == "dark"
+
+
+def test_the_apps_theme_toggle_is_remembered(app):
+    app.evaluate("localStorage.removeItem('filefold.theme')")
+    app.locator("#theme-btn").click()
+    chosen = app.evaluate("document.documentElement.dataset.theme")
+    app.reload()
+    if _os.environ.get("FILEFOLD_E2E_TARGET") == "static":
+        app.wait_for_selector("#static-banner", state="detached", timeout=90_000)
+    assert app.evaluate("document.documentElement.dataset.theme") == chosen
+
+
+@pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+def test_landing_page_follows_the_system_theme_when_nothing_is_saved(app, base_url, scheme):
+    app.emulate_media(color_scheme=scheme)
+    app.goto(base_url + "../")
+    app.evaluate("localStorage.removeItem('filefold.theme'); delete document.documentElement.dataset.theme")
+    shown, hidden = (f"img.img-{scheme}", f"img.img-{'dark' if scheme == 'light' else 'light'}")
+    assert app.locator(shown + ":visible").count() == 2 and app.locator(hidden + ":visible").count() == 0
+    bg = app.evaluate("getComputedStyle(document.body).backgroundColor")
+    assert bg == ("rgb(217, 219, 215)" if scheme == "light" else "rgb(27, 26, 24)")   # the app's own ground colours

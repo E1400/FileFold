@@ -8,7 +8,7 @@
 const INFO = {
   upload: "Drop a .inp file, click to browse, or use Sample data. Nothing is created until you press Create workspace.",
   inspector: "Every keyword block in the file, coloured by category. Click a block with ▸ to see what is nested inside it.",
-  extract: "Each ticked category becomes its own file. Model set-up (*HEADING, *ASSEMBLY ...) always stays in the main file.",
+  extract: "Each ticked category becomes its own file. Model set-up (*HEADING, *ASSEMBLY ...) always stays in the mother file.",
   subsplit: "Split this category further. Only options that would make a file are shown; ones that overlap grey out once you pick one.",
   status: "clean: exactly as FileFold wrote it. edited: changed since. missing: the file is gone.",
   splits: "Change how this workspace is split. Unticking a category or sub-file folds it back into its parent.",
