@@ -138,8 +138,10 @@ def test_reimport_flags_manual_edit_conflict(app):
 # --- chrome -----------------------------------------------------------------
 
 def test_theme_toggle_does_not_error(app):
-    app.get_by_role("button", name="◑").click()
-    app.get_by_role("button", name="◑").click()
+    before = app.evaluate("document.documentElement.dataset.theme || ''")
+    app.locator("#theme-btn").click()
+    assert app.evaluate("document.documentElement.dataset.theme") != before
+    app.locator("#theme-btn").click()
 
 
 # --- leaving the editor -----------------------------------------------------

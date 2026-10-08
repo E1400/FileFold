@@ -6,7 +6,6 @@ function showView(name) {
   document.getElementById(`view-${name}`).classList.add("active");
   state.view = name;
 
-  document.querySelectorAll(".ws-item").forEach(el => el.classList.remove("active"));
   if (name === "home" || name === "new-workspace") {
     state.activeWs = null;
   }
@@ -16,6 +15,7 @@ function showView(name) {
   else { endTour(null); removeTourPrompt(); }
   closeInfoPopover();
   document.getElementById("nav-info")?.classList.toggle("active", name === "help");
+  renderSidebar();  // re-mark the open workspace
   if (name === "home") loadWorkspaces();
 }
 
@@ -38,16 +38,106 @@ async function loadWorkspaces() {
 
 function renderSidebar() {
   const el = document.getElementById("ws-list");
+  document.getElementById("ws-count").textContent = state.workspaces.length || "";
   if (!state.workspaces.length) {
-    el.innerHTML = `<div class="text-muted text-sm" style="padding:8px 14px">No workspaces yet</div>`;
-    return;
+    el.innerHTML = `<div class="panel-empty">No workspaces yet</div>`;
+  } else {
+    el.innerHTML = state.workspaces.map(name =>
+      `<div class="ws-item ${name === state.activeWs ? "active" : ""}" onclick="openWorkspace('${esc(name).replace(/'/g, "\\'")}')">
+         <span class="dot"></span><span class="lbl">${esc(name)}</span>
+       </div>`
+    ).join("");
   }
-  el.innerHTML = state.workspaces.map(name =>
-    `<div class="ws-item ${name === state.activeWs ? "active" : ""}" onclick="openWorkspace('${esc(name)}')">
-       <span class="dot"></span>${esc(name)}
-     </div>`
-  ).join("");
+  renderSearch();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sidebar chrome — activity bar, collapsible panel, workspace group, search
+// ═══════════════════════════════════════════════════════════════════════════════
+const _sideKey = "filefold.sidebar";
+
+function _sidePref() {
+  try { return JSON.parse(localStorage.getItem(_sideKey)) || {}; } catch { return {}; }
+}
+function _saveSidePref() {
+  try { localStorage.setItem(_sideKey, JSON.stringify({ panel: state.panel, collapsed: state.sideCollapsed, wsOpen: state.wsGroupOpen })); } catch { /* private mode */ }
+}
+
+function applyPanel() {
+  document.getElementById("sidebar").classList.toggle("collapsed", state.sideCollapsed);
+  for (const name of ["workspaces", "search"]) {
+    document.getElementById(`panel-${name}`).hidden = state.panel !== name;
+    document.getElementById(`act-${name}`).classList.toggle("active", !state.sideCollapsed && state.panel === name);
+  }
+}
+
+// Like VS Code: choosing another icon switches panel; choosing the active icon collapses it.
+function selectPanel(name) {
+  if (state.panel === name && !state.sideCollapsed) state.sideCollapsed = true;
+  else { state.panel = name; state.sideCollapsed = false; }
+  applyPanel();
+  _saveSidePref();
+  if (name === "search" && !state.sideCollapsed) document.getElementById("search-input").focus();
+}
+
+function toggleWsGroup() {
+  state.wsGroupOpen = !state.wsGroupOpen;
+  applyWsGroup();
+  _saveSidePref();
+}
+function applyWsGroup() {
+  document.getElementById("ws-group-toggle").setAttribute("aria-expanded", String(state.wsGroupOpen));
+  document.getElementById("ws-list").hidden = !state.wsGroupOpen;
+}
+
+function _hl(text, q) {
+  const i = q ? text.toLowerCase().indexOf(q) : -1;
+  if (i < 0) return `<span class="lbl">${esc(text)}</span>`;
+  return `<span class="lbl">` + esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length)) + `</span>`;
+}
+
+function renderSearch() {
+  const out = document.getElementById("search-results");
+  if (!out) return;
+  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  if (!q) { out.innerHTML = `<div class="panel-empty">Type to search workspaces, categories and help topics.</div>`; return; }
+
+  const wsRows = state.workspaces.filter(name => {
+    const s = state.wsSummary[name] || {};
+    return [name, s.source_name || "", ...(s.categories || []).map(c => c.category)].some(t => t.toLowerCase().includes(q));
+  }).map(name => {
+    const s = state.wsSummary[name] || {};
+    const cat = (s.categories || []).find(c => c.category.toLowerCase().includes(q));
+    const note = !name.toLowerCase().includes(q) && cat ? cat.category : (!name.toLowerCase().includes(q) && s.source_name ? s.source_name : "");
+    return `<div class="ws-item" onclick="openWorkspace('${esc(name).replace(/'/g, "\\'")}')"><span class="dot"></span>${_hl(name, q)}${note ? `<span class="sub">${esc(note)}</span>` : ""}</div>`;
+  });
+
+  const topics = [...document.querySelectorAll("#view-help .help-toc a")]
+    .filter(a => a.textContent.toLowerCase().includes(q))
+    .map(a => `<div class="ws-item" onclick="openHelpTopic('${a.getAttribute("href").slice(1)}')"><span class="dot"></span>${_hl(a.textContent, q)}</div>`);
+
+  out.innerHTML = (wsRows.length ? `<div class="search-group">Workspaces</div>${wsRows.join("")}` : "")
+    + (topics.length ? `<div class="search-group">Help</div>${topics.join("")}` : "")
+    || `<div class="panel-empty">No results for “${esc(q)}”.</div>`;
+}
+
+function openHelpTopic(id) {
+  showView("help");
+  document.getElementById(id)?.scrollIntoView({ block: "start" });
+}
+
+(function initSidebar() {
+  const p = _sidePref();
+  state.panel = p.panel === "search" ? "search" : "workspaces";
+  state.sideCollapsed = !!p.collapsed;
+  state.wsGroupOpen = p.wsOpen !== false;
+  applyPanel();
+  applyWsGroup();
+  document.getElementById("search-input").addEventListener("input", renderSearch);
+  document.getElementById("search-input").addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.target.value = ""; renderSearch(); }
+  });
+})();
 
 function renderHome() {
   const el = document.getElementById("home-cards");
