@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FileFold: Abaqus .inp workspace manager</title>
-<meta name="description" content="Split large Abaqus .inp files into a small mother file and organised child files, track edits, and reimport updated models without losing your work. Runs in your browser; your model never leaves your machine.">
+<title>FileFold: an intelligent parser for Abaqus .inp files</title>
+<meta name="description" content="An intelligent parser for Abaqus .inp files. It reads every keyword block, then splits the model into a small mother file and organised child files, tracks your edits, and reimports updated models without losing your work. Runs in your browser; your model never leaves your machine.">
 <meta name="theme-color" content="#D9DBD7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1B1A18" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 24'%3E%3Cpath d='M0,0 L13,0 L20,7 L20,24 L0,24 Z' fill='%231A2438'/%3E%3Cpath d='M13,0 L20,7 L13,7 Z' fill='%2358A6FF'/%3E%3C/svg%3E">
@@ -121,6 +121,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 [data-cat="mesh"] { --c: var(--cat-mesh); } [data-cat="material"] { --c: var(--cat-material); } [data-cat="step"] { --c: var(--cat-step); }
 [data-cat="constraint"] { --c: var(--cat-constraint); } [data-cat="contact"] { --c: var(--cat-contact); } [data-cat="loads"] { --c: var(--cat-loads); }
 [data-cat="output"] { --c: var(--cat-output); } [data-cat="section"] { --c: var(--cat-section); } [data-cat="model"] { --c: var(--cat-model); }
+[data-cat="initial"] { --c: var(--cat-initial); } [data-cat="unknown"] { --c: var(--cat-unknown); }
 .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
 
 /* top bar: the app's sidebar header, laid flat */
@@ -209,6 +210,16 @@ dl.spec dd strong { font-weight: 600; }
 .get .what .muted { color: var(--muted); display: block; font-size: 12px; margin-top: 2px; }
 .get pre { grid-column: 2 / 4; font-family: var(--mono); font-size: 12px; line-height: 1.6; background: var(--surface2); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 8px 10px; overflow-x: auto; }
 
+/* supported: full breakdown */
+.sec-block { margin-bottom: 34px; }
+.sec-block:last-child { margin-bottom: 0; }
+.sec-block h3 { margin-bottom: 8px; color: var(--text); }
+.sec-block > p { max-width: 50em; font-size: 14px; margin-bottom: 12px; }
+.sec-block dl.spec dt .chip { display: inline-block; }
+.sec-block dl.spec dd { max-width: 52em; }
+.sec-block dl.spec dd code { font-size: .9em; }
+.sec-block dl.spec dd em { font-style: normal; font-weight: 600; }
+
 footer.foot { border-top: 1px solid var(--text); background: var(--surface); }
 footer.foot .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 14px; padding-bottom: 18px; font-size: 12px; color: var(--muted); }
 footer.foot a { text-decoration: none; margin-left: 16px; }
@@ -249,6 +260,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       <a class="label" href="#how">How it works</a>
       <a class="label" href="#inside">In the app</a>
       <a class="label" href="#features">Features</a>
+      <a class="label" href="#supported">Supported</a>
       <a class="label" href="#get">Get it</a>
       <a class="label" href="https://github.com/E1400/FileFold" rel="noopener">GitHub</a>
     </nav>
@@ -261,9 +273,9 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
 
   <div class="hero">
     <div>
-      <p class="label">Abaqus .inp workspace manager</p>
-      <h1>Tame your <em>FEA models.</em></h1>
-      <p class="lede">Split a large <span class="mono">.inp</span> file by category (<span class="mono">*MESH</span>, <span class="mono">*MATERIAL</span>, <span class="mono">*STEP</span> and more) or all the way down to one file per material, step or part. Track your edits, spot conflicts, and reimport an updated model without losing your changes.</p>
+      <p class="label">An intelligent parser for Abaqus .inp files</p>
+      <h1>Parse your <em>FEA models.</em></h1>
+      <p class="lede">FileFold reads a large <span class="mono">.inp</span> file block by block and understands what each keyword is. Then it splits the file by category (<span class="mono">*MESH</span>, <span class="mono">*MATERIAL</span>, <span class="mono">*STEP</span> and more), or all the way down to one file per material, step or part. Track your edits, spot conflicts, and reimport an updated model without losing your changes.</p>
       <div class="ctas">
         <a class="btn btn-primary" href="app/">Open FileFold</a>
         <a class="btn btn-ghost" href="https://github.com/E1400/FileFold/releases" rel="noopener">Download for Mac / Windows</a>
@@ -354,12 +366,102 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       <div><dt>Privacy</dt><dd><strong>Private by design.</strong> The web app runs entirely in your browser: your model is never uploaded and workspaces stay on your device. Decks up to 100 MB are tested; use the desktop app or command line for larger ones.</dd></div>
       <div><dt>Export</dt><dd><strong>Export as ZIP.</strong> Download the mother file and every child as one archive, ready for submission or archiving.</dd></div>
       <div><dt>Desktop</dt><dd><strong>Native desktop app.</strong> Runs locally on Mac and Windows from the system tray, with no internet needed.</dd></div>
+      <div><dt>Guidance</dt><dd><strong>Sample data and a skippable tour.</strong> Three real decks to try, a one-minute tour of creating a workspace, small (i) reminders where they help, and an Info page describing every function. Light and dark themes.</dd></div>
       <div><dt>Command line</dt><dd><strong>Command line included.</strong> Everything the app does is scriptable: inspect, split, create workspaces, re-split, recombine, reimport and export. The same workspaces open in the app.</dd></div>
     </dl>
   </section>
 
+  <section class="sec" id="supported" aria-labelledby="supported-h">
+    <div class="sec-head"><span class="label">04</span><h2 id="supported-h">Supported</h2><span class="sec-sub">The full breakdown of what FileFold reads, splits and runs on.</span></div>
+
+    <div class="sec-block" id="support-categories">
+      <h3 class="label">Keywords and categories</h3>
+      <p>FileFold recognises <strong data-keyword-count="523">523</strong> keywords, every one in the Abaqus 2016 Keywords Reference, plus about 60 newer ones named in the 2026 release notes. Each belongs to one of eleven categories, and nine of them can be extracted.</p>
+      <dl class="spec">
+      <div><dt><span class="chip" data-cat="mesh">mesh</span></dt><dd><code>*NODE</code>, <code>*ELEMENT</code>, <code>*NSET</code>, <code>*ELSET</code>, <code>*SURFACE</code> and <code>*PART</code> blocks, with their generators.</dd></div>
+      <div><dt><span class="chip" data-cat="section">section</span></dt><dd><code>*SOLID SECTION</code>, <code>*SHELL SECTION</code>, <code>*BEAM SECTION</code>, <code>*ORIENTATION</code>, <code>*CONNECTOR SECTION</code>.</dd></div>
+      <div><dt><span class="chip" data-cat="material">material</span></dt><dd><code>*MATERIAL</code> with all its options: <code>*ELASTIC</code>, <code>*PLASTIC</code>, <code>*DENSITY</code>, <code>*HYPERELASTIC</code>, <code>*DAMAGE INITIATION</code>, <code>*USER MATERIAL</code>.</dd></div>
+      <div><dt><span class="chip" data-cat="step">step</span></dt><dd><code>*STEP</code> and everything inside it: <code>*STATIC</code>, <code>*DYNAMIC</code>, <code>*FREQUENCY</code>, <code>*BUCKLE</code>, <code>*HEAT TRANSFER</code>. A step moves as one unit.</dd></div>
+      <div><dt><span class="chip" data-cat="loads">loads</span></dt><dd>Loads and conditions outside steps: <code>*BOUNDARY</code>, <code>*CLOAD</code>, <code>*DLOAD</code>, <code>*DSLOAD</code>, <code>*AMPLITUDE</code>, <code>*TEMPERATURE</code>.</dd></div>
+      <div><dt><span class="chip" data-cat="contact">contact</span></dt><dd><code>*CONTACT PAIR</code>, general <code>*CONTACT</code>, <code>*SURFACE INTERACTION</code>, <code>*FRICTION</code>, <code>*SURFACE BEHAVIOR</code>.</dd></div>
+      <div><dt><span class="chip" data-cat="constraint">constraint</span></dt><dd><code>*TIE</code>, <code>*COUPLING</code>, <code>*MPC</code>, <code>*EQUATION</code>, <code>*RIGID BODY</code>.</dd></div>
+      <div><dt><span class="chip" data-cat="initial">initial</span></dt><dd>The starting state: <code>*INITIAL CONDITIONS</code>.</dd></div>
+      <div><dt><span class="chip" data-cat="output">output</span></dt><dd><code>*OUTPUT</code>, <code>*NODE OUTPUT</code>, <code>*ELEMENT OUTPUT</code>, <code>*RESTART</code>, <code>*NODE PRINT</code> and the other output requests.</dd></div>
+      <div><dt><span class="chip" data-cat="model">model</span></dt><dd>Model set-up: <code>*HEADING</code>, <code>*PREPRINT</code>, <code>*INCLUDE</code>, <code>*ASSEMBLY</code>, <code>*INSTANCE</code>. Stays in the mother file.</dd></div>
+      <div><dt><span class="chip" data-cat="unknown">unknown</span></dt><dd>Keywords FileFold does not recognise. They stay with the keyword above them and are never separated from it.</dd></div>
+      </dl>
+    </div>
+
+    <div class="sec-block" id="support-deeper">
+      <h3 class="label">Finer splits</h3>
+      <p>A ticked category can split further. You are only offered splits that would produce a file for your deck. Alternatives for the same blocks, such as a whole part or just its nodes, cannot both be ticked.</p>
+      <dl class="spec">
+      <div><dt><span class="chip" data-cat="mesh">mesh</span></dt><dd>Nodes, elements, node sets, element sets, surfaces, or one file per part.</dd></div>
+      <div><dt><span class="chip" data-cat="material">material</span></dt><dd>One file per material, each with its options.</dd></div>
+      <div><dt><span class="chip" data-cat="step">step</span></dt><dd>One file per step, named after the step.</dd></div>
+      <div><dt><span class="chip" data-cat="contact">contact</span></dt><dd>Contact pairs, interaction properties, general contact.</dd></div>
+      <div><dt><span class="chip" data-cat="constraint">constraint</span></dt><dd>Ties, couplings, rigid bodies, MPCs and equations.</dd></div>
+      <div><dt><span class="chip" data-cat="loads">loads</span></dt><dd>Boundary conditions, amplitudes, applied loads, thermal.</dd></div>
+      </dl>
+    </div>
+
+    <div class="sec-block" id="support-parser">
+      <h3 class="label">What the parser understands</h3>
+      
+      <dl class="spec">
+      <div><dt>Line types</dt><dd><code>*</code> keyword lines, <code>**</code> comments, data lines and blank lines. Everything after a keyword, up to the next keyword, belongs to it.</dd></div>
+      <div><dt>Wrapped lines</dt><dd>A keyword line ending in a comma continues on the next line; its parameters are merged. Quoted values may contain commas.</dd></div>
+      <div><dt>Case and spacing</dt><dd>Keywords are matched whatever the case and spacing. Your own text is never reformatted.</dd></div>
+      <div><dt>Options</dt><dd>Options always stay with their parent: <code>*ELASTIC</code> with its <code>*MATERIAL</code>, <code>*FRICTION</code> with its <code>*SURFACE INTERACTION</code>.</dd></div>
+      <div><dt>Containers</dt><dd><code>*PART</code>, <code>*ASSEMBLY</code>, <code>*INSTANCE</code> and <code>*STEP</code> own the blocks inside them, which travel with the container.</dd></div>
+      <div><dt>Line endings</dt><dd>Windows (CRLF) and Unix (LF) files keep their line endings through every split, edit and recombine. The reassembled model is byte-identical.</dd></div>
+      <div><dt>Existing includes</dt><dd>An <code>*INCLUDE</code> already in your file is kept exactly as written.</dd></div>
+      </dl>
+    </div>
+
+    <div class="sec-block" id="support-work">
+      <h3 class="label">What you can do with a workspace</h3>
+      
+      <dl class="spec">
+      <div><dt>Create</dt><dd>Upload or load a sample, tick categories and finer splits, name it. Nothing happens until you press Create workspace.</dd></div>
+      <div><dt>Extract and split</dt><dd>Extract more categories later, split a category further, or change which finer splits exist, from the Splits tab.</dd></div>
+      <div><dt>Fold back and rename</dt><dd>Fold any file back into its parent, rename files (the <code>*INCLUDE</code> lines follow), rename or delete whole workspaces.</dd></div>
+      <div><dt>Edit</dt><dd>Edit any file in the built-in editor: find, line-range selection, comment toggling, save and discard. Changed files are marked <em>edited</em>.</dd></div>
+      <div><dt>Reimport</dt><dd>Bring in a newer version of the model. Each file is marked safe to update, unchanged or conflict, you choose what to overwrite, and you can extract categories that are new.</dd></div>
+      <div><dt>Export</dt><dd>Download a ZIP of the mother file and every child.</dd></div>
+      <div><dt>Command line</dt><dd><span class="mono">filefold inspect</span>, <span class="mono">filefold options</span>, <span class="mono">filefold split</span>, <span class="mono">filefold split-partial</span>, <span class="mono">filefold serve</span>, <span class="mono">filefold launch</span>, and <span class="mono">filefold workspace</span> <span class="mono">list</span>, <span class="mono">create</span>, <span class="mono">status</span>, <span class="mono">options</span>, <span class="mono">extract</span>, <span class="mono">resplit</span>, <span class="mono">recombine</span>, <span class="mono">rename-file</span>, <span class="mono">rename</span>, <span class="mono">delete</span>, <span class="mono">export</span>, <span class="mono">cat</span>, <span class="mono">put</span>, <span class="mono">reimport</span>.</dd></div>
+      <div><dt>Learn</dt><dd>Sample decks <span class="mono">Job-1</span>, <span class="mono">mmxmn</span> and <span class="mono">fempy_example</span>, a skippable tour, (i) reminders, and an Info page.</dd></div>
+      </dl>
+    </div>
+
+    <div class="sec-block" id="support-runs">
+      <h3 class="label">Where it runs</h3>
+      
+      <dl class="spec">
+      <div><dt>Browser</dt><dd>Runs entirely in your browser (Python compiled to WebAssembly). Nothing is uploaded; workspaces are kept in this browser. Decks up to 100 MB are tested (about 7 seconds to inspect, 15 to create); larger ones may run out of memory.</dd></div>
+      <div><dt>macOS</dt><dd>Menu-bar app with a local server. Files stay on your machine.</dd></div>
+      <div><dt>Windows</dt><dd>Tray app with a local server. Files stay on your machine.</dd></div>
+      <div><dt>Command line</dt><dd>Python 3.13 and uv. Everything the app does, on the same workspaces, and the way to handle very large decks.</dd></div>
+      <div><dt>Self-hosted</dt><dd>A Docker image and FastAPI server are included. Optional shared password and upload size limit. One shared workspace folder and no accounts yet.</dd></div>
+      </dl>
+    </div>
+
+    <div class="sec-block" id="not-supported">
+      <h3 class="label">Not supported yet</h3>
+      
+      <dl class="spec">
+      <div><dt>Other formats</dt><dd>Only Abaqus <code>.inp</code> text files. No <code>.odb</code>, <code>.cae</code> or <code>.sim</code>.</dd></div>
+      <div><dt>Running analyses</dt><dd>FileFold organises input files. It does not run Abaqus or check that a model will solve.</dd></div>
+      <div><dt>Existing includes</dt><dd>Files that your own <code>*INCLUDE</code> lines point to are not opened or split.</dd></div>
+      <div><dt>Inside a step</dt><dd>A step moves as one unit; there is no finer split within it.</dd></div>
+      <div><dt>Accounts and sharing</dt><dd>No sign-in and no shared team workspaces yet.</dd></div>
+      <div><dt>Phones</dt><dd>The app is built for desktop and tablet screens.</dd></div>
+      </dl>
+    </div>
+  </section>
+
   <section class="sec" id="get" aria-labelledby="get-h">
-    <div class="sec-head"><span class="label">04</span><h2 id="get-h">Get FileFold</h2><span class="sec-sub">Online or on your machine.</span></div>
+    <div class="sec-head"><span class="label">05</span><h2 id="get-h">Get FileFold</h2><span class="sec-sub">Online or on your machine.</span></div>
     <div class="get">
       <div>
         <span class="label">Browser</span>
@@ -392,7 +494,7 @@ uv run filefold inspect model.inp --options</pre>
 
 <footer class="foot">
   <div class="wrap">
-    <span>FileFold · Abaqus deck manager</span>
+    <span>FileFold · Abaqus .inp parser</span>
     <span><a href="https://github.com/E1400/FileFold" rel="noopener">GitHub</a><a href="https://github.com/E1400/FileFold/releases" rel="noopener">Releases</a><a href="app/">Open the app</a></span>
   </div>
 </footer>

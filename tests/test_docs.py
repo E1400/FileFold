@@ -115,3 +115,73 @@ def test_the_figure_on_the_landing_page_is_what_filefold_really_does():
     for line in html.unescape(re.sub(r"<[^>]+>", "", snippet)).splitlines():
         if line.strip() and line.strip() != "…":
             assert line.strip() in mother, f"figure quotes a line the mother file does not contain: {line!r}"
+
+
+# --- the landing page's "Supported" breakdown is tied to the code, so it cannot go stale ----------------
+
+def _supported() -> str:
+    return re.search(r'<section class="sec" id="supported".*?</section>', LANDING, flags=re.S).group(0)
+
+
+def test_landing_lists_every_category_the_parser_has():
+    from filefold.core.keywords import Category
+    section = _supported()
+    for cat in Category:
+        assert f'data-cat="{cat.value}"' in section, f"landing 'Supported' never lists the {cat.value!r} category"
+
+
+def test_landing_lists_every_fixed_split_option_and_the_name_based_ones():
+    from filefold.core.keywords import CATEGORY_SUB_OPTIONS
+    text = re.sub(r"<[^>]+>", " ", _supported()).lower()
+    for options in CATEGORY_SUB_OPTIONS.values():
+        for opt in options:
+            assert opt["label"].split(" (")[0].lower() in text, f"landing never mentions the split '{opt['label']}'"
+    for phrase in ("one file per material", "one file per step", "one file per part"):
+        assert phrase in text
+
+
+def test_landing_keyword_count_is_the_real_one():
+    from filefold.core.keyword_reference import FACTS
+    claimed = int(re.search(r'data-keyword-count="(\d+)"', _supported()).group(1))
+    assert claimed == len(FACTS), f"landing says {claimed} keywords, the reference table has {len(FACTS)}"
+
+
+def test_landing_names_every_command_line_command():
+    from typer.main import get_command
+    root = get_command(app)
+    names = set(root.commands) - {"workspace"}
+    names |= {f"workspace {c}" for c in root.commands["workspace"].commands}
+    text = re.sub(r"<[^>]+>", " ", LANDING)
+    missing = sorted(n for n in names if f"filefold {n}" not in text and not (n.startswith("workspace ") and n.split()[1] in text))
+    assert not missing, f"landing page never mentions CLI commands: {missing}"
+
+
+def test_landing_states_the_in_browser_size_limit_the_app_enforces():
+    js = (ROOT / "src" / "filefold" / "web" / "static" / "create.js").read_text()
+    limit = int(re.search(r"STATIC_MAX_TESTED_BYTES = (\d+) \* 1024 \* 1024", js).group(1))
+    assert f"{limit} MB" in _supported() and f"{limit} MB" in LANDING
+
+
+def test_landing_names_the_three_sample_decks_and_admits_what_it_cannot_do():
+    section = _supported()
+    for deck in ("Job-1", "mmxmn", "fempy_example"):
+        assert deck in LANDING
+    assert 'id="not-supported"' in section and "Not supported yet" in section
+
+
+def test_every_example_keyword_on_the_landing_page_is_in_the_category_shown_beside_it():
+    from filefold.core.keywords import Category, categorize
+    section = re.search(r'id="support-categories".*?</dl>', LANDING, flags=re.S).group(0)
+    checked = 0
+    for row in re.finditer(r'<dt>.*?data-cat="(\w+)".*?</dt>\s*<dd>(.*?)</dd>', section, flags=re.S):
+        category, body = row.group(1), row.group(2)
+        for kw in re.findall(r"<code>(\*[^<]+)</code>", body):
+            assert categorize(kw) is Category(category), f"{kw} is shown under {category!r} but the parser says {categorize(kw).value!r}"
+            checked += 1
+    assert checked >= 40
+
+
+def test_every_category_chip_on_the_landing_page_has_its_colour():
+    from filefold.core.keywords import Category
+    for cat in Category:
+        assert f'[data-cat="{cat.value}"] {{ --c: var(--cat-{cat.value}); }}' in LANDING, f"no chip colour for {cat.value}"
