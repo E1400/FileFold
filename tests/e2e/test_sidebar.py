@@ -56,20 +56,15 @@ def test_info_icon_opens_info_and_marks_active(app):
     expect(app.locator("#nav-info")).to_have_class("act-btn active")
 
 
-def test_search_finds_workspaces_and_help(app):
+def test_search_filters_workspace_titles(app):
     make_workspace(app)
     app.locator("#act-search").click()
     box = app.locator("#search-input")
     box.fill("job")
     expect(app.locator("#search-results .ws-item")).to_have_count(1)
-    box.fill("reimport")
-    expect(app.locator("#search-results .search-group")).to_have_text("Help")
-    app.locator("#search-results .ws-item").first.click()
-    expect(app.locator("#view-help")).to_be_visible()
-    box.fill("zzzz-nothing")
+    app.locator("#search-results .ws-item").click()
+    expect(app.locator("#view-detail")).to_be_visible()
+    box.fill("reimport")  # help topics and categories are not searched
     expect(app.locator("#search-results .panel-empty")).to_contain_text("No results")
     box.press("Escape")
     expect(box).to_have_value("")
-    # a category present in the workspace is searchable too
-    box.fill("mesh")
-    expect(app.locator("#search-results .ws-item", has_text="Job-1")).to_be_visible()

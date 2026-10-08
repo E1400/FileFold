@@ -209,11 +209,8 @@ body {
 .ws-item.active { background: var(--hairline); color: var(--text); box-shadow: inset 2px 0 0 var(--text); }
 .ws-item .lbl { overflow: hidden; text-overflow: ellipsis; }
 .ws-item .dot { width: 6px; height: 1px; background: currentColor; flex-shrink: 0; }
-.ws-item .sub { margin-left: auto; padding-left: 8px; font-size: var(--fs-micro); color: var(--muted); }
 .search-box { padding: 8px 12px; }
 .search-box input { width: 100%; }
-.search-group { padding: 8px 16px 2px; font-size: var(--fs-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.search-group mark, .ws-item mark { background: none; color: var(--text); font-weight: 600; text-decoration: underline; }
 
 /* ── Main ───────────────────────────────────────────────── */
 #main {

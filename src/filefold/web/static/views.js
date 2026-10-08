@@ -90,40 +90,15 @@ function applyWsGroup() {
   document.getElementById("ws-list").hidden = !state.wsGroupOpen;
 }
 
-function _hl(text, q) {
-  const i = q ? text.toLowerCase().indexOf(q) : -1;
-  if (i < 0) return `<span class="lbl">${esc(text)}</span>`;
-  return `<span class="lbl">` + esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length)) + `</span>`;
-}
-
 function renderSearch() {
   const out = document.getElementById("search-results");
   if (!out) return;
   const q = document.getElementById("search-input").value.trim().toLowerCase();
-  if (!q) { out.innerHTML = `<div class="panel-empty">Type to search workspaces, categories and help topics.</div>`; return; }
-
-  const wsRows = state.workspaces.filter(name => {
-    const s = state.wsSummary[name] || {};
-    return [name, s.source_name || "", ...(s.categories || []).map(c => c.category)].some(t => t.toLowerCase().includes(q));
-  }).map(name => {
-    const s = state.wsSummary[name] || {};
-    const cat = (s.categories || []).find(c => c.category.toLowerCase().includes(q));
-    const note = !name.toLowerCase().includes(q) && cat ? cat.category : (!name.toLowerCase().includes(q) && s.source_name ? s.source_name : "");
-    return `<div class="ws-item" onclick="openWorkspace('${esc(name).replace(/'/g, "\\'")}')"><span class="dot"></span>${_hl(name, q)}${note ? `<span class="sub">${esc(note)}</span>` : ""}</div>`;
-  });
-
-  const topics = [...document.querySelectorAll("#view-help .help-toc a")]
-    .filter(a => a.textContent.toLowerCase().includes(q))
-    .map(a => `<div class="ws-item" onclick="openHelpTopic('${a.getAttribute("href").slice(1)}')"><span class="dot"></span>${_hl(a.textContent, q)}</div>`);
-
-  out.innerHTML = (wsRows.length ? `<div class="search-group">Workspaces</div>${wsRows.join("")}` : "")
-    + (topics.length ? `<div class="search-group">Help</div>${topics.join("")}` : "")
-    || `<div class="panel-empty">No results for “${esc(q)}”.</div>`;
-}
-
-function openHelpTopic(id) {
-  showView("help");
-  document.getElementById(id)?.scrollIntoView({ block: "start" });
+  if (!q) { out.innerHTML = `<div class="panel-empty">Type to search workspace titles.</div>`; return; }
+  const rows = state.workspaces.filter(name => name.toLowerCase().includes(q));
+  out.innerHTML = rows.length
+    ? rows.map(name => `<div class="ws-item" onclick="openWorkspace('${esc(name).replace(/'/g, "\\'")}')"><span class="dot"></span><span class="lbl">${esc(name)}</span></div>`).join("")
+    : `<div class="panel-empty">No results for “${esc(q)}”.</div>`;
 }
 
 (function initSidebar() {
