@@ -100,6 +100,6 @@ function helpJump(event, id) {
   // category chips are drawn with the same function the rest of the app uses
   document.querySelectorAll("#view-help [data-cat]").forEach(el => { el.innerHTML = catChip(el.dataset.cat); });
   // where files live depends on the build: keep only the sentence that is true here
-  const keep = window.FILEFOLD_STATIC ? "static" : "server";
+  const keep = window.FILEFOLD_STATIC ? "static" : document.documentElement.dataset.desktop ? "desktop" : "server";
   document.querySelectorAll("#view-help [data-mode]").forEach(el => { if (el.dataset.mode !== keep) el.remove(); });
 })();

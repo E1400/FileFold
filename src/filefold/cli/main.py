@@ -456,7 +456,7 @@ def launch() -> None:
         console.print("[red]PySide6 is not installed.[/red]")
         console.print("[dim]Install the desktop extra:  pip install filefold[desktop][/dim]")
         raise typer.Exit(1)
-    _main()
+    _main([])
 
 
 @app.command()

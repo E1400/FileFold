@@ -142,6 +142,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .lede .mono { font-size: .88em; }
 .ctas { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 16px; }
 .fineprint { font-size: 12px; color: var(--muted); max-width: 36em; }
+#first-launch { margin-top: 12px; max-width: 60em; }
 
 /* figure: one deck in, a workspace out */
 .fig { background: var(--surface); border: 1px solid var(--text); border-radius: var(--radius); }
@@ -278,7 +279,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       <p class="lede">FileFold reads a large <span class="mono">.inp</span> file block by block and understands what each keyword is. Then it splits the file by category (<span class="mono">*MESH</span>, <span class="mono">*MATERIAL</span>, <span class="mono">*STEP</span> and more), or all the way down to one file per material, step or part. Track your edits, spot conflicts, and reimport an updated model without losing your changes.</p>
       <div class="ctas">
         <a class="btn btn-primary" href="app/">Open FileFold</a>
-        <a class="btn btn-ghost" href="https://github.com/E1400/FileFold/releases" rel="noopener">Download for Mac / Windows</a>
+        <a class="btn btn-ghost" href="#get">Download for Mac / Windows</a>
       </div>
       <p class="fineprint">The web app runs entirely in your browser. Your model is never uploaded, and nothing needs installing.</p>
     </div>
@@ -365,7 +366,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       <div><dt>Parser</dt><dd><strong>Container-aware parsing.</strong> Understands <span class="mono">*PART</span>, <span class="mono">*STEP</span> and <span class="mono">*ASSEMBLY</span> nesting and wrapped keyword lines. Material and contact options travel with their parent and are never split apart.</dd></div>
       <div><dt>Privacy</dt><dd><strong>Private by design.</strong> The web app runs entirely in your browser: your model is never uploaded and workspaces stay on your device. Decks up to 100 MB are tested; use the desktop app or command line for larger ones.</dd></div>
       <div><dt>Export</dt><dd><strong>Export as ZIP.</strong> Download the mother file and every child as one archive, ready for submission or archiving.</dd></div>
-      <div><dt>Desktop</dt><dd><strong>Native desktop app.</strong> Runs locally on Mac and Windows from the system tray, with no internet needed.</dd></div>
+      <div><dt>Desktop</dt><dd><strong>Desktop app.</strong> The same app on your Mac or Windows PC, with your files on your own disk, no internet needed, and no browser memory limit.</dd></div>
       <div><dt>Guidance</dt><dd><strong>Sample data and a skippable tour.</strong> Three real decks to try, a one-minute tour of creating a workspace, small (i) reminders where they help, and an Info page describing every function. Light and dark themes.</dd></div>
       <div><dt>Command line</dt><dd><strong>Command line included.</strong> Everything the app does is scriptable: inspect, split, create workspaces, re-split, recombine, reimport and export. The same workspaces open in the app.</dd></div>
     </dl>
@@ -439,8 +440,8 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       
       <dl class="spec">
       <div><dt>Browser</dt><dd>Runs entirely in your browser (Python compiled to WebAssembly). Nothing is uploaded; workspaces are kept in this browser. Decks up to 100 MB are tested (about 7 seconds to inspect, 15 to create); larger ones may run out of memory.</dd></div>
-      <div><dt>macOS</dt><dd>Menu-bar app with a local server. Files stay on your machine.</dd></div>
-      <div><dt>Windows</dt><dd>Tray app with a local server. Files stay on your machine.</dd></div>
+      <div><dt>macOS</dt><dd>macOS 12 or later, Apple Silicon or Intel (separate downloads). A window plus a menu-bar icon; workspaces in <span class="mono">~/.filefold/workspaces</span>, shared with the command line.</dd></div>
+      <div><dt>Windows</dt><dd>Windows 10 or 11, 64-bit. A window plus a system-tray icon; no installer. Files stay on your machine.</dd></div>
       <div><dt>Command line</dt><dd>Python 3.13 and uv. Everything the app does, on the same workspaces, and the way to handle very large decks.</dd></div>
       <div><dt>Self-hosted</dt><dd>A Docker image and FastAPI server are included. Optional shared password and upload size limit. One shared workspace folder and no accounts yet.</dd></div>
       </dl>
@@ -470,13 +471,18 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       </div>
       <div>
         <span class="label">macOS</span>
-        <span class="what">Universal app for Apple Silicon and Intel. <span class="muted">Lives in the menu bar; launch once.</span></span>
-        <a class="btn btn-ghost" href="https://github.com/E1400/FileFold/releases" rel="noopener">Download .app</a>
+        <span class="what">Apple Silicon: Macs with an M1 chip or later. <span class="muted">Unzip, move FileFold to Applications, open it.</span></span>
+        <a class="btn btn-ghost" href="https://github.com/E1400/FileFold/releases/latest/download/FileFold-macOS-AppleSilicon.zip" data-asset="FileFold-macOS-AppleSilicon.zip">Download for Apple Silicon</a>
+      </div>
+      <div>
+        <span class="label">macOS</span>
+        <span class="what">Intel: Macs with an Intel processor. <span class="muted">Not sure? Apple menu &gt; About This Mac: "Chip" means Apple Silicon.</span></span>
+        <a class="btn btn-ghost" href="https://github.com/E1400/FileFold/releases/latest/download/FileFold-macOS-Intel.zip" data-asset="FileFold-macOS-Intel.zip">Download for Intel</a>
       </div>
       <div>
         <span class="label">Windows</span>
-        <span class="what">Standalone executable, no installer. <span class="muted">Unzip and run; lives in the system tray.</span></span>
-        <a class="btn btn-ghost" href="https://github.com/E1400/FileFold/releases" rel="noopener">Download .exe</a>
+        <span class="what">Windows 10 or 11, no installer. <span class="muted">Unzip the folder and run FileFold.exe inside it.</span></span>
+        <a class="btn btn-ghost" href="https://github.com/E1400/FileFold/releases/latest/download/FileFold-Windows.zip" data-asset="FileFold-Windows.zip">Download for Windows</a>
       </div>
       <div>
         <span class="label">Command line</span>
@@ -487,6 +493,7 @@ cd FileFold &amp;&amp; uv sync
 uv run filefold inspect model.inp --options</pre>
       </div>
     </div>
+    <p class="fineprint" id="first-launch">The desktop app is not yet signed by Apple or Microsoft, so the first launch shows a warning. On a Mac, click Done, then open System Settings &gt; Privacy &amp; Security and click <strong>Open Anyway</strong>. On Windows, click <strong>More info</strong>, then <strong>Run anyway</strong>. <a href="https://github.com/E1400/FileFold/releases/latest" rel="noopener">All downloads and release notes</a>.</p>
   </section>
 
 </div>
