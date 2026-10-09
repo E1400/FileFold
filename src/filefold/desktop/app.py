@@ -49,6 +49,11 @@ def choose_port(preferred: int) -> int:
     if preferred:
         try:
             with socket.socket() as s:
+                # Probe the way uvicorn binds (SO_REUSEADDR on POSIX), so connections left in
+                # TIME_WAIT by the previous run don't push a quick relaunch onto another port.
+                # Never on Windows, where SO_REUSEADDR would let us share a port in use.
+                if os.name != "nt":
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(("127.0.0.1", preferred))
             return preferred
         except OSError:

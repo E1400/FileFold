@@ -29,6 +29,22 @@ def test_choose_port_falls_back_when_the_stable_port_is_taken():
     assert port != taken and 0 < port < 65536
 
 
+def test_choose_port_reuses_the_stable_port_right_after_a_quit():
+    """Quitting leaves recently used connections in TIME_WAIT; the next launch must still get the
+    same port (the server can bind it), or the window's saved settings are lost."""
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)   # as uvicorn does
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    port = listener.getsockname()[1]
+    client = socket.create_connection(("127.0.0.1", port))
+    conn, _ = listener.accept()
+    conn.close()                    # the server side closes first -> its end sits in TIME_WAIT
+    client.close()
+    listener.close()
+    assert desktop.choose_port(port) == port
+
+
 def test_only_the_local_server_stays_inside_the_window():
     port = 47321
     assert not desktop.is_external(f"http://127.0.0.1:{port}/?desktop=1", port)
