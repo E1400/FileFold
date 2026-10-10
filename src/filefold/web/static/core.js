@@ -128,17 +128,29 @@ function liveSubKeys(claims, ticked) {
   return live;
 }
 
+// Ticked parents ("Elements") left with no blocks because their ticked refinements
+// ("Element type: X") took them all. Such a parent makes no file, which is fine.
+// Mirrors filefold.core.subsplits.covered_parents.
+function coveredSubParents(claims, ticked, options) {
+  const live = liveSubKeys(claims, ticked);
+  const parents = new Set(options.filter(o => o.parent && ticked.has(o.sub_category)).map(o => o.parent));
+  return new Set([...ticked].filter(k => !live.has(k) && parents.has(k)));
+}
+
 // Decide which sub-split options can be ticked. A choice is never silently unticked:
 // the first choice stays, and an option is disabled when ticking it would give it no
 // blocks or would leave an already-ticked option with none (e.g. "Part: X" and "Nodes"
-// are alternative depths for the same blocks). Mirrors filefold.core.subsplits.can_tick.
-// `ids` maps an option key to its checkbox element id.
+// are alternative depths for the same blocks). A refinement and its parent ("Element
+// type: X" under "Elements") never conflict: the parent takes whatever is left.
+// Mirrors filefold.core.subsplits.can_tick. `ids.box` maps an option key to its checkbox
+// id; `ids.hint`, if given, to an element that explains a parent with nothing left.
 function refreshSubAvailability(claims, options, ids) {
   if (!claims || !claims.length) return;
   const known = new Set(claims.flat());
   // Options the claims know nothing about (an already-extracted split) are left alone.
   const rows = options.filter(opt => known.has(opt.sub_category)).map(opt => ({
     key: opt.sub_category,
+    parent: opt.parent && known.has(opt.parent) ? opt.parent : null,
     box: document.getElementById(ids.box(opt.sub_category)),
   })).filter(r => r.box);
 
@@ -146,9 +158,48 @@ function refreshSubAvailability(claims, options, ids) {
   for (const r of rows) {
     if (r.box.checked) { r.box.disabled = false; r.box.title = ""; continue; }
     const after = new Set([...ticked, r.key]);
+    if (r.parent) after.add(r.parent);              // ticking a refinement ticks its parent
     const live = liveSubKeys(claims, after);
-    const ok = [...after].every(k => live.has(k));
+    const covered = coveredSubParents(claims, after, options);
+    const ok = [...after].every(k => live.has(k) || covered.has(k));
     r.box.disabled = !ok;
     r.box.title = ok ? "" : "Not available with your current choices: the blocks it would split are already taken by another ticked option.";
   }
+  if (!ids.hint) return;
+  const covered = coveredSubParents(claims, ticked, options);
+  for (const r of rows) {
+    const hint = document.getElementById(ids.hint(r.key));
+    if (hint) hint.textContent = covered.has(r.key) ? "all split by type below, so no file of its own" : "";
+    const name = ids.name && document.getElementById(ids.name(r.key));
+    if (name && r.box.checked && !name.disabled) name.style.opacity = covered.has(r.key) ? ".4" : "1";
+  }
+}
+
+// Keep refinements and their parent consistent after `key` was toggled: ticking a
+// refinement ticks its parent; unticking a parent unticks its refinements. Returns the
+// keys whose box changed, so the caller can update their filename inputs.
+function followSubTree(options, key, boxOf) {
+  const box = boxOf(key);
+  if (!box) return [];
+  const changed = [];
+  const opt = options.find(o => o.sub_category === key);
+  if (box.checked && opt?.parent) {
+    const parent = boxOf(opt.parent);
+    if (parent && !parent.checked) { parent.checked = true; changed.push(opt.parent); }
+  }
+  if (!box.checked) {
+    for (const child of options.filter(o => o.parent === key)) {
+      const cb = boxOf(child.sub_category);
+      if (cb && cb.checked) { cb.checked = false; changed.push(child.sub_category); }
+    }
+  }
+  return changed;
+}
+
+// The sub-split keys that will actually make a file: ticked, minus a parent its
+// refinements emptied (sending it would only record a file that is never written).
+function effectiveSubKeys(claims, options, ticked) {
+  if (!claims || !claims.length) return new Set(ticked);
+  const covered = coveredSubParents(claims, ticked, options);
+  return new Set([...ticked].filter(k => !covered.has(k)));
 }

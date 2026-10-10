@@ -51,8 +51,20 @@ def test_discovery_lists_names_present_in_the_deck(tmp_path):
     assert [o.sub_category for o in discover_options(Category.STEP, b)] == ["step.load", "step.2"]
     mesh = [o.sub_category for o in discover_options(Category.MESH, b)]
     assert {"part.bracket", "part.plate", "nodes", "elements"} <= set(mesh)
-    assert not any(k.startswith("etype.") for k in mesh)      # supported by the splitter, not offered
     assert mesh.index("nodes") < mesh.index("part.bracket")  # static options first
+
+
+def test_element_types_are_offered_as_a_finer_split_of_elements(tmp_path):
+    """Element type refines "Elements": listed right under it and marked as its child, so the
+    UI can show it indented and tick both (it was once hidden, which made it a one-way door)."""
+    opts = discover_options(Category.MESH, _blocks(tmp_path))
+    keys = [o.sub_category for o in opts]
+    etypes = [k for k in keys if k.startswith("etype.")]
+    assert etypes
+    first = keys.index("elements") + 1
+    assert keys[first:first + len(etypes)] == etypes
+    assert all(o.parent == "elements" for o in opts if o.sub_category.startswith("etype."))
+    assert all(o.parent is None for o in opts if not o.sub_category.startswith("etype."))
 
 
 def test_discovery_ignores_blocks_nested_in_other_categories(tmp_path):

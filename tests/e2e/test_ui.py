@@ -261,12 +261,73 @@ def test_steps_split_by_name(app):
     assert "step-1.inp" in detail_filenames(app)
 
 
-def test_mesh_offers_parts_but_not_element_types(app):
+def test_mesh_offers_parts_and_element_types(app):
     open_new_workspace(app)
     upload(app, "fempy_example.inp")
     app.locator("#sel-mesh").check()
     assert _dynamic_ids(app, "mesh", "part"), "fempy_example is built from *PART blocks"
-    assert not _dynamic_ids(app, "mesh", "etype"), "element type is too fine-grained to offer"
+    assert _dynamic_ids(app, "mesh", "etype"), "element type is offered as a finer split of Elements"
+
+
+def _box(page: Page, box_id: str):
+    return page.locator(f'[id="{box_id}"]')
+
+
+def _apply_splits(page: Page) -> None:
+    btn = page.locator("#ws-splits-apply-btn")
+    btn.click()
+    expect(btn).to_have_text("Apply changes", timeout=30_000)      # finished, tab re-rendered
+    expect(btn).to_be_enabled()
+
+
+def test_elements_and_element_type_tick_together_and_never_disappear(app):
+    """Regression: in Job-1 every element is CPS4R, so "Elements" and "Element type: CPS4R"
+    claim the same lines. They used to exclude each other, and since element type was hidden
+    from the menus, switching to Elements and applying made it vanish for good."""
+    open_new_workspace(app)
+    upload(app, "Job-1.inp")
+    app.locator("#sel-mesh").check()
+    etype, elements = _box(app, "sub-mesh-etype.cps4r"), _box(app, "sub-mesh-elements")
+    expect(etype).to_be_enabled()
+    etype.check()                                     # a refinement ticks its parent
+    expect(elements).to_be_checked()
+    expect(elements).to_be_enabled()
+    expect(_box(app, "subhint-mesh-elements")).to_contain_text("split by type")
+    create(app)
+    files = detail_filenames(app)
+    assert "elements-cps4r.inp" in files and "mesh-elements.inp" not in files   # no empty file
+
+    app.locator("#tab-btn-splits").click()
+    ws_etype, ws_elements = _box(app, "ws-sub-mesh-etype.cps4r"), _box(app, "ws-sub-mesh-elements")
+    expect(ws_etype).to_be_checked()
+    expect(ws_elements).to_be_checked()
+    ws_etype.uncheck()                                # switch to plain Elements
+    expect(ws_elements).to_be_checked()
+    expect(ws_elements).to_be_enabled()
+    expect(_box(app, "ws-subhint-mesh-elements")).to_have_text("")
+    _apply_splits(app)
+    app.locator("#tab-btn-files").click()
+    files = detail_filenames(app)
+    assert "mesh-elements.inp" in files and "elements-cps4r.inp" not in files
+
+    app.locator("#tab-btn-splits").click()
+    expect(ws_etype).to_have_count(1)                 # still offered: the door goes both ways
+    expect(ws_etype).to_be_enabled()
+    ws_etype.check()                                  # and back to element type
+    _apply_splits(app)
+    expect(ws_etype).to_be_checked()
+    expect(ws_elements).to_be_checked()
+    app.locator("#tab-btn-files").click()
+    files = detail_filenames(app)
+    assert "elements-cps4r.inp" in files and "mesh-elements.inp" not in files
+
+    app.locator("#tab-btn-splits").click()
+    ws_elements.uncheck()                             # unticking the parent unticks its refinements
+    expect(ws_etype).not_to_be_checked()
+    _apply_splits(app)
+    app.locator("#tab-btn-files").click()
+    files = detail_filenames(app)
+    assert "elements-cps4r.inp" not in files and "mesh-elements.inp" not in files
 
 
 def test_dynamic_sub_split_from_the_splits_tab(app):

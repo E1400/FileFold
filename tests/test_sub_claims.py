@@ -61,10 +61,27 @@ def test_can_tick_never_allows_a_choice_that_empties_another():
     assert can_tick(mixed, {"part.x"}, "nodes")              # so "nodes" still has blocks to take
 
 
+def test_elements_and_element_type_can_be_ticked_together():
+    """"Elements" is the parent of every "Element type" option: ticked together it takes the
+    elements not split by type, and may be left with none (it then simply makes no file)."""
+    from filefold.core.subsplits import can_tick, covered_parents
+    one_type = [["etype.cps4r", "elements"], ["nodes"]]       # Job-1: every element is CPS4R
+    assert can_tick(one_type, {"elements"}, "etype.cps4r")
+    assert can_tick(one_type, {"etype.cps4r"}, "elements")
+    assert covered_parents(one_type, {"etype.cps4r", "elements"}) == {"elements"}
+    two_types = [["etype.a", "elements"], ["etype.b", "elements"]]
+    assert covered_parents(two_types, {"etype.a", "elements"}) == set()   # b still goes to elements
+    # still no choice that empties an unrelated option
+    inside_part = [["part.x"], ["part.x", "etype.a", "elements"]]
+    assert not can_tick(inside_part, {"part.x"}, "etype.a")
+    assert not can_tick(inside_part, {"etype.a"}, "part.x")
+
+
 @pytest.mark.parametrize("deck", ["Job-1.inp", "test_2.inp", "mmxmn.inp", "fempy_example.inp"])
 def test_choosing_in_any_order_with_can_tick_always_makes_every_file(deck):
-    """Greedy first-choice-wins selection (what the UI does) never leaves an empty option."""
-    from filefold.core.subsplits import can_tick
+    """Greedy first-choice-wins selection (what the UI does) never leaves an empty option,
+    except a parent ("Elements") whose children took everything, which makes no file."""
+    from filefold.core.subsplits import can_tick, covered_parents
     blocks = parse(FIXTURES / deck)
     for cat in Category:
         options, claims = discover(cat, [b for b in blocks if b.category is cat])
@@ -76,4 +93,5 @@ def test_choosing_in_any_order_with_can_tick_always_makes_every_file(deck):
                     ticked.add(k)
             sel = SplitSelection(cat, "parent.out", [SubSplitSelection(k, f"{k}.out") for k in sorted(ticked)])
             _, files = compute_split(blocks, [sel]) if ticked else (None, {})
-            assert {k for k in keys if f"{k}.out" in files} == ticked, (deck, cat.value, order)
+            expected = ticked - covered_parents(claims, ticked)   # a covered parent makes no file
+            assert {k for k in keys if f"{k}.out" in files} == expected, (deck, cat.value, order)

@@ -10,6 +10,10 @@ HTML ids, so every key is made of [a-z0-9_.-] only):
 A block can have several candidate keys (an *ELEMENT is both "etype.c3d8r" and
 "elements"); the splitter takes the first one the user selected, so the more specific
 dynamic key wins.
+
+Element type is a finer split *of* "Elements" (its parent): ticked together, the type
+files take their elements and "Elements" takes the rest, which may be nothing (then it
+makes no file). Parents are never in conflict with their own children.
 """
 from __future__ import annotations
 
@@ -19,9 +23,9 @@ from dataclasses import asdict, dataclass
 from .block import Block
 from .keywords import CATEGORY_SUB_KEYWORDS, CATEGORY_SUB_OPTIONS, Category
 
-# Axes the splitter still understands (so existing workspaces keep working) but that the
-# menus do not offer: element type is finer than most people want to manage.
-HIDDEN_AXES = frozenset({"etype"})
+# A name-based axis that refines a static group: its options are listed right under that
+# group and may be ticked together with it (see `can_tick`).
+_AXIS_PARENT = {"etype": "elements"}
 
 _AXIS_LABEL = {"material": "Material", "step": "Step", "part": "Part", "etype": "Element type"}
 _AXIS_FILE = {"material": "material", "step": "step", "part": "part", "etype": "elements"}
@@ -88,9 +92,15 @@ class SubOption:
     sub_category: str
     label: str
     default_filename: str
+    parent: str | None = None     # the option this one refines (shown indented under it)
 
     def as_dict(self) -> dict[str, str]:
         return asdict(self)
+
+
+def parent_of(key: str) -> str | None:
+    """The static group a name-based key refines ("etype.c3d8r" -> "elements"), if any."""
+    return _AXIS_PARENT.get(key.partition(".")[0]) if "." in key else None
 
 
 def option_from_key(category: Category, key: str, name: str | None = None) -> SubOption:
@@ -102,7 +112,7 @@ def option_from_key(category: Category, key: str, name: str | None = None) -> Su
     shown = name or tail
     prefix = _AXIS_FILE.get(axis, axis)
     stem = tail if tail.startswith(prefix) else f"{prefix}-{tail}"   # "step-1", not "step-step-1"
-    return SubOption(key, f"{_AXIS_LABEL.get(axis, axis.title())}: {shown}", f"{stem}.inp")
+    return SubOption(key, f"{_AXIS_LABEL.get(axis, axis.title())}: {shown}", f"{stem}.inp", parent_of(key))
 
 
 def _display_name(key: str, block: Block) -> str | None:
@@ -149,10 +159,14 @@ def discover(category: Category, blocks: list[Block]) -> tuple[list[SubOption], 
             walk(b.children, ancestors + tuple(keys))
 
     walk(blocks, ())
-    ordered = [option_from_key(category, o["sub_category"])
-               for o in CATEGORY_SUB_OPTIONS.get(category, []) if o["sub_category"] in static_found]
-    offered = [o for o in dynamic.values() if o.sub_category.partition(".")[0] not in HIDDEN_AXES]
-    return ordered + offered, [list(c) for c in claims]
+    options: list[SubOption] = []
+    for o in CATEGORY_SUB_OPTIONS.get(category, []):
+        if o["sub_category"] in static_found:
+            options.append(option_from_key(category, o["sub_category"]))
+            options += [d for d in dynamic.values() if d.parent == o["sub_category"]]  # its refinements
+    listed = {o.sub_category for o in options}
+    options += [d for d in dynamic.values() if d.sub_category not in listed]
+    return options, [list(c) for c in claims]
 
 
 def discover_options(category: Category, blocks: list[Block]) -> list[SubOption]:
@@ -163,13 +177,24 @@ def discover_options(category: Category, blocks: list[Block]) -> list[SubOption]
 def can_tick(claims: list[list[str]], ticked: set[str], key: str) -> bool:
     """May `key` be ticked on top of `ticked` without emptying anything?
 
-    True when ticking it gives it at least one block and leaves every already-ticked option
-    with at least one block. The UI uses this so a choice is never silently unticked: the
-    first choice stays, and the option that would conflict with it is disabled instead.
-    Mirrors the JavaScript `refreshSubAvailability`.
+    Ticking a refinement ("Element type: X") also ticks its parent ("Elements"). Allowed
+    when every ticked option still gets at least one block, except a parent whose children
+    took all of its blocks (it then makes no file, which is fine: nothing is lost). The UI
+    uses this so a choice is never silently unticked: the first choice stays, and the option
+    that would conflict with it is disabled instead. Mirrors the JavaScript
+    `refreshSubAvailability`.
     """
     after = ticked | {key}
-    return after <= live_keys(claims, after)
+    parent = parent_of(key)
+    if parent and any(parent in pattern for pattern in claims):
+        after.add(parent)
+    return after - covered_parents(claims, after) <= live_keys(claims, after)
+
+
+def covered_parents(claims: list[list[str]], ticked: set[str]) -> set[str]:
+    """Ticked parents left with no blocks because their ticked children took them all."""
+    live = live_keys(claims, ticked)
+    return {k for k in ticked - live if any(parent_of(c) == k for c in ticked)}
 
 
 def live_keys(claims: list[list[str]], ticked: set[str]) -> set[str]:

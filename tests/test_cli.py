@@ -57,7 +57,7 @@ def test_inspect_lists_blocks_and_the_split_options_that_exist(ws):
     assert "ELEMENT" in out and "mesh" in out
     assert "mesh:nodes" in out and "material:material.steel" in out and "step:step.step-1" in out
     assert "constraint:rigid" in out
-    assert "etype" not in out                       # element-type splits are not offered
+    assert "mesh:etype.cps4r" in out                # element type, a finer split of elements
     assert "constraint:ties" not in out             # nothing in Job-1 to tie
 
 

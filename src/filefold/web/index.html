@@ -151,14 +151,14 @@
             <h2>Going deeper</h2>
             <p>A ticked category can be split into finer files. You only see options that will really produce a file for your deck.</p>
             <dl class="help-defs">
-              <dt><span data-cat="mesh"></span></dt><dd>Nodes, elements, node sets, element sets, surfaces, or one file per part.</dd>
+              <dt><span data-cat="mesh"></span></dt><dd>Nodes, elements (optionally one file per element type), node sets, element sets, surfaces, or one file per part.</dd>
               <dt><span data-cat="material"></span></dt><dd>One file per material, each with its options.</dd>
               <dt><span data-cat="step"></span></dt><dd>One file per step.</dd>
               <dt><span data-cat="contact"></span></dt><dd>Contact pairs, interaction properties, general contact.</dd>
               <dt><span data-cat="constraint"></span></dt><dd>Ties, couplings, rigid bodies, MPCs and equations.</dd>
               <dt><span data-cat="loads"></span></dt><dd>Boundary conditions, amplitudes, applied loads, thermal.</dd>
             </dl>
-            <p>Some options are alternatives for the same blocks, for example a whole part or just its nodes. The one you tick first wins and the other greys out; untick it to switch.</p>
+            <p>An element type is a finer split of Elements: ticking one also ticks Elements, which then keeps the elements of any type you did not split out (if none are left, it makes no file). Other options are alternatives for the same blocks, for example a whole part or just its nodes. The one you tick first wins and the other greys out; untick it to switch.</p>
           </section>
 
           <section id="help-files">

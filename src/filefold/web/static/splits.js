@@ -62,9 +62,12 @@ function renderSplitsTab(data) {
     const existingSubs = {};
     if (existing) existing.sub_selections.forEach(ss => { existingSubs[ss.sub_category] = ss.filename; });
 
-    const allSubsOn = subOpts.length > 0 && subOpts.every(
-      opt => existingSubs[opt.sub_category] && actualGrandchildren.has(existingSubs[opt.sub_category])
-    );
+    // A sub-split is checked only if its file actually exists on disk (in file_records).
+    // A parent ("Elements") also shows checked when one of its refinements ("Element type: X")
+    // is: together they mean "split elements by type", even if no elements were left over.
+    const onDisk = key => !!(existingSubs[key] && actualGrandchildren.has(existingSubs[key]));
+    const isOn = opt => onDisk(opt.sub_category) || subOpts.some(o => o.parent === opt.sub_category && onDisk(o.sub_category));
+    const allSubsOn = subOpts.length > 0 && subOpts.every(isOn);
     const subPanel = subOpts.length ? `
       <div class="sub-options visible" id="ws-sub-opts-${cat}">
         <div class="text-muted text-sm" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
@@ -78,17 +81,17 @@ function renderSplitsTab(data) {
         </div>
         ${subOpts.map(opt => {
           const subFn = existingSubs[opt.sub_category] || opt.default_filename;
-          // A sub-split is checked only if its file actually exists on disk (in file_records)
-          const subChecked = !!(existingSubs[opt.sub_category] && actualGrandchildren.has(existingSubs[opt.sub_category]));
+          const subChecked = isOn(opt);
           // Sub-options are interactive only when the parent category is extracted
           const subDisabled = !isExtracted;
-          return `<div class="sub-option-row">
+          return `<div class="sub-option-row${opt.parent ? " sub-child" : ""}">
             <input type="checkbox" id="ws-sub-${cat}-${opt.sub_category}"
                    value="${opt.sub_category}" ${subChecked ? "checked" : ""}
                    ${subDisabled ? "disabled" : ""}
                    onchange="wsToggleSubOption('${cat}','${opt.sub_category}')">
             <label for="ws-sub-${cat}-${opt.sub_category}"
                    style="cursor:pointer;user-select:none">${esc(opt.label)}</label>
+            <span class="sub-hint" id="ws-subhint-${cat}-${opt.sub_category}"></span>
             <input type="text" id="ws-subfn-${cat}-${opt.sub_category}" value="${subFn}"
                    placeholder="${opt.default_filename}"
                    ${!subChecked || subDisabled ? "disabled" : ""}
@@ -120,7 +123,9 @@ function renderSplitsTab(data) {
     </div>`;
   }).join("");
   // Apply availability to extracted categories as rendered (their sub-files start ticked).
-  allCats.forEach(cat => { if (document.getElementById(`ws-sel-${cat}`)?.checked) _refreshWsSubs(cat); });
+  allCats.forEach(cat => {
+    if (document.getElementById(`ws-sel-${cat}`)?.checked) { _refreshWsSubs(cat); _syncSubAllBox(cat); }
+  });
 }
 
 function wsToggleSplitRow(cat) {
@@ -152,11 +157,15 @@ function wsToggleSplitRow(cat) {
 }
 
 function wsToggleSubOption(cat, subCat) {
-  const cb = document.getElementById(`ws-sub-${cat}-${subCat}`);
-  const inp = document.getElementById(`ws-subfn-${cat}-${subCat}`);
-  if (!inp) return;
-  inp.disabled = !cb.checked;
-  inp.style.opacity = cb.checked ? "1" : ".4";
+  const options = state.wsData?.sub_options?.[cat] ?? [];
+  const followed = followSubTree(options, subCat, key => document.getElementById(`ws-sub-${cat}-${key}`));
+  [subCat, ...followed].forEach(key => {
+    const cb = document.getElementById(`ws-sub-${cat}-${key}`);
+    const inp = document.getElementById(`ws-subfn-${cat}-${key}`);
+    if (!cb || !inp) return;
+    inp.disabled = !cb.checked;
+    inp.style.opacity = cb.checked ? "1" : ".4";
+  });
   _refreshWsSubs(cat);
   _syncSubAllBox(cat);
 }
@@ -166,6 +175,7 @@ function _refreshWsSubs(cat) {
   refreshSubAvailability(data?.sub_claims?.[cat], data?.sub_options?.[cat] ?? [], {
     box: key => `ws-sub-${cat}-${key}`,
     name: key => `ws-subfn-${cat}-${key}`,
+    hint: key => `ws-subhint-${cat}-${key}`,
   });
 }
 
@@ -293,8 +303,12 @@ async function applyEditSplits() {
 
       let subChanged = false;
       const newSubSelections = [];
+      // A ticked parent its refinements emptied makes no file: not a change, not sent.
+      const ticked = new Set(subOpts.map(o => o.sub_category)
+        .filter(k => document.getElementById(`ws-sub-${cat}-${k}`)?.checked));
+      const effective = effectiveSubKeys(data.sub_claims?.[cat], subOpts, ticked);
       subOpts.forEach(opt => {
-        const isSubChecked = !!(document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked);
+        const isSubChecked = effective.has(opt.sub_category);
         const existingEntry = existingSubMap[opt.sub_category];
         const wasSubExtracted = !!(existingEntry && actualGrandchildren.has(existingEntry.filename));
 

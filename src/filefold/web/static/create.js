@@ -131,11 +131,12 @@ function renderSplitConfig(blocks) {
           </label>
         </div>
         ${subOpts.map(opt => `
-          <div class="sub-option-row">
+          <div class="sub-option-row${opt.parent ? " sub-child" : ""}">
             <label>
               <input type="checkbox" id="sub-${cat}-${opt.sub_category}" value="${opt.sub_category}" onchange="toggleSubOption('${cat}','${opt.sub_category}')">
               ${esc(opt.label)}
             </label>
+            <span class="sub-hint" id="subhint-${cat}-${opt.sub_category}"></span>
             <input type="text" id="subfn-${cat}-${opt.sub_category}" value="${opt.default_filename}" placeholder="${opt.default_filename}" disabled style="opacity:.4">
           </div>`).join("")}
       </div>` : "";
@@ -176,11 +177,15 @@ function toggleSplitRow(cat) {
 }
 
 function toggleSubOption(cat, subCat) {
-  const cb = document.getElementById(`sub-${cat}-${subCat}`);
-  const inp = document.getElementById(`subfn-${cat}-${subCat}`);
-  if (!inp) return;
-  inp.disabled = !cb.checked;
-  inp.style.opacity = cb.checked ? "1" : ".4";
+  const options = state.inspectResult?.sub_options?.[cat] ?? [];
+  const followed = followSubTree(options, subCat, key => document.getElementById(`sub-${cat}-${key}`));
+  [subCat, ...followed].forEach(key => {
+    const cb = document.getElementById(`sub-${cat}-${key}`);
+    const inp = document.getElementById(`subfn-${cat}-${key}`);
+    if (!cb || !inp) return;
+    inp.disabled = !cb.checked;
+    inp.style.opacity = cb.checked ? "1" : ".4";
+  });
   _refreshCreateSubs(cat);
   _syncCreateSubMaster(cat);
 }
@@ -190,6 +195,7 @@ function _refreshCreateSubs(cat) {
   refreshSubAvailability(info?.sub_claims?.[cat], info?.sub_options?.[cat] ?? [], {
     box: key => `sub-${cat}-${key}`,
     name: key => `subfn-${cat}-${key}`,
+    hint: key => `subhint-${cat}-${key}`,
   });
 }
 
@@ -263,9 +269,11 @@ async function createWorkspace() {
         const fn = document.getElementById(`fn-${cat}`).value.trim() || `${cat}.inp`;
         const sub_selections = [];
         const subOpts = state.inspectResult?.sub_options?.[cat] ?? [];
+        const ticked = new Set(subOpts.map(o => o.sub_category)
+          .filter(k => document.getElementById(`sub-${cat}-${k}`)?.checked));
+        const effective = effectiveSubKeys(state.inspectResult?.sub_claims?.[cat], subOpts, ticked);
         subOpts.forEach(opt => {
-          const subCb = document.getElementById(`sub-${cat}-${opt.sub_category}`);
-          if (subCb && subCb.checked) {
+          if (effective.has(opt.sub_category)) {
             const subFn = document.getElementById(`subfn-${cat}-${opt.sub_category}`).value.trim()
               || opt.default_filename;
             sub_selections.push({ sub_category: opt.sub_category, filename: subFn });

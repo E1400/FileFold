@@ -453,6 +453,11 @@ body {
 }
 .sub-option-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .sub-option-row input[type="text"] { font-size: var(--fs-micro); padding: 4px 8px; width: 160px; }
+/* A refinement ("Element type: X") sits indented under the option it refines ("Elements"). */
+.sub-option-row.sub-child { padding-left: 22px; }
+.sub-option-row.sub-child::before { content: "\2514"; margin-left: -16px; width: 10px; color: var(--muted); font-family: var(--mono); }
+.sub-hint { font-size: var(--fs-micro); color: var(--muted); font-style: italic; }
+.sub-hint:empty { display: none; }
 .tree-indent { width: 20px; flex-shrink: 0; color: var(--muted); font-family: var(--mono); font-size: var(--fs-sm); text-align: center; }
 .filename-cell { display: flex; align-items: center; }
 input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }

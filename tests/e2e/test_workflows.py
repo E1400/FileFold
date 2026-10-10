@@ -284,9 +284,12 @@ _DECKS = [
 
 
 def _ticked_subs(page: Page, prefix: str) -> list[str]:
-    """ids of sub-split checkboxes that are ticked (the 'all' master boxes excluded)."""
+    """ids of ticked sub-split checkboxes that should make a file: the 'all' master boxes are
+    excluded, and so is a parent ("Elements") whose hint says its refinements took everything."""
     return page.evaluate("""p => [...document.querySelectorAll(`input[type=checkbox][id^='${p}-']`)]
-        .filter(cb => cb.checked && !cb.id.startsWith(p.replace('sub', 'submaster') + '-')).map(cb => cb.id)""", prefix)
+        .filter(cb => cb.checked && !cb.id.startsWith(p.replace('sub', 'submaster') + '-'))
+        .filter(cb => !document.getElementById(cb.id.replace(`${p}-`, `${p.replace('sub', 'subhint')}-`))?.textContent)
+        .map(cb => cb.id)""", prefix)
 
 
 @_pytest.mark.parametrize("deck", _DECKS)
@@ -319,12 +322,14 @@ def _sub_labels(page: Page, cat: str, prefix: str = "sub") -> list[str]:
     return [t.strip() for t in page.locator(f"#{prefix}-opts-{cat} .sub-option-row label").all_text_contents()]
 
 
-def test_mesh_menu_for_job1_offers_four_options_and_no_element_type(app):
+def test_mesh_menu_for_job1_lists_element_type_under_elements(app):
     open_new_workspace(app)
     upload(app, "Job-1.inp")
     app.locator("#sel-mesh").check()
     labels = _sub_labels(app, "mesh")
-    assert labels == ["Nodes (*NODE)", "Elements (*ELEMENT)", "Node Sets (*NSET)", "Element Sets (*ELSET)"], labels
+    assert labels == ["Nodes (*NODE)", "Elements (*ELEMENT)", "Element type: CPS4R",
+                      "Node Sets (*NSET)", "Element Sets (*ELSET)"], labels
+    expect(app.locator(".sub-option-row.sub-child")).to_have_count(1)      # shown indented
 
 
 def test_ticking_an_option_never_unticks_another(app):
@@ -372,3 +377,36 @@ def test_javascript_availability_rule_agrees_with_python(app):
     for claims, ticked in cases:
         js = set(app.evaluate("([c, t]) => [...liveSubKeys(c, new Set(t))]", [claims, sorted(ticked)]))
         assert js == live_keys(claims, ticked), (claims, ticked)
+
+
+def test_javascript_parent_rule_agrees_with_python(app):
+    """Which options the UI lets you tick (refreshSubAvailability) matches subsplits.can_tick,
+    including a refinement and its parent ("Element type: X" under "Elements")."""
+    from filefold.core.subsplits import can_tick, covered_parents, parent_of
+    decks = [
+        [["etype.a", "elements"], ["nodes"]],                                # one element type
+        [["etype.a", "elements"], ["etype.b", "elements"], ["nodes"]],       # two types
+        [["part.x"], ["part.x", "etype.a", "elements"], ["nodes"]],          # elements inside a part
+    ]
+    js_can_tick = """([claims, ticked, key]) => {
+        const options = [...new Set(claims.flat())].map(k => ({sub_category: k, parent: k.startsWith('etype.') ? 'elements' : null}));
+        document.body.insertAdjacentHTML('beforeend', '<div id="parity"></div>');
+        const host = document.getElementById('parity');
+        host.innerHTML = options.map(o => `<input type="checkbox" id="p-${o.sub_category}" ${ticked.includes(o.sub_category) ? 'checked' : ''}>`).join('');
+        refreshSubAvailability(claims, options, {box: k => `p-${k}`});
+        const ok = !document.getElementById(`p-${key}`).disabled;
+        const covered = [...coveredSubParents(claims, new Set(ticked), options)];
+        host.remove();
+        return [ok, covered];
+    }"""
+    for claims in decks:
+        keys = sorted(set(k for c in claims for k in c))
+        for ticked in [set(), {"elements"}, {"etype.a"}, {"etype.a", "elements"}, {"part.x"}, {"nodes"}]:
+            ticked = {k for k in ticked if k in keys}
+            ticked |= {parent_of(k) for k in ticked if parent_of(k) in keys}      # the UI keeps parents ticked
+            for key in keys:
+                if key in ticked:
+                    continue
+                ok, covered = app.evaluate(js_can_tick, [claims, sorted(ticked), key])
+                assert ok == can_tick(claims, ticked, key), (claims, ticked, key)
+                assert set(covered) == covered_parents(claims, ticked), (claims, ticked)
