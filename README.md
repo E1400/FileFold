@@ -21,7 +21,7 @@ Abaqus `.inp` files grow large and hard to manage: mesh, materials, boundary con
 **Core workflow:**
 
 1. Upload a mother `.inp` file, or load one of the three sample decks (`Job-1`, `mmxmn`, `fempy_example`)
-2. Choose which categories to extract (`mesh`, `section`, `material`, `step`, `loads`, `contact`, `constraint`, `initial`, `output`), and optionally split them further: one file per material, step or part; nodes, elements and sets; contact pairs; ties and couplings. Only splits that would produce a file for your deck are offered.
+2. Choose which categories to extract (`mesh`, `section`, `material`, `step`, `loads`, `contact`, `constraint`, `initial`, `output`), and optionally split them further: one file per material, step or part; nodes, elements (optionally one file per element type) and sets; contact pairs; ties and couplings. Only splits that would produce a file for your deck are offered.
 3. FileFold creates a workspace: the mother file with `*INCLUDE` pointers, plus one file per choice
 4. Edit files in the built-in editor, extract more later, re-split, fold files back, rename them
 5. Reimport an updated mother file when the source model changes; conflicts show exactly what changed
