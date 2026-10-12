@@ -13,7 +13,12 @@ Windows:
 """
 
 import sys
+import tomllib
 from pathlib import Path
+
+from PyInstaller.utils.hooks import collect_submodules
+
+VERSION = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
 
 # ---------------------------------------------------------------------------
 # Analysis
@@ -28,44 +33,11 @@ a = Analysis(
         ("src/filefold/web/index.html", "filefold/web"),
         ("src/filefold/web/static", "filefold/web/static"),
     ],
-    hiddenimports=[
-        # uvicorn dynamic imports
-        "uvicorn.logging",
-        "uvicorn.loops",
-        "uvicorn.loops.auto",
-        "uvicorn.loops.asyncio",
-        "uvicorn.protocols",
-        "uvicorn.protocols.http",
-        "uvicorn.protocols.http.auto",
-        "uvicorn.protocols.http.h11_impl",
-        "uvicorn.protocols.websockets",
-        "uvicorn.protocols.websockets.auto",
-        "uvicorn.lifespan",
-        "uvicorn.lifespan.on",
-        "uvicorn.lifespan.off",
-        # fastapi / starlette internals loaded at runtime
-        "fastapi",
-        "fastapi.routing",
-        "fastapi.responses",
-        "starlette.routing",
-        "starlette.responses",
-        "starlette.middleware",
-        "starlette.middleware.base",
-        "starlette.staticfiles",
-        # anyio asyncio backend
-        "anyio",
+    # Every FileFold and uvicorn module, found automatically, so new modules are never missed
+    # (a hand-written list here had silently gone stale).
+    hiddenimports=collect_submodules("filefold") + collect_submodules("uvicorn") + [
         "anyio._backends._asyncio",
-        # multipart (file uploads)
         "multipart",
-        # filefold packages — explicit so nothing is missed
-        "filefold.api.main",
-        "filefold.api.server",
-        "filefold.core.keywords",
-        "filefold.core.block",
-        "filefold.core.parser",
-        "filefold.core.tokenizer",
-        "filefold.core.splitter",
-        "filefold.core.workspace",
     ],
     hookspath=[],
     hooksconfig={},
@@ -79,6 +51,8 @@ a = Analysis(
         "numpy",
         "pandas",
         "IPython",
+        "playwright",
+        "PyInstaller",
     ],
     noarchive=False,
 )
@@ -136,10 +110,11 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleName": "FileFold",
             "CFBundleDisplayName": "FileFold",
-            "CFBundleVersion": "0.1.0",
-            "CFBundleShortVersionString": "0.1.0",
+            "CFBundleVersion": VERSION,
+            "CFBundleShortVersionString": VERSION,
             "CFBundleExecutable": "FileFold",
             "NSHighResolutionCapable": True,
+            "LSMinimumSystemVersion": "12.0",
             "NSRequiresAquaSystemAppearance": False,  # supports dark mode
             # WebEngine needs this on macOS to render properly
             "NSAppTransportSecurity": {"NSAllowsLocalNetworking": True},

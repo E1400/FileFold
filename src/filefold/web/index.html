@@ -28,7 +28,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>
     </button>
     <span class="spacer"></span>
-    <a class="act-btn" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener" title="Download desktop app" aria-label="Download desktop app">
+    <a class="act-btn hide-in-desktop" href="https://github.com/E1400/FileFold/releases" target="_blank" rel="noopener" title="Download desktop app" aria-label="Download desktop app">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
     </a>
     <button class="act-btn" id="theme-btn" type="button" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
@@ -196,7 +196,8 @@
             <h2>Export and command line</h2>
             <p><b>Export ZIP</b> downloads the mother file and every child. Everything the app does is also available as <code>filefold</code> commands (<code>inspect</code>, <code>split-partial</code>, <code>workspace create</code>, <code>extract</code>, <code>resplit</code>, <code>recombine</code>, <code>reimport</code>, <code>export</code>), and workspaces are shared with the app. Your files are kept
               <span data-mode="static">in this browser, on this device; nothing is uploaded anywhere. Decks up to 100 MB are tested here; use the desktop app or command line for larger ones.</span>
-              <span data-mode="server">on the server, in this app's workspace folder.</span></p>
+              <span data-mode="server">on the server, in this app's workspace folder.</span>
+              <span data-mode="desktop">on this computer, in the workspace folder <code>~/.filefold/workspaces</code>, shared with the command line.</span></p>
           </section>
 
           <section id="help-parser">

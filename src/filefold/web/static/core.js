@@ -78,6 +78,12 @@ function toast(msg, type = "ok") {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Theme toggle
 // ═══════════════════════════════════════════════════════════════════════════════
+// Inside the desktop app (it opens "/?desktop=1"): hide web-only things such as the
+// "Download desktop app" button, and describe where files live accordingly.
+if (new URLSearchParams(location.search).get("desktop") === "1") {
+  document.documentElement.dataset.desktop = "1";
+}
+
 // The choice is remembered, and shared with the landing page (same origin, same key).
 const THEME_KEY = "filefold.theme";
 (function applyStoredTheme() {

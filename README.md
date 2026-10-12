@@ -1,6 +1,6 @@
 # FileFold
 
-Workspace manager for Abaqus `.inp` files. Split large FEA models by category, or down to one file per material, step or part. Track edits, detect reimport conflicts, and export clean archives — from your browser, a native desktop app, or the command line.
+An intelligent parser for Abaqus `.inp` files. FileFold reads a model block by block, knows what every keyword is (all 523 in the Abaqus 2016 Keywords Reference, plus newer ones), and splits the model into a small mother file and organised child files joined by `*INCLUDE`. You can split by category, or down to one file per material, step or part. It tracks your edits, flags conflicts when you reimport an updated model, and exports clean archives. Use it in your browser, as a desktop app for Mac and Windows, or from the command line.
 
 ---
 
@@ -10,28 +10,31 @@ Workspace manager for Abaqus `.inp` files. Split large FEA models by category, o
 |---|---|
 | **Web app** (runs in your browser) | https://e1400.github.io/FileFold/app/ |
 | **Landing page** | https://e1400.github.io/FileFold |
-| **Desktop downloads** | https://github.com/E1400/FileFold/releases |
+| **Desktop downloads** | https://github.com/E1400/FileFold/releases/latest |
 
 ---
 
 ## What it does
 
-Abaqus `.inp` files grow large and become difficult to manage — mesh, materials, boundary conditions, and step definitions all living in one file. FileFold splits a mother file into category-specific child files using `*INCLUDE` directives, so Abaqus reads the model identically but engineers can work on each section independently.
+Abaqus `.inp` files grow large and hard to manage: mesh, materials, boundary conditions and steps all in one file. FileFold splits the original (the **mother** file) into child files and puts `*INCLUDE` lines in their place, so Abaqus reads the model exactly as before while you work on each part separately.
 
 **Core workflow:**
 
-1. Upload a mother `.inp` file
-2. Choose which categories to extract (`MESH`, `MATERIAL`, `STEP`, `LOADS`, `CONTACT`, `CONSTRAINT`, `OUTPUT`, etc.), and optionally split them further: one file per material, step or part; nodes, elements and sets; contact pairs; ties and couplings
-3. FileFold produces a workspace: a mother file with `*INCLUDE` pointers + individual child files
-4. Edit child files directly; reimport an updated mother when the source changes
-5. Export the full workspace as a ZIP when ready
+1. Upload a mother `.inp` file, or load one of the three sample decks (`Job-1`, `mmxmn`, `fempy_example`)
+2. Choose which categories to extract (`mesh`, `section`, `material`, `step`, `loads`, `contact`, `constraint`, `initial`, `output`), and optionally split them further: one file per material, step or part; nodes, elements and sets; contact pairs; ties and couplings. Only splits that would produce a file for your deck are offered.
+3. FileFold creates a workspace: the mother file with `*INCLUDE` pointers, plus one file per choice
+4. Edit files in the built-in editor, extract more later, re-split, fold files back, rename them
+5. Reimport an updated mother file when the source model changes; conflicts show exactly what changed
+6. Export the whole workspace as a ZIP
 
 **What makes it reliable:**
 
-- **Byte-exact round-trips** — the reassembled model is character-for-character identical to the original
-- **Container-aware parsing** — `*PART`, `*ASSEMBLY`, `*STEP` blocks are understood as containers; nested blocks follow their parent, never misclassified
-- **SHA-256 change detection** — reimport shows exactly which files changed in the new source, which were manually edited, and which conflict
-- **In-browser editor** — view and edit any workspace file without leaving the UI (Tab indenting, Cmd+S to save, unsaved-changes guard)
+- **Byte-exact round-trips**: the reassembled model is character-for-character identical to the original, line endings included
+- **Container-aware parsing**: `*PART`, `*ASSEMBLY`, `*INSTANCE` and `*STEP` own the blocks inside them; options such as `*ELASTIC` always stay with their `*MATERIAL`
+- **SHA-256 change detection**: reimport knows whether a file changed in the new source, was edited by you, or both
+- **Built-in editor**: find, line-range selection, comment toggling, Cmd/Ctrl+S to save, unsaved-changes guard
+
+New users get a skippable one-minute tour, small (i) reminders, and an Info page that describes every function.
 
 ---
 
@@ -39,20 +42,32 @@ Abaqus `.inp` files grow large and become difficult to manage — mesh, material
 
 ### Online (no install)
 
-Go to **https://e1400.github.io/FileFold/app/** — upload a file and use it directly in the browser.
+Go to **https://e1400.github.io/FileFold/app/**.
 
-This is a static site: FileFold's Python runs inside your browser (via [Pyodide](https://pyodide.org)), so your model **never leaves your machine** and there is no server. Workspaces are stored in the browser (IndexedDB) on that device; use **Export ZIP** to take them elsewhere. First load downloads about 13 MB of runtime, then it is cached.
+This is a static site: FileFold's Python runs inside your browser (via [Pyodide](https://pyodide.org)), so your model **never leaves your machine** and there is no server. Workspaces are stored in the browser (IndexedDB) on that device; use **Export ZIP** to take them elsewhere. The first visit downloads about 13 MB of runtime, which is then cached.
 
-Size: decks up to **100 MB** are tested end to end (about 7 s to inspect, 15 s to create). A 200 MB deck did not finish creating in the browser, so use the desktop app for models that large.
+Size: decks up to **100 MB** are tested end to end (about 7 s to inspect, 15 s to create). A 200 MB deck did not finish creating in the browser, so use the desktop app or the command line for models that large.
 
 ### Desktop app
 
-Download from the [Releases page](https://github.com/E1400/FileFold/releases):
+The same app, running on your computer. It has no size limit beyond your machine's memory and works without an internet connection. Download it from the [latest release](https://github.com/E1400/FileFold/releases/latest):
 
-- **macOS** — `FileFold-macOS.zip` → unzip → open `FileFold.app`. Runs as a menu bar tray app (no terminal needed).
-- **Windows** — `FileFold-Windows.zip` → unzip → run `FileFold.exe`. Same tray-icon experience.
+| Computer | Download | Then |
+|---|---|---|
+| Mac with Apple Silicon (M1 or later) | `FileFold-macOS-AppleSilicon.zip` | unzip, move `FileFold.app` to Applications, open it |
+| Mac with an Intel processor | `FileFold-macOS-Intel.zip` | same as above |
+| Windows 10 or 11 (64-bit) | `FileFold-Windows.zip` | unzip the whole folder, run `FileFold.exe` inside it |
 
-The desktop app runs a local server on a free port and opens the UI in an embedded browser window. Files never leave your machine.
+To see which Mac you have, choose Apple menu > About This Mac: "Chip" means Apple Silicon, "Processor" means Intel. macOS 12 or later is needed.
+
+**First launch.** The app is not yet signed with an Apple or Microsoft developer certificate, so your computer warns you the first time:
+
+- **macOS** says it cannot verify the app. Click **Done**, open **System Settings > Privacy & Security**, scroll down to the message about FileFold and click **Open Anyway**, then confirm. You only do this once.
+- **Windows** shows "Windows protected your PC". Click **More info**, then **Run anyway**.
+
+**Using it.** FileFold opens in its own window and puts an icon in the menu bar (macOS) or the system tray (Windows). Closing the window keeps FileFold running; reopen it from that icon (or the Dock on macOS) and quit from the icon's menu or with Cmd/Ctrl+Q. Exports are saved to your Downloads folder. Workspaces are stored in `~/.filefold/workspaces`, the same folder the command line uses, so a workspace made in one shows up in the other.
+
+The desktop app runs FileFold's server on your computer only (`127.0.0.1`) and shows it in a built-in browser window. Nothing is sent anywhere. It is about 550 MB unzipped, mostly the built-in browser engine.
 
 ### Self-hosted / local development
 
@@ -76,6 +91,8 @@ uv run filefold serve --reload
 ```bash
 uv run filefold serve --host 0.0.0.0 --port 9000
 ```
+
+A `Dockerfile` is included for hosting it on a server; see [docs/RAILWAY.md](docs/RAILWAY.md).
 
 ---
 
@@ -113,7 +130,7 @@ uv run filefold serve
 uv run filefold launch
 ```
 
-`-e CATEGORY[=filename]` extracts a category; `-s CATEGORY:KEY[=filename]` splits it further (list the keys with `inspect --options` or `workspace options`) and implies extracting the category. A workspace argument may also be a folder path, as in earlier versions.
+`-e CATEGORY[=filename]` extracts a category; `-s CATEGORY:KEY[=filename]` splits it further (list the keys with `inspect --options` or `workspace options`) and implies extracting the category. A workspace argument may also be a folder path, as in earlier versions. `filefold launch` starts the desktop app from source (needs `uv sync --extra desktop`).
 
 ---
 
@@ -137,20 +154,23 @@ python scripts/build_pages.py
 python -m http.server --directory site 8080   # then open http://localhost:8080/app/
 ```
 
-**Build the desktop app (requires icons first):**
+**Build and test the desktop app:**
 ```bash
 uv sync --extra desktop
-uv run python build/make_icons.py
-uv run pyinstaller filefold.spec --clean
+uv run python build/make_icons.py            # icon.png / .ico / .icns from the app's logo
+uv run pyinstaller filefold.spec --clean --noconfirm
+dist/FileFold.app/Contents/MacOS/FileFold --smoke-test          # prints SMOKE OK
+FILEFOLD_DESKTOP_APP=dist/FileFold.app/Contents/MacOS/FileFold uv run pytest tests/desktop
 ```
 
-The built app appears at `dist/FileFold.app` (macOS) or `dist/FileFold/` (Windows).
+The built app appears at `dist/FileFold.app` (macOS) or `dist/FileFold/FileFold.exe` (Windows); it is built for the processor of the machine that builds it. `tests/desktop` drives the built app's real window through its remote-debugging port (creating a workspace, exporting it, settings surviving a restart); on a machine without a display set `QT_QPA_PLATFORM=offscreen`. `tests/test_desktop.py` covers the desktop code without building.
 
-**Release a new version** (triggers GitHub Actions to build Mac + Windows bundles):
+**Release a new version.** Pushing a tag builds the Apple Silicon, Intel and Windows apps on GitHub Actions, smoke-tests and end-to-end tests each one, and attaches the three zips to a GitHub release:
 ```bash
 git tag v0.x.x
 git push origin v0.x.x
 ```
+Running the "Build Desktop App" workflow by hand builds and tests without releasing.
 
 ---
 
@@ -158,34 +178,19 @@ git push origin v0.x.x
 
 ```
 src/filefold/
-├── api/
-│   ├── main.py        # FastAPI routes
-│   └── server.py      # Workspace base path, FILEFOLD_WORKSPACE_DIR
-├── cli/
-│   └── main.py        # Typer CLI (inspect, split, serve, launch, workspace)
-├── core/
-│   ├── parser.py      # .inp file parser
-│   ├── tokenizer.py   # Keyword/data line tokenizer
-│   ├── block.py       # Block data model
-│   ├── keywords.py    # Category taxonomy
-│   ├── splitter.py    # Split logic, *INCLUDE generation, SHA-256 tracking
-│   └── workspace.py   # Workspace create/load/reimport
-├── desktop/
-│   └── app.py         # PySide6 app + uvicorn server thread + system tray
-└── web/
-    └── index.html     # Single-page frontend (vanilla JS, no build step)
+├── core/              # the parser: tokenizer, parser, keyword registry, splitter, workspace
+├── service.py         # all application logic, shared by every front end below
+├── api/               # FastAPI server: main.py (app), routes/ (thin wrappers over service)
+├── browser.py         # in-browser dispatcher for the static build (mirrors the API routes)
+├── cli/main.py        # Typer CLI (thin layer over service)
+├── desktop/           # PySide6 desktop app (app.py) and its icon (icon.py)
+└── web/               # index.html + static/ (CSS, JS, sample decks); no build step
 
-docs/
-└── index.html         # Landing page (served via GitHub Pages)
-
-build/
-├── make_icons.py      # Generates icon.icns / icon.ico via PySide6 + iconutil
-└── entitlements.plist # macOS codesign entitlements for WebEngine
-
-tests/
-├── test_api.py        # FastAPI endpoint tests (20 tests)
-├── test_splitter.py   # Core splitter tests (14 tests)
-└── fixtures/          # Sample .inp files for testing
+docs/                  # landing page (GitHub Pages) and RAILWAY.md hosting checklist
+scripts/               # static site build, landing screenshots, sample manifest, Docker smoke test
+build/                 # make_icons.py, macOS entitlements
+filefold.spec          # PyInstaller recipe for the desktop app
+tests/                 # unit + API tests, e2e/ (Playwright), desktop/ (built desktop app)
 ```
 
 ---
@@ -197,3 +202,8 @@ tests/
 | `FILEFOLD_WORKSPACE_DIR` | `~/.filefold/workspaces` | Where workspaces are stored on disk |
 | `PORT` | `8000` | Port for the web server (hosts such as Railway set it automatically) |
 | `FILEFOLD_HOST` | `127.0.0.1` | Bind address for the web server |
+| `FILEFOLD_MAX_UPLOAD_MB` | none | Server: reject uploads above this size |
+| `FILEFOLD_BASIC_AUTH` | none | Server: `user:password` gate for the whole app |
+| `FILEFOLD_DESKTOP_PORT` | `47321` | Desktop: local port (a fixed port keeps the window's settings; `0` = any free port) |
+| `FILEFOLD_DESKTOP_DATA` | `~/.filefold/desktop` | Desktop: the window's browser storage (theme, tour) |
+| `FILEFOLD_DOWNLOAD_DIR` | your Downloads folder | Desktop: where exports are saved |

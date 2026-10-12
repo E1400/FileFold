@@ -4,20 +4,29 @@ on:
   push:
     tags:
       - "v*"          # trigger on version tags: v0.1.0, v1.0.0, etc.
-  workflow_dispatch:  # manual trigger from GitHub UI
+  workflow_dispatch:  # manual trigger from GitHub UI (builds and tests, no release)
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build ${{ matrix.artifact }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            artifact: FileFold-macOS.zip
+          - os: macos-latest          # arm64
+            artifact: FileFold-macOS-AppleSilicon.zip
+            binary: dist/FileFold.app/Contents/MacOS/FileFold
+          - os: macos-15-intel        # x86_64
+            artifact: FileFold-macOS-Intel.zip
+            binary: dist/FileFold.app/Contents/MacOS/FileFold
           - os: windows-latest
             artifact: FileFold-Windows.zip
+            binary: dist/FileFold/FileFold.exe
+
+    env:
+      QT_QPA_PLATFORM: offscreen                 # no display on CI runners
+      QTWEBENGINE_CHROMIUM_FLAGS: --disable-gpu
 
     steps:
       - uses: actions/checkout@v4
@@ -33,28 +42,39 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra desktop
 
-      - name: Generate icons (macOS)
-        if: runner.os == 'macOS'
-        run: uv run python build/make_icons.py
-
-      - name: Generate icons (Windows)
-        if: runner.os == 'Windows'
+      - name: Generate icons
         run: uv run python build/make_icons.py
 
       - name: Build with PyInstaller
-        run: uv run pyinstaller filefold.spec --clean
+        run: uv run pyinstaller filefold.spec --clean --noconfirm
+
+      - name: Smoke test the built app (macOS)
+        if: runner.os == 'macOS'
+        run: ${{ matrix.binary }} --smoke-test
+
+      - name: Smoke test the built app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # windowed exe: no console output, so judge by the exit code
+          $p = Start-Process -FilePath "${{ matrix.binary }}" -ArgumentList "--smoke-test" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "smoke test failed with exit code $($p.ExitCode)" }
+
+      - name: Test the built app end to end
+        shell: bash
+        env:
+          FILEFOLD_DESKTOP_APP: ${{ matrix.binary }}
+        run: uv run pytest tests/desktop -q
 
       - name: Package macOS app
         if: runner.os == 'macOS'
-        run: |
-          cd dist
-          zip -r ../${{ matrix.artifact }} FileFold.app
+        # ditto keeps the framework symlinks and extended attributes that zip -r breaks
+        run: ditto -c -k --keepParent dist/FileFold.app ${{ matrix.artifact }}
 
       - name: Package Windows app
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          Compress-Archive -Path dist\FileFold -DestinationPath ${{ matrix.artifact }}
+        run: Compress-Archive -Path dist\FileFold -DestinationPath ${{ matrix.artifact }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -78,6 +98,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            FileFold-macOS.zip/FileFold-macOS.zip
+            FileFold-macOS-AppleSilicon.zip/FileFold-macOS-AppleSilicon.zip
+            FileFold-macOS-Intel.zip/FileFold-macOS-Intel.zip
             FileFold-Windows.zip/FileFold-Windows.zip
           generate_release_notes: true

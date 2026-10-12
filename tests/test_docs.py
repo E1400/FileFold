@@ -185,3 +185,26 @@ def test_every_category_chip_on_the_landing_page_has_its_colour():
     from filefold.core.keywords import Category
     for cat in Category:
         assert f'[data-cat="{cat.value}"] {{ --c: var(--cat-{cat.value}); }}' in LANDING, f"no chip colour for {cat.value}"
+
+
+# --- desktop downloads: the links must match what the release workflow publishes ---------------
+
+def _released_assets() -> set[str]:
+    workflow = (ROOT / ".github" / "workflows" / "build-desktop.yml").read_text()
+    matrix = set(re.findall(r"artifact:\s*(FileFold-[\w-]+\.zip)", workflow))
+    released = set(re.findall(r"^\s*(FileFold-[\w-]+\.zip)/\1\s*$", workflow, flags=re.M))
+    assert matrix and matrix == released, "every built zip must be attached to the release, and nothing else"
+    return released
+
+
+def test_landing_download_buttons_point_at_assets_the_release_workflow_publishes():
+    links = re.findall(r'href="https://github\.com/E1400/FileFold/releases/latest/download/([^"]+)"', LANDING)
+    assert links and set(links) == _released_assets()
+    assert "Universal" not in LANDING            # the Mac builds are per-architecture
+    assert "Open Anyway" in LANDING and "Run anyway" in LANDING   # unsigned-app first launch
+
+
+def test_readme_names_every_desktop_download_and_the_first_launch_steps():
+    for asset in _released_assets():
+        assert f"`{asset}`" in README, f"README does not mention {asset}"
+    assert "Open Anyway" in README and "Run anyway" in README
