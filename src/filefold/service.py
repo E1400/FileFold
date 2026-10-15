@@ -48,10 +48,23 @@ NON_EXTRACTABLE = {"unknown", "model"}
 
 
 class ServiceError(Exception):
-    def __init__(self, status: int, detail: str):
+    """An error for the caller. `detail` is for logs and the CLI; `code` (and `field`/`value`
+    when it concerns a form input) lets the web UI show its own wording on the right field."""
+
+    def __init__(self, status: int, detail: str, code: str = "error", field: str | None = None,
+                 value: str | None = None):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+        self.code, self.field, self.value = code, field, value
+
+    def payload(self) -> dict:
+        out = {"detail": self.detail, "code": self.code}
+        if self.field:
+            out["field"] = self.field
+        if self.value is not None:
+            out["value"] = self.value
+        return out
 
 
 # ---------------------------------------------------------------------------
@@ -68,12 +81,12 @@ def validate_selection_filenames(sel_data: list[dict]) -> None:
     for s in sel_data:
         fn = safe_segment(s.get("filename", ""), "filename")
         if fn in seen:
-            raise UnsafeName(f"Duplicate filename in selections: {fn!r}")
+            raise UnsafeName(f"Duplicate filename in selections: {fn!r}", "duplicate_filename", "filename", fn)
         seen.add(fn)
         for ss in s.get("sub_selections", []):
             sub_fn = safe_segment(ss.get("filename", ""), "filename")
             if sub_fn in seen:
-                raise UnsafeName(f"Duplicate filename in selections: {sub_fn!r}")
+                raise UnsafeName(f"Duplicate filename in selections: {sub_fn!r}", "duplicate_filename", "filename", sub_fn)
             seen.add(sub_fn)
 
 
@@ -82,7 +95,7 @@ def parse_category(value: str) -> Category:
     try:
         return Category(value)
     except ValueError:
-        raise ServiceError(400, f"Unknown category: {value!r}")
+        raise ServiceError(400, f"Unknown category: {value!r}", "unknown_category")
 
 
 def reject_non_extractable(sel_data: list[dict]) -> None:
@@ -92,6 +105,7 @@ def reject_non_extractable(sel_data: list[dict]) -> None:
             400,
             f"Category '{blocked[0]}' cannot be extracted into its own file. "
             f"It owns the *INCLUDE directives that hold the workspace together.",
+            "not_extractable",
         )
 
 
@@ -115,7 +129,7 @@ def _load(name: str) -> tuple[Path, Workspace]:
     try:
         return ws_dir, Workspace.load(ws_dir)
     except FileNotFoundError:
-        raise ServiceError(404, f"Workspace '{name}' not found")
+        raise ServiceError(404, f"Workspace '{name}' not found", "workspace_not_found")
 
 
 def safe_upload_name(filename: str) -> str:
@@ -275,7 +289,7 @@ def create_workspace(name: str, filename: str, data: bytes | Path, sel_data: lis
     ws_name = safe_segment(name.strip() or Path(filename or "model").stem, "workspace name")
     ws_dir = workspace_path(ws_name)
     if ws_dir.exists():
-        raise ServiceError(400, f"Workspace '{ws_name}' already exists")
+        raise ServiceError(400, f"Workspace '{ws_name}' already exists", "workspace_exists", "name", ws_name)
 
     reject_non_extractable(sel_data)
     validate_selection_filenames(sel_data)
@@ -405,13 +419,13 @@ def _blocks_with_subfiles_folded_back(ws_dir: Path, sel: SplitSelection):
 def rename_workspace(name: str, new_name: str) -> dict:
     new_name = (new_name or "").strip()
     if not new_name:
-        raise ServiceError(400, "name is required")
+        raise ServiceError(400, "name is required", "required", "name")
     old_dir = workspace_path(name)
     new_dir = workspace_path(new_name)
     if not old_dir.exists():
-        raise ServiceError(404, f"Workspace '{name}' not found")
+        raise ServiceError(404, f"Workspace '{name}' not found", "workspace_not_found")
     if new_dir.exists():
-        raise ServiceError(400, f"Workspace '{new_name}' already exists")
+        raise ServiceError(400, f"Workspace '{new_name}' already exists", "workspace_exists", "name", new_name)
     ws = Workspace.load(old_dir)
     ws.name = new_name
     ws._save()
@@ -422,7 +436,7 @@ def rename_workspace(name: str, new_name: str) -> dict:
 def delete_workspace(name: str) -> dict:
     ws_dir = workspace_path(name)
     if not ws_dir.exists():
-        raise ServiceError(404, f"Workspace '{name}' not found")
+        raise ServiceError(404, f"Workspace '{name}' not found", "workspace_not_found")
     shutil.rmtree(ws_dir)
     return {"deleted": name}
 
@@ -434,12 +448,12 @@ def delete_workspace(name: str) -> dict:
 def extract_splits(name: str, sel_data: list[dict]) -> dict:
     """Extract new splits from the existing mother file without re-uploading it."""
     if not sel_data:
-        raise ServiceError(400, "selections is required")
+        raise ServiceError(400, "selections is required", "required")
     reject_non_extractable(sel_data)
     ws_dir, ws = _load(name)
     mother_path = ws_dir / ws.source_name
     if not mother_path.exists():
-        raise ServiceError(404, f"Mother file '{ws.source_name}' not found")
+        raise ServiceError(404, f"Mother file '{ws.source_name}' not found", "mother_missing")
     validate_selection_filenames(sel_data)
     new_sels = selections_from_payload(sel_data)
     blocks = parse(mother_path)
@@ -458,7 +472,7 @@ def resplit_child(name: str, category_str: str, sub_sel_data: list[dict]) -> dic
     """Modify sub-splits for an already-extracted category (recombine then re-extract)."""
     category_str = (category_str or "").strip()
     if not category_str:
-        raise ServiceError(400, "category is required")
+        raise ServiceError(400, "category is required", "required")
     _, ws = _load(name)
     # A sub-split writes straight to its filename. Without this check, naming a
     # sub-split after an existing child ("material.inp") silently overwrites that
@@ -470,9 +484,10 @@ def resplit_child(name: str, category_str: str, sub_sel_data: list[dict]) -> dic
     for ss in sub_sel_data:
         fn = safe_segment(ss.get("filename", ""), "filename")
         if fn in reserved:
-            raise ServiceError(400, f"'{fn}' is already used by another file in this workspace")
+            raise ServiceError(400, f"'{fn}' is already used by another file in this workspace",
+                               "filename_taken", "filename", fn)
         if fn in seen:
-            raise ServiceError(400, f"Duplicate sub-split filename: '{fn}'")
+            raise ServiceError(400, f"Duplicate sub-split filename: '{fn}'", "duplicate_filename", "filename", fn)
         seen.add(fn)
 
     new_sub = [SubSplitSelection(ss["sub_category"], ss["filename"]) for ss in sub_sel_data]
@@ -489,7 +504,10 @@ def rename_file(name: str, old_filename: str, new_filename: str) -> dict:
     new_filename = safe_segment(new_filename, "new_filename")
     if old_filename == new_filename:
         return {"renamed": old_filename, "workspace": name}
-    _, ws = _load(name)
+    ws_dir, ws = _load(name)
+    if (ws_dir / new_filename).exists():
+        raise ServiceError(400, f"Target filename '{new_filename}' already exists",
+                           "filename_taken", "filename", new_filename)
     try:
         ws.rename_child(old_filename, new_filename)
     except (ValueError, FileNotFoundError) as e:
@@ -500,7 +518,7 @@ def rename_file(name: str, old_filename: str, new_filename: str) -> dict:
 def recombine(name: str, filenames: list[str]) -> dict:
     """Fold listed child/sub-child files back into their parent (reverse of split)."""
     if not filenames:
-        raise ServiceError(400, "filenames is required")
+        raise ServiceError(400, "filenames is required", "required")
     filenames = [safe_segment(f, "filename") for f in filenames]
     _, ws = _load(name)
 
@@ -511,7 +529,7 @@ def recombine(name: str, filenames: list[str]) -> dict:
     }
     unknown = [f for f in filenames if f not in known]
     if unknown:
-        raise ServiceError(400, f"Not an extracted file in this workspace: {unknown[0]!r}")
+        raise ServiceError(400, f"Not an extracted file in this workspace: {unknown[0]!r}", "not_extracted")
     try:
         ws.recombine(filenames)
     except (ValueError, FileNotFoundError) as e:
@@ -571,7 +589,7 @@ def export_zip(name: str) -> bytes:
     """All workspace files as a zip (hidden manifest files excluded)."""
     ws_dir = workspace_path(name)
     if not ws_dir.exists():
-        raise ServiceError(404, f"Workspace '{name}' not found")
+        raise ServiceError(404, f"Workspace '{name}' not found", "workspace_not_found")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in ws_dir.iterdir():
@@ -584,7 +602,7 @@ def file_path(name: str, filename: str) -> Path:
     """Validated path of an existing workspace file (lets the server stream it from disk)."""
     fpath = child_path(workspace_path(name), filename)
     if not fpath.exists():
-        raise ServiceError(404, f"File '{filename}' not found in workspace '{name}'")
+        raise ServiceError(404, f"File '{filename}' not found in workspace '{name}'", "file_not_found")
     return fpath
 
 
@@ -597,7 +615,7 @@ def write_file(name: str, filename: str, body: bytes) -> dict:
     """Overwrite a workspace file with edited content."""
     fpath = child_path(workspace_path(name), filename)
     if not fpath.exists():
-        raise ServiceError(404, f"File '{filename}' not found in workspace '{name}'")
+        raise ServiceError(404, f"File '{filename}' not found in workspace '{name}'", "file_not_found")
     content = body.decode("utf-8", errors="surrogateescape")
     # newline="" so the editor round-trips a CRLF deck byte-for-byte instead of
     # rewriting its line endings on every save.

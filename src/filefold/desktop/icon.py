@@ -13,7 +13,7 @@ from pathlib import Path
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPixmap, QPolygonF
 
-GROUND = QColor("#E8E9E5")   # the app's surface colour
+GROUND = QColor("#E8E9E5")   # the app's surface color
 RULE = QColor("#212523")     # ink
 DOC = QColor("#1A2438")      # the logo's document
 FOLD = QColor("#58A6FF")     # the logo's folded corner

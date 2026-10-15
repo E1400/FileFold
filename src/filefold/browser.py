@@ -113,9 +113,9 @@ def handle(
         try:
             result = handler(req)
         except ServiceError as e:
-            return as_json(e.status, {"detail": e.detail})
+            return as_json(e.status, e.payload())
         except UnsafeName as e:
-            return as_json(400, {"detail": str(e)})
+            return as_json(400, e.payload())
         except (json.JSONDecodeError, KeyError) as e:
             return as_json(400, {"detail": f"Bad request: {e}"})
         if isinstance(result, Raw):

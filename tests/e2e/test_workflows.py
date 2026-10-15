@@ -60,7 +60,7 @@ def test_failed_save_is_reported_not_claimed_as_saved(app):
     app.locator("#editor-ta").click()
     app.keyboard.type("x")
     app.locator("#editor-save-btn").click()
-    expect(app.locator(".toast", has_text="Save failed")).to_be_visible()
+    expect(app.locator(".toast.error", has_text="Couldn't save mesh.inp")).to_be_visible()
     expect(app.locator(".toast", has_text="Saved mesh.inp")).to_have_count(0)
     app.expected_errors.clear()  # the injected 500 is the point of this test
 
@@ -246,7 +246,7 @@ def test_failed_save_from_dialog_keeps_the_editor_open(app):
     app.keyboard.type("x")
     _go_back(app)
     app.get_by_role("button", name="Save and close").click()
-    expect(app.locator(".toast", has_text="Save failed")).to_be_visible()
+    expect(app.locator(".toast.error", has_text="Couldn't save mesh.inp")).to_be_visible()
     expect(app.locator("#view-editor")).to_be_visible()  # edits must not be lost
     app.expected_errors.clear()
 

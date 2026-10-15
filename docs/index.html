@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FileFold: an intelligent parser for Abaqus .inp files</title>
-<meta name="description" content="An intelligent parser for Abaqus .inp files. It reads every keyword block, then splits the model into a small mother file and organised child files, tracks your edits, and reimports updated models without losing your work. Runs in your browser; your model never leaves your machine.">
+<meta name="description" content="An intelligent parser for Abaqus .inp files. It reads every keyword block, then splits the model into a small mother file and organized child files, tracks your edits, and reimports updated models without losing your work. Runs in your browser; your model never leaves your machine.">
 <meta name="theme-color" content="#D9DBD7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1B1A18" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 24'%3E%3Cpath d='M0,0 L13,0 L20,7 L20,24 L0,24 Z' fill='%231A2438'/%3E%3Cpath d='M13,0 L20,7 L13,7 Z' fill='%2358A6FF'/%3E%3C/svg%3E">
 <script>try{var t=localStorage.getItem('filefold.theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
 /* Same design system as the app: ink on grey, structure from rules, category pigments as the
-   only colour, two weights, system fonts. The tokens below are copied from the app's
+   only color, two weights, system fonts. The tokens below are copied from the app's
    stylesheet and tests/test_docs.py fails if they ever differ. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -326,9 +326,9 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
   </div>
 
   <section class="sec" id="how" aria-labelledby="how-h">
-    <div class="sec-head"><span class="label">01</span><h2 id="how-h">How it works</h2><span class="sec-sub">One file in. An organised workspace out.</span></div>
+    <div class="sec-head"><span class="label">01</span><h2 id="how-h">How it works</h2><span class="sec-sub">One file in. An organized workspace out.</span></div>
     <div class="steps">
-      <div class="step"><span class="no">1</span><h3>Upload the mother file</h3><p>Drop your <span class="mono">.inp</span>. FileFold reads every keyword block and recognises every keyword in the Abaqus reference. Options always stay with their parent.</p></div>
+      <div class="step"><span class="no">1</span><h3>Upload the mother file</h3><p>Drop your <span class="mono">.inp</span>. FileFold reads every keyword block and recognizes every keyword in the Abaqus reference. Options always stay with their parent.</p></div>
       <div class="step"><span class="no">2</span><h3>Choose what to extract</h3><p>Pick categories, or go finer: one file per material, step or part. You only see options that will actually make a file.</p>
         <div class="chip-row"><span class="chip" data-cat="mesh">mesh</span><span class="chip" data-cat="material">material</span><span class="chip" data-cat="step">step</span><span class="chip" data-cat="contact">contact</span><span class="chip" data-cat="constraint">constraint</span></div></div>
       <div class="step"><span class="no">3</span><h3>Get a workspace</h3><p>Each choice becomes its own file. The mother file gets <span class="mono">*INCLUDE</span> lines in their place, so Abaqus reads it identically.</p></div>
@@ -377,7 +377,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
 
     <div class="sec-block" id="support-categories">
       <h3 class="label">Keywords and categories</h3>
-      <p>FileFold recognises <strong data-keyword-count="523">523</strong> keywords, every one in the Abaqus 2016 Keywords Reference, plus about 60 newer ones named in the 2026 release notes. Each belongs to one of eleven categories, and nine of them can be extracted.</p>
+      <p>FileFold recognizes <strong data-keyword-count="523">523</strong> keywords, every one in the Abaqus 2016 Keywords Reference, plus about 60 newer ones named in the 2026 release notes. Each belongs to one of eleven categories, and nine of them can be extracted.</p>
       <dl class="spec">
       <div><dt><span class="chip" data-cat="mesh">mesh</span></dt><dd><code>*NODE</code>, <code>*ELEMENT</code>, <code>*NSET</code>, <code>*ELSET</code>, <code>*SURFACE</code> and <code>*PART</code> blocks, with their generators.</dd></div>
       <div><dt><span class="chip" data-cat="section">section</span></dt><dd><code>*SOLID SECTION</code>, <code>*SHELL SECTION</code>, <code>*BEAM SECTION</code>, <code>*ORIENTATION</code>, <code>*CONNECTOR SECTION</code>.</dd></div>
@@ -389,7 +389,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       <div><dt><span class="chip" data-cat="initial">initial</span></dt><dd>The starting state: <code>*INITIAL CONDITIONS</code>.</dd></div>
       <div><dt><span class="chip" data-cat="output">output</span></dt><dd><code>*OUTPUT</code>, <code>*NODE OUTPUT</code>, <code>*ELEMENT OUTPUT</code>, <code>*RESTART</code>, <code>*NODE PRINT</code> and the other output requests.</dd></div>
       <div><dt><span class="chip" data-cat="model">model</span></dt><dd>Model set-up: <code>*HEADING</code>, <code>*PREPRINT</code>, <code>*INCLUDE</code>, <code>*ASSEMBLY</code>, <code>*INSTANCE</code>. Stays in the mother file.</dd></div>
-      <div><dt><span class="chip" data-cat="unknown">unknown</span></dt><dd>Keywords FileFold does not recognise. They stay with the keyword above them and are never separated from it.</dd></div>
+      <div><dt><span class="chip" data-cat="unknown">unknown</span></dt><dd>Keywords FileFold does not recognize. They stay with the keyword above them and are never separated from it.</dd></div>
       </dl>
     </div>
 
@@ -424,7 +424,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       <h3 class="label">What you can do with a workspace</h3>
       
       <dl class="spec">
-      <div><dt>Create</dt><dd>Upload or load a sample, tick categories and finer splits, name it. Nothing happens until you press Create workspace.</dd></div>
+      <div><dt>Create</dt><dd>Upload a file or load a sample, tick categories and finer splits, name it, and press Create workspace.</dd></div>
       <div><dt>Extract and split</dt><dd>Extract more categories later, split a category further, or change which finer splits exist, from the Splits tab.</dd></div>
       <div><dt>Fold back and rename</dt><dd>Fold any file back into its parent, rename files (the <code>*INCLUDE</code> lines follow), rename or delete whole workspaces.</dd></div>
       <div><dt>Edit</dt><dd>Edit any file in the built-in editor: find, line-range selection, comment toggling, save and discard. Changed files are marked <em>edited</em>.</dd></div>
@@ -452,7 +452,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       
       <dl class="spec">
       <div><dt>Other formats</dt><dd>Only Abaqus <code>.inp</code> text files. No <code>.odb</code>, <code>.cae</code> or <code>.sim</code>.</dd></div>
-      <div><dt>Running analyses</dt><dd>FileFold organises input files. It does not run Abaqus or check that a model will solve.</dd></div>
+      <div><dt>Running analyses</dt><dd>FileFold organizes input files. It does not run Abaqus or check that a model will solve.</dd></div>
       <div><dt>Existing includes</dt><dd>Files that your own <code>*INCLUDE</code> lines point to are not opened or split.</dd></div>
       <div><dt>Inside a step</dt><dd>A step moves as one unit; there is no finer split within it.</dd></div>
       <div><dt>Accounts and sharing</dt><dd>No sign-in and no shared team workspaces yet.</dd></div>

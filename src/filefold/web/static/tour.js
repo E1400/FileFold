@@ -4,7 +4,8 @@
 // Offered (never forced) to new visitors on the New Workspace screen, like the floating
 // prompt in a spreadsheet app. Every step can be skipped or stepped back, Esc ends it, and
 // the page stays fully usable underneath: the dimming is purely visual. The tour never
-// loads a file on its own; where a step needs one it offers a button.
+// loads a file on its own: the steps that need one wait (pointing at Sample data) until
+// the person loads a sample from the card or drops in their own file.
 
 const TOUR_KEY = "filefold.tour";   // "done" | "dismissed"; absent for a first-time visitor
 
@@ -13,11 +14,11 @@ function _setTourPref(v) { try { localStorage.setItem(TOUR_KEY, v); } catch { /*
 
 const TOUR_STEPS = [
   { title: "Start with a model", target: () => document.getElementById("upload-zone"), side: "right",
-    text: "Drop a .inp file here or click to browse. Nothing changes until you create the workspace." },
+    text: "Drop a .inp file here or click to browse." },
   { title: "No file handy?", target: () => document.getElementById("sample-btn"), side: "bottom",
-    text: "Sample data has three real decks to try. Nothing loads until you choose one." },
+    text: "Sample data has three real decks to try." },
   { title: "See what's inside", needsFile: true, target: () => document.getElementById("inspector-section"), side: "right",
-    text: "Every keyword block in the file, coloured by category." },
+    text: "Every keyword block in the file, colored by category." },
   { title: "Choose what to extract", needsFile: true, target: () => document.getElementById("split-config-section"), side: "left",
     text: "Tick a category to give it its own file. Model set-up always stays in the mother file." },
   { title: "Go deeper if you like", needsFile: true,
@@ -72,7 +73,7 @@ function startTour() {
   document.addEventListener("keydown", _tourKey, true);
   window.addEventListener("resize", _tourRender);
   document.addEventListener("scroll", _tourRender, true);
-  document.addEventListener("filefold:upload-ready", _tourRender);
+  document.addEventListener("filefold:upload-ready", _tourUploadReady);
   _tourRender(true);
 }
 
@@ -86,13 +87,22 @@ function endTour(persist) {
   document.removeEventListener("keydown", _tourKey, true);
   window.removeEventListener("resize", _tourRender);
   document.removeEventListener("scroll", _tourRender, true);
-  document.removeEventListener("filefold:upload-ready", _tourRender);
+  document.removeEventListener("filefold:upload-ready", _tourUploadReady);
   if (persist) _setTourPref(persist);
+}
+
+// A deck finished loading: a waiting step can now show its real target, so move there.
+function _tourUploadReady() { _tourRender(true); }
+
+function _tourWaiting() {
+  const step = TOUR_STEPS[_tour.i];
+  return !!step?.needsFile && !_hasFile();
 }
 
 function _tourGo(delta) {
   const next = _tour.i + delta;
   if (next < 0) return;
+  if (delta > 0 && _tourWaiting()) return;      // nothing to show on the next steps yet
   if (next >= TOUR_STEPS.length) { endTour("done"); return; }
   _tour.i = next;
   _tourRender(true);
@@ -118,32 +128,33 @@ function _tourRender(focusNext = false) {
   if (!_tour.active) return;
   const step = TOUR_STEPS[_tour.i];
   const last = _tour.i === TOUR_STEPS.length - 1;
-  const waitingForFile = step.needsFile && !_hasFile();
-  const target = waitingForFile ? null : step.target();
+  const waitingForFile = _tourWaiting();
+  // While waiting for data, point at where data comes from.
+  const target = waitingForFile ? document.getElementById("sample-btn") : step.target();
   const visible = target && target.getClientRects().length > 0;
 
   _tour.card.innerHTML = `
     <span class="tour-arrow" data-side="none"></span>
     <h3>${esc(step.title)}</h3>
-    <p>${waitingForFile ? "Add a file to see this step. Drop your own, or:" : esc(step.text)}</p>
-    ${waitingForFile ? `<button type="button" class="btn btn-ghost btn-sm tour-sample" data-act="sample">Load the Job-1 sample</button>` : ""}
+    <p>${waitingForFile ? "Load sample data to continue the tour, or drop in your own .inp file." : esc(step.text)}</p>
+    ${waitingForFile ? `<button type="button" class="btn btn-primary btn-sm tour-sample" data-act="sample">Load sample data</button>` : ""}
     <div class="tour-foot">
       <span class="tour-progress">${_tour.i + 1} of ${TOUR_STEPS.length}</span>
       <span class="spacer"></span>
       <button type="button" class="btn btn-ghost btn-sm" data-act="skip">Skip tour</button>
       <button type="button" class="btn btn-ghost btn-sm" data-act="back" ${_tour.i === 0 ? "disabled" : ""}>Back</button>
-      <button type="button" class="btn btn-primary btn-sm" data-act="next">${last ? "Done" : "Next"}</button>
+      <button type="button" class="btn ${waitingForFile ? "btn-ghost" : "btn-primary"} btn-sm" data-act="next" ${waitingForFile ? "disabled" : ""}>${last ? "Done" : "Next"}</button>
     </div>`;
 
-  if (!visible) {                       // no target to point at: centre the card, no spotlight
+  if (!visible) {                       // no target to point at: center the card, no spotlight
     _tour.spot.style.display = "none";
     _tour.card.querySelector(".tour-arrow").remove();
     Object.assign(_tour.card.style, { left: "50%", top: "50%", transform: "translate(-50%, -50%)" });
   } else {
     if (focusNext === true) target.scrollIntoView({ block: "center", inline: "nearest" });
-    _tourPlace(target, step.side);
+    _tourPlace(target, waitingForFile ? "bottom" : step.side);
   }
-  if (focusNext === true) _tour.card.querySelector("[data-act=next]")?.focus({ preventScroll: true });
+  if (focusNext === true) _tour.card.querySelector(waitingForFile ? "[data-act=sample]" : "[data-act=next]")?.focus({ preventScroll: true });
 }
 
 function _tourPlace(target, preferred) {
@@ -177,7 +188,7 @@ function _tourPlace(target, preferred) {
   top = clampY(top);
   card.style.left = `${left}px`;
   card.style.top = `${top}px`;
-  // the arrow points from the card edge facing the target, toward the target's centre
+  // the arrow points from the card edge facing the target, toward the target's center
   const arrow = card.querySelector(".tour-arrow");
   arrow.dataset.side = { bottom: "top", top: "bottom", right: "left", left: "right" }[side];
   if (side === "bottom" || side === "top") {

@@ -239,7 +239,7 @@ def test_tour_walks_through_creating_a_workspace_with_arrows(app):
     expect(card).to_contain_text("3 of 6")
     # no file yet: the step offers to load one, but only when the user asks
     expect(app.locator("#inspector-section")).to_be_hidden()
-    card.get_by_role("button", name="Load the Job-1 sample").click()
+    card.get_by_role("button", name="Load sample data").click()
     expect(app.locator("#inspector-section")).to_be_visible(timeout=60_000)
     spotlight_settles_on(app, "#inspector-section")
 
@@ -255,6 +255,29 @@ def test_tour_walks_through_creating_a_workspace_with_arrows(app):
     app.locator("#sel-mesh").check()                              # the page is fully usable afterwards
     create(app)
     assert "mesh.inp" in detail_filenames(app)
+
+
+def test_tour_waits_for_data_before_the_steps_that_need_it(app):
+    """Steps 3-6 point at things that only exist once a deck is loaded. Without one they used to
+    cycle as a centred card that highlighted nothing; now the tour asks for data and waits."""
+    start_tour(app)
+    card = app.locator("#tour-card")
+    expect(card).not_to_contain_text("Nothing")                   # no redundant reassurances
+    app.keyboard.press("ArrowRight")
+    expect(card).to_contain_text("2 of 6")
+    expect(card).not_to_contain_text("Nothing")
+    app.keyboard.press("ArrowRight")
+    expect(card).to_contain_text("3 of 6")
+    expect(card).to_contain_text("Load sample data to continue the tour")
+    expect(card.get_by_role("button", name="Next")).to_be_disabled()
+    spotlight_settles_on(app, "#sample-btn")                      # points at where data comes from
+    app.keyboard.press("ArrowRight")
+    expect(card).to_contain_text("3 of 6")                        # the arrow key waits too
+    card.get_by_role("button", name="Load sample data").click()
+    expect(app.locator("#inspector-section")).to_be_visible(timeout=60_000)
+    expect(card.get_by_role("button", name="Next")).to_be_enabled()
+    expect(card).to_contain_text("Every keyword block")
+    spotlight_settles_on(app, "#inspector-section")
 
 
 def test_every_tour_step_can_be_skipped_or_stepped_back(app):
@@ -303,7 +326,7 @@ def test_tour_follows_a_file_the_user_uploads_themselves(app):
     card.get_by_role("button", name="Next").click()
     card.get_by_role("button", name="Next").click()
     expect(card).to_contain_text("3 of 6")
-    expect(card.get_by_role("button", name="Load the Job-1 sample")).to_have_count(0)   # already have a file
+    expect(card.get_by_role("button", name="Load sample data")).to_have_count(0)   # already have a file
     spotlight_settles_on(app, "#inspector-section")
 
 
@@ -339,6 +362,14 @@ def test_info_tab_describes_every_function(app):
     for options in CATEGORY_SUB_OPTIONS.values():
         for opt in options:
             assert opt["label"].split(" (")[0].lower() in text, opt["label"]
+
+
+def test_info_tab_wording_is_plain(app):
+    open_info(app)
+    text = app.locator("#view-help").inner_text()
+    assert "Nothing is created" not in text                        # redundant reassurance, removed
+    assert "Windows and Unix line endings" not in text             # jargon, explained instead
+    assert "overlap" in text and "greyed out" in text              # the overlap rule is explained
 
 
 def test_info_tab_table_of_contents_jumps_to_sections(app):

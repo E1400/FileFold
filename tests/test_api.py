@@ -310,3 +310,34 @@ def test_index_has_no_inline_script_or_style(client):
     html = client.get("/").text
     assert "<style" not in html
     assert not re.search(r"<script(?![^>]*src=)", html)
+
+
+# ---------------------------------------------------------------------------
+# Errors carry a code (and the form field) so the UI can word them itself
+# ---------------------------------------------------------------------------
+
+def test_errors_name_their_code_and_field(client):
+    job1 = FIXTURES / "Job-1.inp"
+    assert _upload(client, job1, "/api/workspaces", {"name": "a"}).status_code == 200
+    assert _upload(client, job1, "/api/workspaces", {"name": "b"}).status_code == 200
+
+    r = _upload(client, job1, "/api/workspaces", {"name": "a"})
+    assert r.status_code == 400
+    assert r.json() | {"detail": None} == {"detail": None, "code": "workspace_exists", "field": "name", "value": "a"}
+
+    r = _upload(client, job1, "/api/workspaces", {"name": "../evil"})
+    assert (r.json()["code"], r.json()["field"]) == ("invalid_name", "name")
+
+    r = client.patch("/api/workspaces/a", json={"name": "b"})
+    assert (r.status_code, r.json()["code"], r.json()["value"]) == (400, "workspace_exists", "b")
+
+    r = client.get("/api/workspaces/nope")
+    assert (r.status_code, r.json()["code"]) == (404, "workspace_not_found")
+
+    client.post("/api/workspaces/a/extract", json={"selections": [{"category": "mesh", "filename": "mesh.inp", "sub_selections": []},
+                                                                  {"category": "material", "filename": "material.inp", "sub_selections": []}]})
+    r = client.post("/api/workspaces/a/rename-file", json={"old_filename": "mesh.inp", "new_filename": "material.inp"})
+    assert (r.status_code, r.json()["code"], r.json()["field"], r.json()["value"]) == (400, "filename_taken", "filename", "material.inp")
+    r = client.post("/api/workspaces/a/resplit-child", json={"category": "mesh", "sub_selections": [
+        {"sub_category": "nodes", "filename": "material.inp"}]})
+    assert (r.json()["code"], r.json()["value"]) == ("filename_taken", "material.inp")

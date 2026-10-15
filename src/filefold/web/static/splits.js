@@ -238,8 +238,27 @@ async function applyEditSplits() {
   // The plan is built from wsData but posted against activeWs. Refuse to act if the
   // two ever disagree rather than applying one workspace's changes to another.
   if (data.name !== state.activeWs) {
-    toast("Workspace changed while editing — reopen it and try again", "warn");
+    toast("The workspace changed while you were editing. Reopen it and try again.", "warn");
     return;
+  }
+  const grid = document.getElementById("ws-split-config");
+  clearFieldErrors(grid);
+  // Every file that will exist needs a valid name of its own (checked like a form).
+  const fileInputs = [...grid.querySelectorAll("input[type=text][id^='ws-fn-'], input[type=text][id^='ws-subfn-']")]
+    .filter(inp => !inp.disabled && !(parseFloat(inp.style.opacity) < 1))
+    .map(inp => ({ input: inp, fn: inp.value.trim() || inp.placeholder }));
+  const used = new Map([[data.source_name, null]]);
+  for (const { fn, input } of fileInputs) {
+    const problem = filenameProblem(fn)
+      || (used.has(fn) ? (used.get(fn) ? errorText({ code: "duplicate_filename", value: fn })
+                                        : `The mother file is already called "${fn}". Choose a different name.`) : null);
+    if (problem) {
+      // A clash concerns two fields: mark the one the person changed, if either.
+      const other = used.get(fn);
+      showFieldError(other && other.value !== other.defaultValue && input.value === input.defaultValue ? other : input, problem);
+      return;
+    }
+    used.set(fn, input);
   }
 
   const existingByCategory = {};
@@ -331,6 +350,7 @@ async function applyEditSplits() {
     return;
   }
 
+  let failed = null;
   const btn = document.getElementById("ws-splits-apply-btn");
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span> Applying…`;
@@ -352,7 +372,7 @@ async function applyEditSplits() {
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/rename-file`, r);
     toast(parts.join(", "), "ok");
   } catch (e) {
-    toast("Failed: " + e.message, "error");
+    failed = e;
   } finally {
     // Always refresh from server so the UI reflects actual workspace state, even after a
     // partial failure (e.g. recombine succeeded but resplit failed mid-way).
@@ -364,5 +384,11 @@ async function applyEditSplits() {
     } catch (_) {}
     btn.disabled = false;
     btn.textContent = "Apply changes";
+  }
+  // After the re-render, so a field error lands on the input that is now on screen.
+  if (failed) {
+    const findInput = value => [...document.querySelectorAll("#ws-split-config input[type=text]")]
+      .find(inp => (inp.value.trim() || inp.placeholder) === value);
+    if (!showApiErrorOnField(failed, { filename: findInput })) toastError("Couldn't apply the changes", failed);
   }
 }

@@ -9,7 +9,7 @@ function startReimp() {
 
 // Markup for the idle re-import drop zone. handleReimpUpload overwrites the zone
 // with a spinner, so it has to be restored here — otherwise re-opening the view
-// shows the previous run's "Analysing <other-file>…" spinner, which looks like a
+// shows the previous run's "Analyzing <other-file>…" spinner, which looks like a
 // hang but is just stale DOM with no request behind it.
 const _REIMP_DROP_IDLE = `
   <div class="icon">📂</div>
@@ -22,14 +22,19 @@ function resetReimp() {
   document.getElementById("reimp-preview-section").style.display = "none";
   document.getElementById("reimp-input").value = "";
   const zone = document.getElementById("reimp-drop");
-  if (zone) zone.innerHTML = _REIMP_DROP_IDLE;
+  if (zone) { clearFieldError(zone); zone.innerHTML = _REIMP_DROP_IDLE; }
 }
 
 async function handleReimpUpload(file) {
   if (!file) return;
-  state.reimp.file = file;
   const zone = document.getElementById("reimp-drop");
-  zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Analysing ${esc(file.name)}…</p>`;
+  clearFieldError(zone);
+  if (!/\.inp$/i.test(file.name)) {
+    showFieldError(zone, `FileFold reads Abaqus input files (.inp), and "${file.name}" isn't one. Choose a .inp file.`);
+    return;
+  }
+  state.reimp.file = file;
+  zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Analyzing ${esc(file.name)}…</p>`;
 
   try {
     const fd = new FormData();
@@ -46,8 +51,9 @@ async function handleReimpUpload(file) {
     document.getElementById("reimp-upload-section").style.display = "none";
     document.getElementById("reimp-preview-section").style.display = "";
   } catch (e) {
-    zone.innerHTML = `<div class="icon">⚠</div><p>${esc(e.message)}</p>`;
-    toast("Preview failed: " + e.message, "error");
+    zone.innerHTML = `<div class="icon">⚠</div><p>Couldn't read ${esc(file.name)}</p>`;
+    showFieldError(zone, plainError(e));
+    if (!(e instanceof ApiError)) console.error(e);
   }
 }
 
@@ -197,7 +203,7 @@ async function applyReimp() {
     await loadWorkspaces();
     openWorkspace(wsName);
   } catch (e) {
-    toast("Apply failed: " + e.message, "error");
+    toastError("Couldn't apply the reimport", e);
     btn.disabled = false;
     btn.textContent = "Apply updates";
   }

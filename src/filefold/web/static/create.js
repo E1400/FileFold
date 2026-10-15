@@ -24,6 +24,12 @@ function staticSizeWarning(bytes) {
 
 async function handleUpload(file) {
   if (!file) return;
+  const zone = document.getElementById("upload-zone");
+  clearFieldError(zone);
+  if (!/\.inp$/i.test(file.name)) {
+    showFieldError(zone, `FileFold reads Abaqus input files (.inp), and "${file.name}" isn't one. Choose a .inp file.`);
+    return;
+  }
   const sizeWarning = staticSizeWarning(file.size);
   if (sizeWarning) toast(sizeWarning, "warn");
   state.uploadedFile = file;
@@ -33,7 +39,6 @@ async function handleUpload(file) {
   const nameInput = document.getElementById("ws-name-input");
   if (!nameInput.value) nameInput.value = base;
 
-  const zone = document.getElementById("upload-zone");
   zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Parsing ${esc(file.name)}…</p>`;
 
   try {
@@ -54,8 +59,11 @@ async function handleUpload(file) {
     document.getElementById("create-btn-row").style.display = "";
     document.dispatchEvent(new CustomEvent("filefold:upload-ready"));
   } catch (e) {
-    zone.innerHTML = `<div class="icon">⚠</div><p>${esc(e.message)}</p>`;
-    toast("Parse error: " + e.message, "error");
+    state.uploadedFile = null;
+    zone.innerHTML = `<div class="icon">⚠</div><p>Couldn't read ${esc(file.name)}</p>
+      <div class="hint"><a href="#" onclick="document.getElementById('upload-input').click();return false">choose another file</a></div>`;
+    showFieldError(zone, plainError(e));
+    if (!(e instanceof ApiError)) console.error(e);
   }
 }
 
@@ -251,13 +259,20 @@ function toggleAllCategories() {
 // Create workspace
 // ═══════════════════════════════════════════════════════════════════════════════
 async function createWorkspace() {
-  if (!state.uploadedFile) { toast("Upload a file first", "warn"); return; }
+  const view = document.getElementById("view-new-workspace");
+  clearFieldErrors(view);
+  if (!state.uploadedFile) {
+    showFieldError(document.getElementById("upload-zone"), "Choose a .inp file first, or load one from Sample data.");
+    return;
+  }
+  const nameInput = document.getElementById("ws-name-input");
+  const name = nameInput.value.trim();
+  const nameProblem = workspaceNameProblem(name);
+  if (nameProblem) { showFieldError(nameInput, nameProblem); return; }
 
-  const name = document.getElementById("ws-name-input").value.trim();
-  if (!name) { toast("Enter a workspace name", "warn"); return; }
-
-  // Collect selections
+  // Collect selections, remembering which input each filename came from
   const selections = [];
+  const fileInputs = [];
   if (state.inspectResult) {
     const cats = new Set();
     // Must match renderSplitConfig's filter, or this loop looks for rows that were
@@ -266,7 +281,9 @@ async function createWorkspace() {
     cats.forEach(cat => {
       const cb = document.getElementById(`sel-${cat}`);
       if (cb && cb.checked) {
-        const fn = document.getElementById(`fn-${cat}`).value.trim() || `${cat}.inp`;
+        const fnInput = document.getElementById(`fn-${cat}`);
+        const fn = fnInput.value.trim() || `${cat}.inp`;
+        fileInputs.push({ fn, input: fnInput });
         const sub_selections = [];
         const subOpts = state.inspectResult?.sub_options?.[cat] ?? [];
         const ticked = new Set(subOpts.map(o => o.sub_category)
@@ -274,14 +291,30 @@ async function createWorkspace() {
         const effective = effectiveSubKeys(state.inspectResult?.sub_claims?.[cat], subOpts, ticked);
         subOpts.forEach(opt => {
           if (effective.has(opt.sub_category)) {
-            const subFn = document.getElementById(`subfn-${cat}-${opt.sub_category}`).value.trim()
-              || opt.default_filename;
+            const subInput = document.getElementById(`subfn-${cat}-${opt.sub_category}`);
+            const subFn = subInput.value.trim() || opt.default_filename;
+            fileInputs.push({ fn: subFn, input: subInput });
             sub_selections.push({ sub_category: opt.sub_category, filename: subFn });
           }
         });
         selections.push({ category: cat, filename: fn, sub_selections });
       }
     });
+  }
+
+  // Every file needs a valid name of its own, different from the mother file's.
+  const used = new Map([[state.uploadedFile.name, null]]);
+  for (const { fn, input } of fileInputs) {
+    const problem = filenameProblem(fn)
+      || (used.has(fn) ? (used.get(fn) ? errorText({ code: "duplicate_filename", value: fn })
+                                        : `The mother file is already called "${fn}". Choose a different name.`) : null);
+    if (problem) {
+      // A clash concerns two fields: mark the one the person changed, if either.
+      const other = used.get(fn);
+      showFieldError(other && other.value !== other.defaultValue && input.value === input.defaultValue ? other : input, problem);
+      return;
+    }
+    used.set(fn, input);
   }
 
   const btn = document.querySelector("#create-btn-row button");
@@ -299,7 +332,11 @@ async function createWorkspace() {
     openWorkspace(name);
     resetNewWorkspace();
   } catch (e) {
-    toast("Failed: " + e.message, "error");
+    const onField = showApiErrorOnField(e, {
+      name: nameInput,
+      filename: value => fileInputs.find(f => f.fn === value)?.input,
+    });
+    if (!onField) toastError("Couldn't create the workspace", e);
   } finally {
     // Always restore the button. On success the row is only hidden, so a button
     // left reading "Creating…" and disabled comes back that way on the next
@@ -311,6 +348,7 @@ async function createWorkspace() {
 
 function resetNewWorkspace() {
   closeSampleMenu(false);
+  clearFieldErrors(document.getElementById("view-new-workspace"));
   state.uploadedFile = null;
   state.inspectResult = null;
   document.getElementById("upload-zone").innerHTML = `
