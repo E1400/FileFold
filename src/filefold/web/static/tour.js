@@ -18,7 +18,7 @@ const TOUR_STEPS = [
   { title: "No file handy?", target: () => document.getElementById("sample-btn"), side: "bottom",
     text: "Sample data has three real decks to try." },
   { title: "See what's inside", needsFile: true, target: () => document.getElementById("inspector-section"), side: "right",
-    text: "Every keyword block in the file, coloured by category." },
+    text: "Every keyword block in the file, colored by category." },
   { title: "Choose what to extract", needsFile: true, target: () => document.getElementById("split-config-section"), side: "left",
     text: "Tick a category to give it its own file. Model set-up always stays in the mother file." },
   { title: "Go deeper if you like", needsFile: true,
@@ -146,7 +146,7 @@ function _tourRender(focusNext = false) {
       <button type="button" class="btn ${waitingForFile ? "btn-ghost" : "btn-primary"} btn-sm" data-act="next" ${waitingForFile ? "disabled" : ""}>${last ? "Done" : "Next"}</button>
     </div>`;
 
-  if (!visible) {                       // no target to point at: centre the card, no spotlight
+  if (!visible) {                       // no target to point at: center the card, no spotlight
     _tour.spot.style.display = "none";
     _tour.card.querySelector(".tour-arrow").remove();
     Object.assign(_tour.card.style, { left: "50%", top: "50%", transform: "translate(-50%, -50%)" });
@@ -188,7 +188,7 @@ function _tourPlace(target, preferred) {
   top = clampY(top);
   card.style.left = `${left}px`;
   card.style.top = `${top}px`;
-  // the arrow points from the card edge facing the target, toward the target's centre
+  // the arrow points from the card edge facing the target, toward the target's center
   const arrow = card.querySelector(".tour-arrow");
   arrow.dataset.side = { bottom: "top", top: "bottom", right: "left", left: "right" }[side];
   if (side === "bottom" || side === "top") {

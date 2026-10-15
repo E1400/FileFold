@@ -9,7 +9,7 @@ function startReimp() {
 
 // Markup for the idle re-import drop zone. handleReimpUpload overwrites the zone
 // with a spinner, so it has to be restored here — otherwise re-opening the view
-// shows the previous run's "Analysing <other-file>…" spinner, which looks like a
+// shows the previous run's "Analyzing <other-file>…" spinner, which looks like a
 // hang but is just stale DOM with no request behind it.
 const _REIMP_DROP_IDLE = `
   <div class="icon">📂</div>
@@ -34,7 +34,7 @@ async function handleReimpUpload(file) {
     return;
   }
   state.reimp.file = file;
-  zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Analysing ${esc(file.name)}…</p>`;
+  zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Analyzing ${esc(file.name)}…</p>`;
 
   try {
     const fd = new FormData();

@@ -123,7 +123,7 @@
             <h2>Creating a workspace</h2>
             <ol>
               <li><b>Upload.</b> Drop a <code>.inp</code> file, click to browse, or choose <b>Sample data</b>.</li>
-              <li><b>Inspect.</b> The block inspector lists every keyword block with its line range, coloured by category. A <code>▸</code> opens the blocks nested inside a <code>*STEP</code>, <code>*PART</code> or <code>*ASSEMBLY</code>.</li>
+              <li><b>Inspect.</b> The block inspector lists every keyword block with its line range, colored by category. A <code>▸</code> opens the blocks nested inside a <code>*STEP</code>, <code>*PART</code> or <code>*ASSEMBLY</code>.</li>
               <li><b>Choose.</b> Tick the categories that should get their own file, and optionally finer splits (see below). Filenames can be changed.</li>
               <li><b>Create workspace.</b> The mother file keeps an <code>*INCLUDE, INPUT=file</code> line where each extracted block used to be.</li>
             </ol>
@@ -143,7 +143,7 @@
               <dt><span data-cat="initial"></span></dt><dd>Starting state: <code>*INITIAL CONDITIONS</code>.</dd>
               <dt><span data-cat="output"></span></dt><dd>Output requests: <code>*OUTPUT</code>, <code>*NODE OUTPUT</code>, <code>*ELEMENT OUTPUT</code>, <code>*RESTART</code>, print and file requests.</dd>
               <dt><span data-cat="model"></span></dt><dd>Model set-up: <code>*HEADING</code>, <code>*INCLUDE</code>, <code>*ASSEMBLY</code>, <code>*INSTANCE</code>. This always stays in the mother file and cannot be extracted.</dd>
-              <dt><span data-cat="unknown"></span></dt><dd>Keywords FileFold does not recognise. They stay with the keyword above them and cannot be extracted on their own.</dd>
+              <dt><span data-cat="unknown"></span></dt><dd>Keywords FileFold does not recognize. They stay with the keyword above them and cannot be extracted on their own.</dd>
             </dl>
           </section>
 
@@ -208,7 +208,7 @@
               <li><b>Wrapped keyword lines.</b> A keyword line ending in a comma continues on the next line; its parameters are merged. Quoted parameters may contain commas.</li>
               <li><b>Options stay with their parent.</b> <code>*ELASTIC</code> follows its <code>*MATERIAL</code>, <code>*FRICTION</code> its <code>*SURFACE INTERACTION</code>. A keyword FileFold does not know is kept with the block above it, so a split can never separate them.</li>
               <li><b>Containers.</b> <code>*STEP</code>, <code>*PART</code>, <code>*ASSEMBLY</code> and <code>*INSTANCE</code> own the blocks inside them, which move with the container.</li>
-              <li><b>Keyword coverage.</b> Every keyword in the Abaqus 2016 Keywords Reference is recognised and assigned a category.</li>
+              <li><b>Keyword coverage.</b> Every keyword in the Abaqus 2016 Keywords Reference is recognized and assigned a category.</li>
               <li><b>Byte-exact.</b> Reassembling the pieces reproduces your original model exactly: same lines, same line endings.</li>
               <li><b>Limits.</b> An <code>*INCLUDE</code> that is already in your file is kept as written; its target file is not opened.</li>
             </ul>

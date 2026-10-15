@@ -1,6 +1,6 @@
 # FileFold
 
-An intelligent parser for Abaqus `.inp` files. FileFold reads a model block by block, knows what every keyword is (all 523 in the Abaqus 2016 Keywords Reference, plus newer ones), and splits the model into a small mother file and organised child files joined by `*INCLUDE`. You can split by category, or down to one file per material, step or part. It tracks your edits, flags conflicts when you reimport an updated model, and exports clean archives. Use it in your browser, as a desktop app for Mac and Windows, or from the command line.
+An intelligent parser for Abaqus `.inp` files. FileFold reads a model block by block, knows what every keyword is (all 523 in the Abaqus 2016 Keywords Reference, plus newer ones), and splits the model into a small mother file and organized child files joined by `*INCLUDE`. You can split by category, or down to one file per material, step or part. It tracks your edits, flags conflicts when you reimport an updated model, and exports clean archives. Use it in your browser, as a desktop app for Mac and Windows, or from the command line.
 
 ---
 

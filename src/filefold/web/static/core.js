@@ -18,7 +18,7 @@ const state = {
   },
 };
 
-// Category colour lives in CSS (--cat-*) and nowhere else. Returning a var()
+// Category color lives in CSS (--cat-*) and nowhere else. Returning a var()
 // reference rather than a hex means chips follow the theme automatically — the
 // previous JS table held the old palette, so retuning the tokens changed nothing
 // on screen and the two sets had silently diverged.
@@ -32,7 +32,7 @@ const CAT_NAMES = new Set([
 function CAT_COLORS_var(cat) {
   return `var(--cat-${CAT_NAMES.has(cat) ? cat : "unknown"})`;
 }
-// Back-compat alias for the places that read a colour for a category.
+// Back-compat alias for the places that read a color for a category.
 const CAT_COLORS = new Proxy({}, { get: (_, k) => CAT_COLORS_var(String(k)) });
 
 function catChip(cat) {
@@ -100,7 +100,7 @@ function errorText({ code, field, value, status }) {
     case "mother_missing":      return "The workspace's mother file is missing, so nothing more can be extracted from it.";
     case "not_extractable":     return "Model set-up always stays in the mother file and can't get a file of its own.";
     case "not_extracted":       return "That file is no longer split out. Reopen the workspace and try again.";
-    case "unknown_category":    return "FileFold didn't recognise one of the categories. Reload the page and try again.";
+    case "unknown_category":    return "FileFold didn't recognize one of the categories. Reload the page and try again.";
     case "file_too_large":      return "This file is larger than this server accepts.";
     case "auth_required":       return "You need to sign in again. Reload the page.";
     case "unreachable":         return "FileFold can't be reached. Check that it is still running, then try again.";
