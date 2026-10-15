@@ -58,3 +58,11 @@ def test_lockfile_matches_pyproject():
     for dep in project["dependencies"]:
         name = re.split(r"[<>=\[ ]", dep, maxsplit=1)[0]
         assert f'name = "{name}"' in lock, f"{name} missing from uv.lock; run `uv lock`"
+
+
+def test_the_api_reports_the_package_version():
+    """The desktop bundle's version comes from pyproject.toml (filefold.spec); keep the API in step."""
+    import tomllib
+    from filefold.api.main import app
+    version = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text())["project"]["version"]
+    assert app.version == version

@@ -18,7 +18,7 @@ from filefold.service import NON_EXTRACTABLE, ServiceError  # noqa: F401  (NON_E
 from .routes import files, inspect, reimport, splits, workspaces
 from .server import UnsafeName
 
-app = FastAPI(title="FileFold", version="0.1.0")
+app = FastAPI(title="FileFold", version="0.1.1")
 
 
 @app.middleware("http")
