@@ -621,6 +621,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   align-items: center;
   gap: 8px;
 }
+.toast { align-items: flex-start; max-width: 380px; }
+.toast-body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.toast-body strong { font-weight: 600; }
+.toast-close { background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 0 0 6px; }
+.toast-close:hover { color: var(--text); }
 .toast.ok     { border-left: 3px solid var(--success); }
 .toast.warn   { border-left: 3px solid var(--warn); }
 .toast.error  { border-left: 3px solid var(--danger); }
@@ -884,3 +889,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* Desktop app (opened as /?desktop=1): web-only controls disappear. */
 :root[data-desktop] .hide-in-desktop { display: none !important; }
+
+/* ── Form field errors (like a web form's required-field check) ───────────────── */
+.field-invalid, input.field-invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 25%, transparent); }
+.drop-zone.field-invalid { border-style: dashed; }
+.field-error { color: var(--danger); font-size: var(--fs-sm); margin: 4px 0 0; flex-basis: 100%; grid-column: 1 / -1; }
+.field-error::before { content: "⚠ "; }
+/* a flex row holding a message wraps it onto its own line instead of squeezing the field */
+:has(> .field-error) { flex-wrap: wrap; }

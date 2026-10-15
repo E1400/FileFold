@@ -129,3 +129,13 @@ def test_path_segments_are_url_decoded_and_traversal_is_rejected(tmp_path, monke
     assert browser.handle("GET", "/api/workspaces/my%20model")[0] == 200
     st, _, _, body = browser.handle("POST", "/api/workspaces", fields={"name": "../evil"}, file_name="a.inp", file_bytes=data)
     assert st == 400
+
+
+def test_errors_carry_the_same_code_through_the_browser_dispatcher(tmp_path, monkeypatch):
+    monkeypatch.setattr("filefold.api.server.WORKSPACE_BASE", tmp_path)
+    data = (Path(__file__).parent / "fixtures" / "Job-1.inp").read_bytes()
+    browser.handle("POST", "/api/workspaces", fields={"name": "a"}, file_name="Job-1.inp", file_bytes=data)
+    st, _, _, body = browser.handle("POST", "/api/workspaces", fields={"name": "a"}, file_name="Job-1.inp", file_bytes=data)
+    assert st == 400 and json.loads(body) | {"detail": None} == {"detail": None, "code": "workspace_exists", "field": "name", "value": "a"}
+    st, _, _, body = browser.handle("POST", "/api/workspaces", fields={"name": "../x"}, file_name="Job-1.inp", file_bytes=data)
+    assert json.loads(body)["code"] == "invalid_name"

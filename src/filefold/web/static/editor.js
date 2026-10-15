@@ -36,14 +36,16 @@ async function viewFile(filename) {
   dlBtn.onclick = async ev => {
     ev.preventDefault();
     try {
-      const blob = await (await fetch(url)).blob();
+      const res = await fetch(url);
+      if (!res.ok) throw await apiErrorFrom(res);
+      const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (err) {
-      toast("Download failed: " + err.message, "error");
+      toastError("Couldn't download the file", err);
     }
   };
   saveBtn.style.display = "none";
@@ -63,7 +65,7 @@ async function viewFile(filename) {
   try {
     // Stream the response so the spinner shows while downloading large files
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw await apiErrorFrom(res);
     const text = await res.text();
     _modalEol = text.includes("\r\n") ? "\r\n" : "\n";
 
@@ -86,7 +88,7 @@ async function viewFile(filename) {
     saveBtn.style.display = "";
     discBtn.style.display = "";
   } catch (e) {
-    loading.innerHTML = `Failed to load: ${esc(e.message)}`;
+    loading.innerHTML = `Couldn't open this file. ${esc(plainError(e))}`;
     loading.style.color = "var(--danger)";
   }
 }
@@ -474,9 +476,9 @@ async function saveFile() {
       { method: "PUT", body: ta.value.replace(/\n/g, _modalEol), headers: { "Content-Type": "text/plain" } }
     );
     // fetch only rejects on network failure; a 4xx/5xx must not be reported as saved.
-    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 120)}`);
+    if (!res.ok) throw await apiErrorFrom(res);
   } catch (e) {
-    toast("Save failed: " + e.message, "error");
+    toastError(`Couldn't save ${_modalFile}`, e);
     return false;
   } finally {
     btn.disabled = false;
@@ -491,7 +493,7 @@ async function saveFile() {
       state.wsData = data;
       renderDetail(data);
     } catch (e) {
-      toast("Saved, but could not refresh the file list: " + e.message, "warn");
+      toast("Saved, but the file list could not be refreshed. Reopen the workspace to see it.", "warn");
     }
   }
   return true;

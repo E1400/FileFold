@@ -135,6 +135,7 @@ def test_create_requires_a_name(app):
     app.fill("#ws-name-input", "")
     app.locator("#create-btn-row button").click()
     expect(app.locator("#view-new-workspace")).to_be_visible()  # stayed put, no request sent
+    expect(app.locator("#ws-name-input + .field-error")).to_contain_text("Give the workspace a name")
 
 
 def test_contact_subsplit_through_the_ui(app):
@@ -156,8 +157,7 @@ def test_duplicate_workspace_name_is_reported_not_swallowed(app):
             create(app)
             app.get_by_role("button", name="← Back").first.click()
     app.locator("#create-btn-row button").click()
-    expect(app.locator(".toast", has_text="already exists")).to_be_visible()
-    app.expected_errors.clear()  # the 400 is the point of this test
+    expect(app.locator("#ws-name-input + .field-error")).to_contain_text("You already have a workspace called")
 
 
 # --- workspace lifecycle ----------------------------------------------------

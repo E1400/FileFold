@@ -11,7 +11,24 @@ WORKSPACE_BASE: Path = Path(os.environ.get("FILEFOLD_WORKSPACE_DIR", _DEFAULT_BA
 
 
 class UnsafeName(ValueError):
-    """A client-supplied workspace or file name that escapes its directory."""
+    """A client-supplied workspace or file name that is missing or escapes its directory.
+
+    Carries a machine-readable `code` and the form `field` it concerns, so the UI can
+    highlight that field with its own wording instead of showing this message.
+    """
+
+    def __init__(self, detail: str, code: str = "invalid_name", field: str | None = None,
+                 value: str | None = None):
+        super().__init__(detail)
+        self.code, self.field, self.value = code, field, value
+
+    def payload(self) -> dict:
+        out = {"detail": str(self), "code": self.code}
+        if self.field:
+            out["field"] = self.field
+        if self.value is not None:
+            out["value"] = self.value
+        return out
 
 
 def safe_segment(value: str, kind: str = "name") -> str:
@@ -23,12 +40,13 @@ def safe_segment(value: str, kind: str = "name") -> str:
     '../evil.inp' should be told no, not handed a file with a different name.
     """
     cleaned = (value or "").strip()
+    field = "name" if kind in ("workspace name", "name") else "filename"
     if not cleaned:
-        raise UnsafeName(f"{kind} is required")
+        raise UnsafeName(f"{kind} is required", "required", field)
     if cleaned in {".", ".."} or "/" in cleaned or "\\" in cleaned or "\x00" in cleaned:
-        raise UnsafeName(f"Invalid {kind}: {value!r}")
+        raise UnsafeName(f"Invalid {kind}: {value!r}", "invalid_name", field, value)
     if Path(cleaned).is_absolute() or Path(cleaned).name != cleaned:
-        raise UnsafeName(f"Invalid {kind}: {value!r}")
+        raise UnsafeName(f"Invalid {kind}: {value!r}", "invalid_name", field, value)
     return cleaned
 
 

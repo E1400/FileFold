@@ -22,13 +22,18 @@ function resetReimp() {
   document.getElementById("reimp-preview-section").style.display = "none";
   document.getElementById("reimp-input").value = "";
   const zone = document.getElementById("reimp-drop");
-  if (zone) zone.innerHTML = _REIMP_DROP_IDLE;
+  if (zone) { clearFieldError(zone); zone.innerHTML = _REIMP_DROP_IDLE; }
 }
 
 async function handleReimpUpload(file) {
   if (!file) return;
-  state.reimp.file = file;
   const zone = document.getElementById("reimp-drop");
+  clearFieldError(zone);
+  if (!/\.inp$/i.test(file.name)) {
+    showFieldError(zone, `FileFold reads Abaqus input files (.inp), and "${file.name}" isn't one. Choose a .inp file.`);
+    return;
+  }
+  state.reimp.file = file;
   zone.innerHTML = `<div class="icon"><div class="spinner"></div></div><p>Analysing ${esc(file.name)}…</p>`;
 
   try {
@@ -46,8 +51,9 @@ async function handleReimpUpload(file) {
     document.getElementById("reimp-upload-section").style.display = "none";
     document.getElementById("reimp-preview-section").style.display = "";
   } catch (e) {
-    zone.innerHTML = `<div class="icon">⚠</div><p>${esc(e.message)}</p>`;
-    toast("Preview failed: " + e.message, "error");
+    zone.innerHTML = `<div class="icon">⚠</div><p>Couldn't read ${esc(file.name)}</p>`;
+    showFieldError(zone, plainError(e));
+    if (!(e instanceof ApiError)) console.error(e);
   }
 }
 
@@ -197,7 +203,7 @@ async function applyReimp() {
     await loadWorkspaces();
     openWorkspace(wsName);
   } catch (e) {
-    toast("Apply failed: " + e.message, "error");
+    toastError("Couldn't apply the reimport", e);
     btn.disabled = false;
     btn.textContent = "Apply updates";
   }

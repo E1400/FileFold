@@ -35,7 +35,7 @@ async def staged_upload(file: UploadFile):
             while chunk := await file.read(_CHUNK):
                 written += len(chunk)
                 if limit is not None and written > limit:
-                    raise ServiceError(413, f"File is larger than the {limit // (1024 * 1024)} MB upload limit")
+                    raise ServiceError(413, f"File is larger than the {limit // (1024 * 1024)} MB upload limit", "file_too_large")
                 out.write(chunk)
         yield path
     finally:

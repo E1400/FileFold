@@ -32,7 +32,7 @@ async function loadWorkspaces() {
     renderSidebar();
     renderHome();
   } catch (e) {
-    toast("Failed to load workspaces: " + e.message, "error");
+    toastError("Couldn't load your workspaces", e);
   }
 }
 
@@ -240,31 +240,46 @@ function renameWorkspace(name) {
   const nameEl = card.querySelector(".wsc-name");
   const input = document.createElement("input");
   input.type = "text";
+  input.id = "ws-rename-input";
+  input.setAttribute("aria-label", "New workspace name");
   input.value = name;
   input.style.cssText = "font-size:var(--fs-lg);font-weight:600;width:100%;background:transparent;border:none;border-bottom:1px solid var(--accent);outline:none;color:var(--text);padding:0";
-  let committed = false;
-  const finish = async () => {
-    if (committed) return;
-    committed = true;
-    const newName = input.value.trim();
+  let busy = false;
+  const close = () => {
+    clearFieldError(input);
     nameEl.textContent = name;
     nameEl.style.display = "";
     input.replaceWith(nameEl);
-    if (!newName || newName === name) return;
+  };
+  // Like a form field: a problem is shown under the name and the field stays open to fix
+  // (Escape cancels). Nothing is sent until the name is acceptable.
+  const commit = async () => {
+    if (busy || !input.isConnected) return;
+    const newName = input.value.trim();
+    if (newName === name) { close(); return; }
+    const problem = workspaceNameProblem(newName, name);
+    if (problem) { showFieldError(input, problem); return; }
+    busy = true;
     try {
       await api("PATCH", `/api/workspaces/${encodeURIComponent(name)}`, { name: newName });
+      close();
       toast(`Renamed to "${newName}"`, "ok");
       state.selectedWs.delete(name);
       await loadWorkspaces();
-    } catch(e) {
-      toast("Rename failed: " + e.message, "error");
+    } catch (e) {
+      if (!showApiErrorOnField(e, { name: input })) { close(); toastError(`Couldn't rename "${name}"`, e); }
+    } finally {
+      busy = false;
     }
   };
+  // The card underneath opens the workspace on click and on Enter: keep those to the field.
+  input.addEventListener("click", e => e.stopPropagation());
   input.addEventListener("keydown", e => {
-    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
-    if (e.key === "Escape") { input.value = name; input.blur(); }
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); commit(); }
+    if (e.key === "Escape") { e.preventDefault(); close(); }
   });
-  input.addEventListener("blur", finish);
+  input.addEventListener("blur", () => { if (!input.classList.contains("field-invalid")) commit(); });
   nameEl.style.display = "none";
   nameEl.insertAdjacentElement("afterend", input);
   input.focus();
@@ -280,7 +295,7 @@ async function exportWsCard(name) {
     URL.revokeObjectURL(url);
     toast(`${name}.zip downloaded`);
   } catch(e) {
-    toast("Export failed: " + e.message, "error");
+    toastError("Couldn't export the workspace", e);
   }
 }
 
@@ -293,7 +308,7 @@ async function deleteWsCard(name) {
     await loadWorkspaces();
     updateSelToolbar();
   } catch(e) {
-    toast("Delete failed: " + e.message, "error");
+    toastError("Couldn't delete the workspace", e);
   }
 }
 
@@ -311,7 +326,7 @@ async function deleteSelected() {
       await api("DELETE", `/api/workspaces/${encodeURIComponent(name)}`);
       state.selectedWs.delete(name);
     } catch(e) {
-      toast(`Failed to delete ${name}: ` + e.message, "error");
+      toastError(`Couldn't delete "${name}"`, e);
     }
   }
   toast(`Deleted ${names.length} workspace(s)`);
@@ -346,7 +361,7 @@ async function openWorkspace(name) {
       renderSplitsTab(data);
     }
   } catch (e) {
-    toast("Failed to load workspace: " + e.message, "error");
+    toastError("Couldn't open the workspace", e);
   }
 }
 
@@ -412,7 +427,7 @@ async function exportWorkspace() {
     URL.revokeObjectURL(url);
     toast("Export downloaded");
   } catch (e) {
-    toast("Export failed: " + e.message, "error");
+    toastError("Couldn't export the workspace", e);
   }
 }
 
@@ -425,6 +440,6 @@ async function deleteWorkspace() {
     await loadWorkspaces();
     showView("home");
   } catch (e) {
-    toast("Delete failed: " + e.message, "error");
+    toastError("Couldn't delete the workspace", e);
   }
 }

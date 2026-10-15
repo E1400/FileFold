@@ -39,7 +39,7 @@ async def _optional_basic_auth(request: Request, call_next):
                 supplied = ""
         if not hmac.compare_digest(supplied.encode(), expected.encode()):
             return JSONResponse(
-                status_code=401, content={"detail": "Authentication required"},
+                status_code=401, content={"detail": "Authentication required", "code": "auth_required"},
                 headers={"WWW-Authenticate": 'Basic realm="FileFold"'},
             )
     return await call_next(request)
@@ -48,12 +48,12 @@ async def _optional_basic_auth(request: Request, call_next):
 @app.exception_handler(UnsafeName)
 async def _unsafe_name_handler(request: Request, exc: UnsafeName) -> JSONResponse:
     """A rejected name is a client error, not a crash."""
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    return JSONResponse(status_code=400, content=exc.payload())
 
 
 @app.exception_handler(ServiceError)
 async def _service_error_handler(request: Request, exc: ServiceError) -> JSONResponse:
-    return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
+    return JSONResponse(status_code=exc.status, content=exc.payload())
 
 
 # Serve the web frontend: one HTML page plus CSS/JS under /static

@@ -21,7 +21,7 @@ let _sampleManifest = null;
 async function _loadSampleManifest() {
   if (_sampleManifest) return _sampleManifest;
   const res = await fetch(`${SAMPLE_BASE}manifest.json`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw await apiErrorFrom(res);
   _sampleManifest = (await res.json()).samples;
   return _sampleManifest;
 }
@@ -56,7 +56,7 @@ async function openSampleMenu() {
     const samples = await _loadSampleManifest();
     if (!menu.hidden) _renderSampleMenu(samples);          // still open: show them
   } catch (e) {
-    if (!menu.hidden) menu.innerHTML = `<p class="sample-error">Sample decks could not be loaded (${esc(e.message)}).</p>`;
+    if (!menu.hidden) menu.innerHTML = `<p class="sample-error">The sample decks couldn't be loaded. Check your connection and try again.</p>`;
   }
 }
 
@@ -64,12 +64,12 @@ async function openSampleMenu() {
 async function loadSample(id) {
   try {
     const res = await fetch(`${SAMPLE_BASE}${encodeURIComponent(id)}.inp`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw await apiErrorFrom(res);
     const file = new File([await res.blob()], `${id}.inp`, { type: "text/plain" });
     if (state.view !== "new-workspace") showView("new-workspace");
     await handleUpload(file);
   } catch (e) {
-    toast("Could not load the sample: " + e.message, "error");
+    toastError("Couldn't load the sample", e);
   }
 }
 
