@@ -124,7 +124,7 @@
             <ol>
               <li><b>Upload.</b> Drop a <code>.inp</code> file, click to browse, or choose <b>Sample data</b>.</li>
               <li><b>Inspect.</b> The block inspector lists every keyword block with its line range, colored by category. A <code>▸</code> opens the blocks nested inside a <code>*STEP</code>, <code>*PART</code> or <code>*ASSEMBLY</code>.</li>
-              <li><b>Choose.</b> Tick the categories that should get their own file, and optionally finer splits (see below). Filenames can be changed.</li>
+              <li><b>Choose.</b> Tick the categories that should get their own file, and optionally finer splits (see below). Filenames can be changed. The <b>Result</b> panel shows the files you will get and the exact number of lines in each, as you tick.</li>
               <li><b>Create workspace.</b> The mother file keeps an <code>*INCLUDE, INPUT=file</code> line where each extracted block used to be.</li>
             </ol>
           </section>
@@ -179,7 +179,7 @@
 
           <section id="help-splits">
             <h2>The Splits tab</h2>
-            <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model. Nothing changes until you press <b>Apply changes</b>: the bar at the bottom counts what will change, each changed row says what will happen (new, folds back, renamed), <b>Discard</b> undoes your choices, and leaving the workspace with choices not applied asks first.</p>
+            <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model. Nothing changes until you press <b>Apply changes</b>: the <b>After Apply</b> panel shows the files and line counts you will end up with, the bar at the bottom counts what will change, each changed row says what will happen (new, folds back, renamed), <b>Discard</b> undoes your choices, and leaving the workspace with choices not applied asks first.</p>
           </section>
 
           <section id="help-reimport">
@@ -246,6 +246,11 @@
                 <div id="sample-menu" class="sample-menu" role="menu" aria-label="Sample data" hidden></div>
               </div>
             </div>
+          </div>
+
+          <div id="result-section" style="display:none">
+            <div class="section-title">Result <span class="section-sub" id="result-count"></span> <button type="button" class="info-btn" data-info="result" aria-label="About the result preview" aria-expanded="false">i</button></div>
+            <div id="result-tree" class="result-panel" aria-live="polite"></div>
           </div>
 
           <div id="inspector-section" style="display:none">
@@ -315,7 +320,13 @@
         Check categories to extract them into their own file. Uncheck existing splits to fold them back into the mother file.
         <button type="button" class="info-btn" data-info="splits" aria-label="About the Splits tab" aria-expanded="false">i</button>
       </p>
-      <div id="ws-split-config" class="split-grid"></div>
+      <div class="splits-layout">
+        <div id="ws-split-config" class="split-grid"></div>
+        <aside class="splits-result" aria-label="Result after Apply">
+          <div class="section-title">After Apply <span class="section-sub" id="ws-result-count"></span></div>
+          <div id="ws-result-tree" class="result-panel" aria-live="polite"></div>
+        </aside>
+      </div>
       <!-- Always on screen while the tab is open: what Apply will do, and the way out. -->
       <div id="splits-pending-bar" class="pending-bar" role="status" aria-live="polite">
         <span id="splits-pending-count" class="pending-count">No changes</span>

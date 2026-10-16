@@ -39,6 +39,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
     stack: list[Block] = []   # nesting stack; stack[-1] is the open container
     current: Block | None = None
     orphans: list[str] = []   # lines before the very first keyword
+    n_orphans = 0             # how many, also when keep_lines=False (orphans then stays empty)
     last_category = Category.UNKNOWN          # category of the most recent block
     cont_block: Block | None = None           # keyword line still being continued
     cont_text = ""                            # its keyword line text so far
@@ -82,6 +83,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
                 # Trailing data/comment/blank on the in-progress block
                 if keep_lines:
                     current.raw_lines.append(tok.text)
+                current.n_own += 1
                 current.line_end = tok.line_no
             elif stack:
                 container = stack[-1]
@@ -90,6 +92,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
                     # (e.g. the step-title data line right after *STEP)
                     if keep_lines:
                         container.raw_lines.append(tok.text)
+                    container.n_own += 1
                     container.line_end = tok.line_no
                 else:
                     # After a child container was closed (e.g. after *END INSTANCE).
@@ -100,10 +103,12 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
                         last = last.children[-1]
                     if keep_lines:
                         last.raw_lines.append(tok.text)
+                    last.n_own += 1
                     last.line_end = tok.line_no
             else:
                 if keep_lines:
                     orphans.append(tok.text)
+                n_orphans += 1
             continue
 
         kw = keyword_of(tok.text)
@@ -119,6 +124,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
                 line_start=tok.line_no,
                 line_end=tok.line_no,
                 context=context(),
+                n_own=1,
             )
             last_category = end_block.category
             if stack:
@@ -132,6 +138,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
             commit()
             leading = list(orphans)
             orphans.clear()
+            n_leading, n_orphans = n_orphans, 0
             container = Block(
                 keyword=kw,
                 params=parse_params(tok.text),
@@ -140,6 +147,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
                 line_start=tok.line_no,
                 line_end=tok.line_no,
                 context=context(),
+                n_own=n_leading + 1,
             )
             last_category = container.category
             if ends_with_continuation(tok.text):
@@ -152,6 +160,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
             commit()
             leading = list(orphans)
             orphans.clear()
+            n_leading, n_orphans = n_orphans, 0
             cat, inherited = resolve(kw)
             current = Block(
                 keyword=kw,
@@ -162,6 +171,7 @@ def parse(path: Path, keep_lines: bool = True) -> list[Block]:
                 line_end=tok.line_no,
                 inherited=inherited,
                 context=context(),
+                n_own=n_leading + 1,
             )
             last_category = cat
             if ends_with_continuation(tok.text):

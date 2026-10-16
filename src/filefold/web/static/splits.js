@@ -324,8 +324,66 @@ function planSplitChanges(data = state.wsData) {
   return plan;
 }
 
-// Update the pending-changes bar and the marks next to each changed row.
+// The workspace's files after Apply, with exact line counts and what changes, computed in
+// the browser from the split plan (no request) whenever a choice changes.
+function renderWsResult(data = state.wsData) {
+  const el = document.getElementById("ws-result-tree");
+  const plan = data?.split_plan?.categories;
+  if (!el || !plan || state.splitsRenderedFor !== data.name) return;
+  const files = data.files || [];
+  const motherFile = files.find(f => f.role === "mother");
+  const existingByCategory = {};
+  data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
+  const onDisk = new Set(files.filter(f => f.exists).map(f => f.filename));
+  const val = id => document.getElementById(id)?.value.trim();
+  const rows = [];
+  let mother = motherFile?.line_count ?? 0;
+
+  document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
+    const cat = cb.id.slice("ws-sel-".length);
+    const nodes = plan[cat] || [];
+    const existing = existingByCategory[cat];
+    const oldSubs = existing ? existing.sub_selections.filter(ss => onDisk.has(ss.filename)) : [];
+    if (!cb.checked) {
+      if (!existing) return;
+      mother += categoryLines(nodes) - 1;                 // folds back, its *INCLUDE goes
+      rows.push({ name: existing.filename, role: "child", cat, mark: `folds back into ${data.source_name}`, markKind: "fold" });
+      oldSubs.forEach(ss => rows.push({ name: ss.filename, role: "sub", cat, mark: "folds back", markKind: "fold" }));
+      return;
+    }
+    if (!nodes.length) return;
+    const filename = val(`ws-fn-${cat}`) || existing?.filename || `${cat}.inp`;
+    const subOpts = data.sub_options?.[cat] ?? [];
+    const ticked = new Set(subOpts.map(o => o.sub_category)
+      .filter(k => document.getElementById(`ws-sub-${cat}-${k}`)?.checked));
+    const effective = effectiveSubKeys(data.sub_claims?.[cat], subOpts, ticked);
+    const subs = {};
+    subOpts.filter(o => effective.has(o.sub_category)).forEach(o => {
+      const old = oldSubs.find(ss => ss.sub_category === o.sub_category);
+      subs[o.sub_category] = val(`ws-subfn-${cat}-${o.sub_category}`) || old?.filename || o.default_filename;
+    });
+    const lines = splitCategoryLines(nodes, filename, subs);
+    if (!existing) mother -= categoryLines(nodes) - 1;     // newly extracted
+    const childMark = !existing ? ["new", "new"] : filename !== existing.filename ? [`renamed from ${existing.filename}`, "rename"] : [];
+    rows.push({ name: filename, role: "child", cat, lines: lines[filename], mark: childMark[0], markKind: childMark[1] });
+    Object.entries(subs).forEach(([key, fn]) => {
+      if (!lines[fn]) return;
+      const old = oldSubs.find(ss => ss.sub_category === key);
+      const m = !old ? ["new", "new"] : old.filename !== fn ? [`renamed from ${old.filename}`, "rename"] : [];
+      rows.push({ name: fn, role: "sub", cat, lines: lines[fn], mark: m[0], markKind: m[1] });
+    });
+    oldSubs.filter(ss => !(ss.sub_category in subs)).forEach(ss =>
+      rows.push({ name: ss.filename, role: "sub", cat, mark: `folds back into ${filename}`, markKind: "fold" }));
+  });
+  rows.unshift({ name: data.source_name, role: "mother", lines: mother });
+  renderResultTree(el, rows);
+  const n = rows.filter(r => r.markKind !== "fold").length;
+  document.getElementById("ws-result-count").textContent = `${n} file${n === 1 ? "" : "s"}`;
+}
+
+// Update the pending-changes bar, the marks next to each changed row and the result tree.
 function refreshSplitsPending() {
+  renderWsResult();
   const plan = planSplitChanges();
   const bar = document.getElementById("splits-pending-bar");
   if (!bar) return plan;

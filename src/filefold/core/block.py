@@ -34,6 +34,11 @@ class Block:
     # from the preceding block (Abaqus options always follow their parent keyword).
     inherited: bool = False
 
+    # How many lines raw_lines holds (or would hold): kept up to date even when the parser
+    # runs with keep_lines=False, so line counts per block are exact without the text.
+    # A block emits n_own + its children's lines (see emit()).
+    n_own: int = 0
+
     # Keywords of the containers open when this block started, outermost first,
     # e.g. ("ASSEMBLY", "INSTANCE") or ("PART",). Empty at file top level.
     context: tuple[str, ...] = ()
@@ -45,3 +50,8 @@ def emit(block: Block) -> list[str]:
     for child in block.children:
         lines.extend(emit(child)) # recursively append each child's lines
     return lines
+
+
+def line_count(block: Block) -> int:
+    """Lines emit(block) produces, from the counts alone (works for light parses)."""
+    return block.n_own + sum(line_count(c) for c in block.children)

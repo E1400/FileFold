@@ -53,9 +53,11 @@ async function handleUpload(file) {
       <div class="hint">${countBlocks(data.blocks)} blocks detected — <a href="#" onclick="document.getElementById('upload-input').click();return false">change file</a></div>`;
 
     document.getElementById("inspector-section").style.display = "";
+    document.getElementById("result-section").style.display = "";
     renderInspector(data.blocks);
     document.getElementById("split-config-section").style.display = "";
     renderSplitConfig(data.blocks);
+    refreshCreateResult();
     document.getElementById("create-btn-row").style.display = "";
     document.dispatchEvent(new CustomEvent("filefold:upload-ready"));
   } catch (e) {
@@ -109,6 +111,11 @@ function renderSplitConfig(blocks) {
   blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) cats.add(b.category); });
 
   const el = document.getElementById("split-config");
+  if (!el.dataset.watching) {            // every tick or filename edit updates the Result tree
+    el.dataset.watching = "1";
+    el.addEventListener("change", refreshCreateResult);
+    el.addEventListener("input", refreshCreateResult);
+  }
   if (!cats.size) { el.innerHTML = `<p class="text-muted">No categories available.</p>`; return; }
 
   // Same master toggle as the edit menu. Ids avoid the "sel-"/"sub-" prefixes that
@@ -258,6 +265,64 @@ function toggleAllCategories() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Create workspace
 // ═══════════════════════════════════════════════════════════════════════════════
+// The categories and finer splits ticked on New Workspace, as the create payload,
+// remembering which input each filename came from (for field errors).
+function collectCreateSelections() {
+  const selections = [];
+  const fileInputs = [];
+  if (!state.inspectResult) return { selections, fileInputs };
+  const cats = new Set();
+  // Must match renderSplitConfig's filter, or this loop looks for rows that were
+  // never rendered (and the server rejects them anyway).
+  state.inspectResult.blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) cats.add(b.category); });
+  cats.forEach(cat => {
+    const cb = document.getElementById(`sel-${cat}`);
+    if (!cb || !cb.checked) return;
+    const fnInput = document.getElementById(`fn-${cat}`);
+    const fn = fnInput.value.trim() || `${cat}.inp`;
+    fileInputs.push({ fn, input: fnInput });
+    const sub_selections = [];
+    const subOpts = state.inspectResult?.sub_options?.[cat] ?? [];
+    const ticked = new Set(subOpts.map(o => o.sub_category)
+      .filter(k => document.getElementById(`sub-${cat}-${k}`)?.checked));
+    const effective = effectiveSubKeys(state.inspectResult?.sub_claims?.[cat], subOpts, ticked);
+    subOpts.forEach(opt => {
+      if (!effective.has(opt.sub_category)) return;
+      const subInput = document.getElementById(`subfn-${cat}-${opt.sub_category}`);
+      const subFn = subInput.value.trim() || opt.default_filename;
+      fileInputs.push({ fn: subFn, input: subInput });
+      sub_selections.push({ sub_category: opt.sub_category, filename: subFn });
+    });
+    selections.push({ category: cat, filename: fn, sub_selections });
+  });
+  return { selections, fileInputs };
+}
+
+// The files the workspace will have, with exact line counts, updated on every tick.
+function refreshCreateResult() {
+  const el = document.getElementById("result-tree");
+  const plan = state.inspectResult?.split_plan;
+  if (!el || !plan || !state.uploadedFile) return;
+  const { selections } = collectCreateSelections();
+  const rows = [];
+  let mother = plan.total_lines;
+  for (const sel of selections) {
+    const nodes = plan.categories[sel.category] || [];
+    if (!nodes.length) continue;
+    const subs = Object.fromEntries(sel.sub_selections.map(ss => [ss.sub_category, ss.filename]));
+    const lines = splitCategoryLines(nodes, sel.filename, subs);
+    rows.push({ name: sel.filename, role: "child", cat: sel.category, lines: lines[sel.filename] });
+    sel.sub_selections.forEach(ss => {
+      if (lines[ss.filename]) rows.push({ name: ss.filename, role: "sub", cat: sel.category, lines: lines[ss.filename] });
+    });
+    mother -= categoryLines(nodes) - 1;                   // one *INCLUDE line stays behind
+  }
+  rows.unshift({ name: state.uploadedFile.name, role: "mother", lines: mother });
+  renderResultTree(el, rows);
+  const n = rows.length;
+  document.getElementById("result-count").textContent = `${n} file${n === 1 ? "" : "s"}`;
+}
+
 async function createWorkspace() {
   const view = document.getElementById("view-new-workspace");
   clearFieldErrors(view);
@@ -270,37 +335,7 @@ async function createWorkspace() {
   const nameProblem = workspaceNameProblem(name);
   if (nameProblem) { showFieldError(nameInput, nameProblem); return; }
 
-  // Collect selections, remembering which input each filename came from
-  const selections = [];
-  const fileInputs = [];
-  if (state.inspectResult) {
-    const cats = new Set();
-    // Must match renderSplitConfig's filter, or this loop looks for rows that were
-    // never rendered (and the server rejects them anyway).
-    state.inspectResult.blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) cats.add(b.category); });
-    cats.forEach(cat => {
-      const cb = document.getElementById(`sel-${cat}`);
-      if (cb && cb.checked) {
-        const fnInput = document.getElementById(`fn-${cat}`);
-        const fn = fnInput.value.trim() || `${cat}.inp`;
-        fileInputs.push({ fn, input: fnInput });
-        const sub_selections = [];
-        const subOpts = state.inspectResult?.sub_options?.[cat] ?? [];
-        const ticked = new Set(subOpts.map(o => o.sub_category)
-          .filter(k => document.getElementById(`sub-${cat}-${k}`)?.checked));
-        const effective = effectiveSubKeys(state.inspectResult?.sub_claims?.[cat], subOpts, ticked);
-        subOpts.forEach(opt => {
-          if (effective.has(opt.sub_category)) {
-            const subInput = document.getElementById(`subfn-${cat}-${opt.sub_category}`);
-            const subFn = subInput.value.trim() || opt.default_filename;
-            fileInputs.push({ fn: subFn, input: subInput });
-            sub_selections.push({ sub_category: opt.sub_category, filename: subFn });
-          }
-        });
-        selections.push({ category: cat, filename: fn, sub_selections });
-      }
-    });
-  }
+  const { selections, fileInputs } = collectCreateSelections();
 
   // Every file needs a valid name of its own, different from the mother file's.
   const used = new Map([[state.uploadedFile.name, null]]);
@@ -358,6 +393,7 @@ function resetNewWorkspace() {
   document.getElementById("upload-input").value = "";
   document.getElementById("ws-name-input").value = "";
   document.getElementById("inspector-section").style.display = "none";
+  document.getElementById("result-section").style.display = "none";
   document.getElementById("split-config-section").style.display = "none";
   document.getElementById("create-btn-row").style.display = "none";
   document.getElementById("inspector-tree").innerHTML = "";

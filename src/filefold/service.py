@@ -23,6 +23,7 @@ from pathlib import Path
 from filefold.api.server import UnsafeName, child_path, list_workspaces, safe_segment, workspace_path
 from filefold.core.keywords import CATEGORY_SUB_OPTIONS, Category
 from filefold.core.parser import parse
+from filefold.core.preview import route_plan, split_plan
 from filefold.core.splitter import (
     SplitSelection, SubSplitSelection, read_raw, split_with_includes,
 )
@@ -219,6 +220,7 @@ def inspect(filename: str, data: bytes | Path) -> dict:
         blocks = parse(tmp_path, keep_lines=False)
         opts, claims = sub_split_info(blocks)
         return {
+            "split_plan": split_plan(blocks),   # live Result preview (core/preview.py)
             "filename": filename,
             "blocks": blocks_to_json(blocks),
             "sub_options": opts,
@@ -359,6 +361,7 @@ def get_workspace(name: str) -> dict:
     # scan only that category's top-level blocks.
     sub_options: dict[str, list[dict[str, str]]] = {}
     sub_claims: dict[str, list[list[str]]] = {}
+    route_plans: dict[str, list[dict]] = {}   # for the Splits tab's live Result preview
     sel_by_cat = {s.category.value: s for s in ws.selections}
     for cat_str in deck_order:
         try:
@@ -371,6 +374,7 @@ def get_workspace(name: str) -> dict:
         else:
             blocks = [b for b in mother_blocks if b.category == cat_enum]
         opts, claims = discover(cat_enum, blocks)
+        route_plans[cat_str] = route_plan(cat_enum, blocks)
         if sel:
             # A split that already exists stays listed even if the menus no longer offer
             # that kind of split (e.g. element type), so applying changes never folds it
@@ -400,6 +404,7 @@ def get_workspace(name: str) -> dict:
         "available_sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in sub_options.items()},
         "sub_options": sub_options,
         "sub_claims": sub_claims,
+        "split_plan": {"categories": route_plans},
     }
 
 

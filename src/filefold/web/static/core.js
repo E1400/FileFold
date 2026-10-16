@@ -362,3 +362,45 @@ function effectiveSubKeys(claims, options, ticked) {
   const covered = coveredSubParents(claims, ticked, options);
   return new Set([...ticked].filter(k => !covered.has(k)));
 }
+
+// ── Live split preview (mirror of filefold.core.preview) ─────────────────────────
+// A plan node: {keys: [...most specific first], lines, own?, children?}. Given one
+// category's plan, its filename and the effective finer-split keys (key -> filename),
+// return {filename: lines} for the files that would really be made. Kept line-for-line
+// equal to split_category in core/preview.py (an e2e test compares it with the files a
+// real split writes).
+function splitCategoryLines(nodes, filename, subs) {
+  const total = nodes.reduce((n, x) => n + x.lines, 0);
+  if (!Object.keys(subs).length) return total ? { [filename]: total } : {};
+  const out = { [filename]: 0 };
+  const route = n => {
+    const key = n.keys.find(k => k in subs);
+    if (key !== undefined) {
+      const target = subs[key];
+      if (!(target in out)) { out[target] = 0; out[filename] += 1; }   // its *INCLUDE line
+      out[target] += n.lines;
+    } else if (n.children) {
+      out[filename] += n.own;
+      n.children.forEach(route);
+    } else {
+      out[filename] += n.lines;
+    }
+  };
+  nodes.forEach(route);
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
+}
+
+function categoryLines(nodes) { return (nodes || []).reduce((n, x) => n + x.lines, 0); }
+
+// Render a result tree: rows [{name, role: "mother"|"child"|"sub", cat, lines, mark?, markKind?}]
+// in display order (mother first, each child followed by its sub-files).
+function renderResultTree(el, rows) {
+  const fmt = n => n == null ? "" : n.toLocaleString();
+  el.innerHTML = `<ul class="result-tree">${rows.map(r => `
+    <li class="result-row role-${r.role}${r.markKind ? " is-" + r.markKind : ""}" data-file="${esc(r.name)}">
+      <span class="result-name">${r.role === "sub" ? '<span class="tree-branch">└</span>' : ""}<span class="mono">${esc(r.name)}</span></span>
+      ${r.role === "mother" ? `<span class="chip result-role">mother</span>` : r.cat ? catChip(r.cat) : ""}
+      ${r.mark ? `<span class="result-mark">${esc(r.mark)}</span>` : ""}
+      <span class="result-lines">${r.markKind === "fold" ? "" : fmt(r.lines)}</span>
+    </li>`).join("")}</ul>`;
+}
