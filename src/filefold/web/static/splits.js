@@ -25,9 +25,12 @@ function renderSplitsTab(data) {
     (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
   );
 
-  // Only show categories that actually exist in this workspace's source file
+  // Only show categories that actually exist in this workspace's source file, in the order
+  // of the deck (where the mother includes each child, or holds each category's first block).
   const allCats = [...(data.available_categories || [])];
   data.selections.forEach(sel => { if (!allCats.includes(sel.category)) allCats.push(sel.category); });
+  const deckRank = cat => { const i = (data.category_order || []).indexOf(cat); return i < 0 ? Infinity : i; };
+  allCats.sort((a, b) => deckRank(a) - deckRank(b));
 
   const el = document.getElementById("ws-split-config");
   if (!allCats.length) {
@@ -104,9 +107,22 @@ function renderSplitsTab(data) {
     // build. It can still be folded back, but not re-extracted — say so, rather
     // than letting the row silently disappear after the next apply.
     const oneWay = NON_EXTRACTABLE.has(cat) && isExtracted;
+    // An extracted file can change place in the deck (its *INCLUDE line moves). The step
+    // file is the fence: model data must stay before the first *STEP.
+    const movable = isExtracted && !NON_EXTRACTABLE.has(cat) && cat !== "step";
+    const fence = isExtracted && cat === "step";
+    const moveCtl = movable ? `<span class="move-ctl">
+        <button type="button" class="move-btn" id="ws-up-${cat}" onclick="wsMoveFile('${cat}', -1)"
+                aria-label="Move ${cat} file up" title="Move up in the deck">↑</button>
+        <button type="button" class="move-btn" id="ws-down-${cat}" onclick="wsMoveFile('${cat}', 1)"
+                aria-label="Move ${cat} file down" title="Move down in the deck">↓</button>
+      </span>` : fence ? `<span class="move-ctl text-muted text-sm" title="Model data must come before the first *STEP, so the step file stays after the other files.">stays last</span>` : "<span></span>";
 
-    return `<div class="split-row${isExtracted ? " selected" : ""}" id="ws-row-${cat}">
+    return `<div class="split-row${isExtracted ? " selected" : ""}" id="ws-row-${cat}" data-cat="${cat}"
+                 ${movable ? 'data-movable="1"' : ""} ${fence ? 'data-fence="1"' : ""}
+                 ${isExtracted ? `data-file="${esc(existing.filename)}"` : ""}>
       <div class="split-row-header">
+        ${movable ? `<span class="drag-handle" draggable="true" title="Drag to change the order in the deck" aria-hidden="true">⠿</span>` : ""}
         <input type="checkbox" id="ws-sel-${cat}" ${isExtracted ? "checked" : ""}
                onchange="wsToggleSplitRow('${cat}')">
         <label for="ws-sel-${cat}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
@@ -119,9 +135,12 @@ function renderSplitsTab(data) {
       <input type="text" id="ws-fn-${cat}" value="${defaultFn}" placeholder="${cat}.inp"
              style="opacity:${isExtracted ? "1" : ".4"}" ${isExtracted ? "" : "disabled"}>
       <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
+      ${moveCtl}
       ${subPanel}
     </div>`;
   }).join("");
+  _wireFileDrag(el);
+  _syncMoveButtons();
   // Apply availability to extracted categories as rendered (their sub-files start ticked).
   allCats.forEach(cat => {
     if (document.getElementById(`ws-sel-${cat}`)?.checked) { _refreshWsSubs(cat); _syncSubAllBox(cat); }
@@ -136,6 +155,7 @@ function wsToggleSplitRow(cat) {
   fnInput.disabled = !checked;
   fnInput.style.opacity = checked ? "1" : ".4";
   _syncMasterCatBox();  // unchecking any single category must clear "select all"
+  _syncMoveButtons();
   const subPanel = document.getElementById(`ws-sub-opts-${cat}`);
   if (!subPanel) return;
   if (!checked) {
@@ -217,6 +237,105 @@ function _syncMasterCatBox() {
   master.checked = rows.length > 0 && rows.every(cb => cb.checked);
 }
 
+// ── File order ──────────────────────────────────────────────────────────────
+// Extracted files can swap places in the deck. Only their rows move; categories still in
+// the mother stay where their blocks are, exactly like the *INCLUDE lines on Apply. The
+// step row splits the files into groups that never mix (model data before the first step).
+function _fileGroups() {
+  const groups = [[]];
+  document.querySelectorAll("#ws-split-config .split-row[data-cat]").forEach(row => {
+    if (row.dataset.fence) groups.push([]);
+    else if (row.dataset.movable) groups[groups.length - 1].push(row);
+  });
+  return groups.filter(g => g.length);
+}
+
+// Put `rows` (one group, in their new order) into the places that group's rows occupy now.
+function _placeRows(group, rows) {
+  const marks = group.map(r => { const m = document.createComment("slot"); r.replaceWith(m); return m; });
+  marks.forEach((m, i) => m.replaceWith(rows[i]));
+  _syncMoveButtons();
+}
+
+function wsMoveFile(cat, step) {
+  const row = document.getElementById(`ws-row-${cat}`);
+  const group = _fileGroups().find(g => g.includes(row));
+  if (!group) return;
+  const i = group.indexOf(row), j = i + step;
+  if (j < 0 || j >= group.length) return;
+  const rows = [...group];
+  [rows[i], rows[j]] = [rows[j], rows[i]];
+  _placeRows(group, rows);
+  document.getElementById(`ws-${step < 0 ? "up" : "down"}-${cat}`)?.focus();
+}
+
+function _syncMoveButtons() {
+  for (const group of _fileGroups()) {
+    group.forEach((row, i) => {
+      const cat = row.dataset.cat;
+      const up = document.getElementById(`ws-up-${cat}`), down = document.getElementById(`ws-down-${cat}`);
+      if (up) up.disabled = i === 0;
+      if (down) down.disabled = i === group.length - 1;
+    });
+  }
+  const hint = document.getElementById("ws-order-hint");
+  if (hint) hint.hidden = !_orderToApply();
+}
+
+function _wireFileDrag(grid) {
+  let dragged = null;
+  grid.querySelectorAll(".split-row[data-movable] .drag-handle").forEach(handle => {
+    const row = handle.closest(".split-row");
+    handle.addEventListener("dragstart", e => {
+      dragged = row;
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", row.dataset.cat);
+      e.dataTransfer.setDragImage(row, 20, 20);
+    });
+    handle.addEventListener("dragend", () => {
+      row.classList.remove("dragging");
+      grid.querySelectorAll(".drop-before, .drop-after").forEach(r => r.classList.remove("drop-before", "drop-after"));
+      dragged = null;
+    });
+  });
+  const target = e => {
+    const row = e.target.closest?.(".split-row[data-movable]");
+    const group = dragged && _fileGroups().find(g => g.includes(dragged));
+    return row && row !== dragged && group?.includes(row) ? { row, group } : null;
+  };
+  grid.addEventListener("dragover", e => {
+    const t = target(e);
+    grid.querySelectorAll(".drop-before, .drop-after").forEach(r => r.classList.remove("drop-before", "drop-after"));
+    if (!t) return;
+    e.preventDefault();
+    const box = t.row.getBoundingClientRect();
+    t.row.classList.add(e.clientY < box.top + box.height / 2 ? "drop-before" : "drop-after");
+  });
+  grid.addEventListener("drop", e => {
+    const t = target(e);
+    if (!t) return;
+    e.preventDefault();
+    const after = t.row.classList.contains("drop-after");
+    const rows = t.group.filter(r => r !== dragged);
+    rows.splice(rows.indexOf(t.row) + (after ? 1 : 0), 0, dragged);
+    _placeRows(t.group, rows);
+  });
+}
+
+// The extracted files in the order shown, when that differs from the deck's; else null.
+// Names are the ones that will exist after Apply's renames.
+function _orderToApply() {
+  const data = state.wsData;
+  if (!data) return null;
+  const shown = [...document.querySelectorAll("#ws-split-config .split-row[data-file]")]
+    .filter(row => document.getElementById(`ws-sel-${row.dataset.cat}`)?.checked);
+  const was = shown.map(row => row.dataset.file);
+  const current = (data.include_order || []).filter(f => was.includes(f));
+  if (was.join("\n") === current.join("\n")) return null;
+  return shown.map(row => document.getElementById(`ws-fn-${row.dataset.cat}`)?.value.trim() || row.dataset.file);
+}
+
 function wsToggleAllCategories() {
   const master = document.getElementById("ws-master-cats");
   if (!master) return;
@@ -268,6 +387,7 @@ async function applyEditSplits() {
   const toExtract = [];
   const toResplit = [];  // sub-split checkbox/filename changes within extracted categories
   const toRename  = [];  // simple file renames (no re-extraction needed)
+  const toReorder = _orderToApply();   // files moved up or down in the deck
 
   const actualGrandchildren = new Set(
     (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
@@ -345,7 +465,7 @@ async function applyEditSplits() {
     }
   });
 
-  if (!toMerge.length && !toExtract.length && !toResplit.length && !toRename.length) {
+  if (!toMerge.length && !toExtract.length && !toResplit.length && !toRename.length && !toReorder) {
     toast("No changes to apply", "warn");
     return;
   }
@@ -360,6 +480,7 @@ async function applyEditSplits() {
   if (toExtract.length) parts.push(`${toExtract.length} extracted`);
   if (toResplit.length) parts.push(`${toResplit.length} re-split`);
   if (toRename.length)  parts.push(`${toRename.length} renamed`);
+  if (toReorder)        parts.push("file order changed");
 
   try {
     if (toMerge.length)
@@ -370,6 +491,8 @@ async function applyEditSplits() {
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/resplit-child`, r);
     for (const r of toRename)
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/rename-file`, r);
+    if (toReorder)   // last: the names are final now
+      await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/reorder`, { order: toReorder });
     toast(parts.join(", "), "ok");
   } catch (e) {
     failed = e;

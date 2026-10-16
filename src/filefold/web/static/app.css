@@ -237,7 +237,9 @@ body {
   background: var(--surface);
   flex-shrink: 0;
 }
-.topbar h1 { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.012em; flex: 1; }
+.topbar h1 { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.012em; flex: 1; min-width: 4em;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .btn { flex-shrink: 0; }
 .content { padding: 28px 32px; flex: 1; }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -439,6 +441,22 @@ body {
   border: 1px solid transparent;
 }
 .split-row.selected { border-color: var(--accent); }
+/* File order: drag handle and up/down buttons on extracted rows */
+.split-row-header { display: flex; align-items: center; gap: 8px; }
+.drag-handle { cursor: grab; color: var(--muted); user-select: none; line-height: 1; padding: 2px 0; }
+.drag-handle:hover { color: var(--text); }
+.split-row.dragging { opacity: .45; }
+.split-row.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+.split-row.drop-after  { box-shadow: 0 2px 0 var(--accent); }
+.move-ctl { display: inline-flex; gap: 4px; justify-self: end; white-space: nowrap; }
+.move-btn {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  color: var(--text); cursor: pointer;
+}
+.move-btn:hover:not(:disabled) { border-color: var(--accent); }
+.move-btn:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
+.move-btn:disabled { opacity: .35; cursor: default; }
 .sub-options {
   display: none;
   grid-column: 1 / -1;
@@ -503,7 +521,7 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
 .file-table tr:last-child td { border-bottom: none; }
 .file-table .row-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
 /* Folder this workspace saves to: a long path must not push the topbar buttons off screen. */
-.save-folder-btn { max-width: 220px; }
+.topbar .save-folder-btn { max-width: 200px; flex-shrink: 1; min-width: 0; }
 .save-folder-btn[hidden] { display: none; }   /* .btn sets display, which beats the hidden attribute */
 .save-folder-btn .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-table tr:hover td { background: var(--surface2); }

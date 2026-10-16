@@ -367,7 +367,9 @@ function renderDetail(data) {
   // Sort files: mother first, then children (no parent), then grandchildren
   // immediately after the child they belong to.
   const mothers = data.files.filter(f => f.role === "mother");
-  const children = data.files.filter(f => f.role === "child");
+  // Children in the order the mother includes them (the order of the deck).
+  const rank = f => { const i = (data.include_order || []).indexOf(f.filename); return i < 0 ? Infinity : i; };
+  const children = data.files.filter(f => f.role === "child").sort((a, b) => rank(a) - rank(b));
   const grandchildren = data.files.filter(f => f.role === "grandchild");
 
   const ordered = [...mothers];
