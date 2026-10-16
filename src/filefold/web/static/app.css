@@ -914,3 +914,32 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .pending-mark.is-fold    { color: var(--warn); }
 .pending-mark.is-rename  { color: var(--accent); }
 .pending-mark-sub { font-size: var(--fs-micro); color: var(--muted); font-style: italic; }
+
+/* ── Re-import review ────────────────────────────────────────────────────────── */
+.reimp-group { margin-bottom: 22px; }
+.reimp-group h3 { font-size: var(--fs-sm); font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.reimp-item { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 8px 10px; margin-bottom: 8px; }
+.reimp-item.is-conflict { border-color: var(--warn); }
+.reimp-item-head { display: flex; align-items: center; gap: 8px; }
+.reimp-item .fname, .reimp-group .fname { font-family: var(--mono); font-size: var(--fs-sm); }
+.reimp-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.reimp-choice { display: flex; gap: 18px; margin-top: 8px; font-size: var(--fs-sm); }
+.reimp-choice label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.reimp-unchanged { font-size: var(--fs-sm); color: var(--muted); }
+.reimp-blocks { margin: 8px 0 16px; font-size: var(--fs-sm); }
+.reimp-blocks summary { cursor: pointer; color: var(--muted); }
+.reimp-actions { margin-top: 16px; gap: 12px; }
+.diff-size { font-family: var(--mono); font-size: var(--fs-micro); }
+.diff-size .add { color: var(--success); }
+.diff-size .del { color: var(--danger); }
+.diff { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; margin-top: 8px; max-height: 360px; overflow: auto; }
+.diff-side { font-family: var(--mono); font-size: var(--fs-micro); border: 1px solid var(--hairline); border-radius: var(--radius); overflow-x: auto; }
+.diff-head { position: sticky; top: 0; background: var(--surface2); padding: 3px 8px; font-family: var(--sans); font-weight: 600; border-bottom: 1px solid var(--hairline); }
+.dl { display: flex; white-space: pre; line-height: 1.5; }
+.dl .ln { flex: 0 0 44px; text-align: right; padding-right: 8px; color: var(--muted); user-select: none; }
+.dl .lt { padding-right: 8px; }
+.dl.del { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.dl.add { background: color-mix(in srgb, var(--success) 14%, transparent); }
+.dl.pad { background: repeating-linear-gradient(45deg, transparent 0 4px, color-mix(in srgb, var(--muted) 10%, transparent) 4px 8px); }
+.dl.gap { justify-content: center; color: var(--muted); background: var(--surface2); }
+.diff-note { margin-top: 4px; }

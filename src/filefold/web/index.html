@@ -184,13 +184,13 @@
 
           <section id="help-reimport">
             <h2>Reimporting a new version</h2>
-            <p>When the original model changes, <b>Re-import</b> the new file. Each existing child is compared with the new version:</p>
+            <p>When the original model changes, <b>Re-import</b> the new file. Nothing is written until you press <b>Apply updates</b>. The review lists each child file by the decision it needs:</p>
             <dl class="help-defs">
-              <dt>safe to update</dt><dd>Changed upstream, not edited here. Updated by default.</dd>
+              <dt>conflict</dt><dd>Changed upstream and edited here. Your version is shown next to the incoming one; choose <b>Keep my edits</b> (the default) or <b>Take incoming</b>.</dd>
+              <dt>will update</dt><dd>Changed upstream, not edited here. Updated by default; <b>Show changes</b> compares the two first.</dd>
               <dt>unchanged</dt><dd>Same in both. Left alone.</dd>
-              <dt>conflict</dt><dd>Changed upstream and edited here. You choose whether to overwrite your edits.</dd>
             </dl>
-            <p>Categories that are new in the file can be extracted at the same time.</p>
+            <p>Categories that are new in the file can be extracted at the same time. The mother file is always updated. Files too large to compare in the browser say so instead.</p>
           </section>
 
           <section id="help-export">
@@ -345,40 +345,20 @@
         <input type="file" id="reimp-input" accept=".inp" style="display:none" onchange="handleReimpUpload(this.files[0])">
       </div>
 
-      <!-- Step 2: review -->
+      <!-- Step 2: review. One list, ordered by the decision each file needs. -->
       <div id="reimp-preview-section" style="display:none">
-        <div class="two-col" style="align-items:start; gap:28px">
+        <div class="section-title">Review the changes <button type="button" class="info-btn" data-info="reimport-status" aria-label="About the reimport statuses" aria-expanded="false">i</button></div>
+        <div id="reimp-results"></div>
 
-          <!-- left: inspector + new categories -->
-          <div class="stack">
-            <div>
-              <div class="section-title" style="cursor:pointer" onclick="toggleReimpInspector()">
-                Block tree — <span id="reimp-file-label" class="mono"></span>
-                <span id="reimp-insp-toggle" style="float:right;color:var(--muted)">▸ show</span>
-              </div>
-              <div id="reimp-inspector-tree" class="inspector-tree" style="display:none"></div>
-            </div>
+        <details class="reimp-blocks">
+          <summary>Keyword blocks in <span id="reimp-file-label" class="mono"></span></summary>
+          <div id="reimp-inspector-tree" class="inspector-tree"></div>
+        </details>
 
-            <div id="reimp-new-cats-section" style="display:none">
-              <div class="section-title">Add new sections</div>
-              <p class="text-muted text-sm" style="margin-bottom:10px">
-                These categories exist in the new file but aren't extracted in this workspace yet.
-                Check any you want to add — a new child file will be created.
-              </p>
-              <div id="reimp-new-cats" class="split-grid"></div>
-            </div>
-          </div>
-
-          <!-- right: conflict preview -->
-          <div>
-            <div class="section-title">Existing sections <button type="button" class="info-btn" data-info="reimport-status" aria-label="About the reimport statuses" aria-expanded="false">i</button></div>
-            <div id="reimp-results"></div>
-          </div>
-        </div>
-
-        <div class="row" style="margin-top:24px">
+        <div class="row reimp-actions">
           <button class="btn btn-ghost" onclick="resetReimp()">← Upload different file</button>
           <span class="spacer"></span>
+          <span id="reimp-summary" class="text-muted text-sm"></span>
           <button id="reimp-apply-btn" class="btn btn-primary" onclick="applyReimp()">Apply updates</button>
         </div>
       </div>

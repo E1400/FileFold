@@ -10,6 +10,7 @@ UnsafeName (a client error, status 400).
 """
 from __future__ import annotations
 
+import difflib
 import hashlib
 import io
 import re
@@ -553,27 +554,84 @@ def recombine(name: str, filenames: list[str]) -> dict:
 # Re-import
 # ---------------------------------------------------------------------------
 
-def _status_json(s) -> dict:
-    return {
+def _status_json(s, current: str | None = None) -> dict:
+    out = {
         "filename": s.filename,
         "category": s.category.value,
         "changed_in_new_mother": s.changed_in_new_mother,
         "manually_edited": s.manually_edited,
     }
+    if current is not None:          # changed upstream: show what would change
+        out["diff"] = side_by_side_diff(current, s.new_content)
+    return out
+
+
+# Diffs are for people to read before deciding; past this size (a 100 MB mesh, in the
+# browser build) they only say how big the files are.
+DIFF_MAX_CHARS = 1_000_000
+
+
+def side_by_side_diff(old: str, new: str, context: int = 2, max_rows: int = 300) -> dict:
+    """Your text vs the incoming text as aligned rows for a two-column view.
+
+    rows: [{"type": "equal"|"replace"|"delete"|"insert"|"gap", "left": [[lineno, text]],
+    "right": [[lineno, text]]}] with `context` unchanged lines around each change and a
+    "gap" row where unchanged lines are skipped. At most ~max_rows lines are returned
+    (`truncated`); `added` / `removed` always count the whole difference.
+    """
+    if len(old) > DIFF_MAX_CHARS or len(new) > DIFF_MAX_CHARS:
+        return {"rows": [], "added": None, "removed": None, "truncated": False, "too_large": True,
+                "old_lines": old.count("\n"), "new_lines": new.count("\n")}
+    a, b = old.splitlines(), new.splitlines()
+    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+    added = removed = 0
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag in ("replace", "delete"):
+            removed += i2 - i1
+        if tag in ("replace", "insert"):
+            added += j2 - j1
+    rows: list[dict] = []
+    budget, truncated = max_rows, False
+    for group in sm.get_grouped_opcodes(context):
+        if budget <= 0:
+            truncated = True
+            break
+        if rows:
+            rows.append({"type": "gap", "left": [], "right": []})
+        for tag, i1, i2, j1, j2 in group:
+            left = [[i + 1, a[i]] for i in range(i1, i2)] if tag != "insert" else []
+            right = [[j + 1, b[j]] for j in range(j1, j2)] if tag != "delete" else []
+            size = max(len(left), len(right))
+            if size > budget:
+                left, right, truncated = left[:budget], right[:budget], True
+            rows.append({"type": tag, "left": left, "right": right})
+            budget -= min(size, budget)
+            if budget <= 0:
+                truncated = truncated or size > 0
+                break
+    return {"rows": rows, "added": added, "removed": removed, "truncated": truncated, "too_large": False}
 
 
 def reimport_preview(name: str, filename: str, data: bytes | Path) -> dict:
     """Upload a new mother file and get a preview of what would change."""
-    _, ws = _load(name)
+    ws_dir, ws = _load(name)
+
+    def current(fname: str) -> str:
+        path = ws_dir / fname
+        return path.read_bytes().decode("utf-8", errors="replace") if path.exists() else ""
+
     with _staged(filename, data) as tmp_path:
         blocks = parse(tmp_path, keep_lines=False)
         preview = ws.reimport_preview(tmp_path)
         return {
             "filename": filename or "upload.inp",
             "blocks": blocks_to_json(blocks),
-            "safe_to_update": [_status_json(s) for s in preview.safe_to_update],
-            "needs_attention": [_status_json(s) for s in preview.needs_attention],
+            "safe_to_update": [_status_json(s, current(s.filename)) for s in preview.safe_to_update],
+            "needs_attention": [_status_json(s, current(s.filename)) for s in preview.needs_attention],
             "unchanged": [_status_json(s) for s in preview.unchanged],
+            # The mother file is always rewritten (its *INCLUDE lines and model set-up).
+            "mother": {"filename": ws.source_name,
+                       "changed": current(ws.source_name) != preview.new_mother_content},
         }
 
 

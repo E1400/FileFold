@@ -161,6 +161,7 @@ def test_reimport_updates_children_and_reports_conflicts(ws, tmp_path):
     new.write_bytes(Path(JOB1).read_bytes().replace(b"*Node", b"*Node ** second upstream", 1))
     out = ws("workspace", "reimport", "demo", str(new)).output
     assert "manually edited" in out and "--force" in out
+    assert "lines)" in out and "mother file, always updated" in out          # how big each change is
     assert service.read_file("demo", "mesh.inp") == b"** mine\r\n"
     ws("workspace", "reimport", "demo", str(new), "--force")
     assert b"second upstream" in service.read_file("demo", "mesh.inp")

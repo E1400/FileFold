@@ -426,11 +426,21 @@ def workspace_reimport(
     console.print(f"\n[bold]Reimport preview[/bold] — {new_source.name} → {name}\n")
     for s in preview["unchanged"]:
         console.print(f"  [dim]·  {s['filename']}  no change[/dim]")
+    def size(s: dict) -> str:
+        d = s.get("diff") or {}
+        if d.get("too_large"):
+            return "  (too large to compare)"
+        return f"  (+{d['added']} -{d['removed']} lines)" if d.get("added") is not None else ""
+
     for s in preview["safe_to_update"]:
-        console.print(f"  [green]↑  {s['filename']}  will update[/green]")
+        console.print(f"  [green]↑  {s['filename']}  will update{size(s)}[/green]")
     for s in preview["needs_attention"]:
         verb = "will be overwritten" if force else "skipped"
-        console.print(f"  [yellow]⚠  {s['filename']}  changed in the new file BUT manually edited — {verb}[/yellow]")
+        console.print(f"  [yellow]⚠  {s['filename']}  changed in the new file BUT manually edited — {verb}{size(s)}[/yellow]")
+    mother = preview.get("mother")
+    if mother:
+        console.print(f"  [dim]↑  {mother['filename']}  mother file, always updated"
+                      f"{'' if mother['changed'] else ' (no change)'}[/dim]")
     if preview["needs_attention"] and not force:
         console.print("\n[dim]Use --force to overwrite manually edited files too.[/dim]")
 

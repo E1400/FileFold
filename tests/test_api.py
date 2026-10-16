@@ -341,3 +341,37 @@ def test_errors_name_their_code_and_field(client):
     r = client.post("/api/workspaces/a/resplit-child", json={"category": "mesh", "sub_selections": [
         {"sub_category": "nodes", "filename": "material.inp"}]})
     assert (r.json()["code"], r.json()["value"]) == ("filename_taken", "material.inp")
+
+
+# ---------------------------------------------------------------------------
+# Re-import review shows what changed (side-by-side rows), and names the mother
+# ---------------------------------------------------------------------------
+
+def test_reimport_preview_includes_a_side_by_side_diff_and_the_mother(client, tmp_path):
+    job1 = FIXTURES / "Job-1.inp"
+    _upload(client, job1, "/api/workspaces", {"name": "rd", "selections": json.dumps(
+        [{"category": "mesh", "filename": "mesh.inp", "sub_selections": []}])})
+    from filefold import service
+    service.write_file("rd", "mesh.inp", b"** mine\r\n" + service.read_file("rd", "mesh.inp"))
+    changed = tmp_path / "Job-1.inp"
+    changed.write_bytes(job1.read_bytes().replace(b"*Node", b"*Node\r\n** upstream", 1))
+    body = _upload(client, changed, "/api/workspaces/rd/reimport/preview").json()
+    conflict = body["needs_attention"][0]
+    assert conflict["filename"] == "mesh.inp"
+    diff = conflict["diff"]
+    yours = [t for row in diff["rows"] for _, t in row["left"]]
+    incoming = [t for row in diff["rows"] for _, t in row["right"]]
+    assert "** mine" in yours and "** mine" not in incoming
+    assert "** upstream" in incoming and "** upstream" not in yours
+    assert diff["added"] >= 1 and diff["removed"] >= 1
+    assert body["mother"] == {"filename": "Job-1.inp", "changed": False}   # the change is inside mesh.inp
+
+
+def test_reimport_diff_is_capped_for_huge_files():
+    from filefold.service import side_by_side_diff
+    a = "\n".join(f"line {i}" for i in range(5000))
+    b = "\n".join(f"line {i}" if i % 2 else f"changed {i}" for i in range(5000))
+    d = side_by_side_diff(a, b, max_rows=50)
+    assert d["truncated"] and sum(len(r["left"]) + len(r["right"]) for r in d["rows"]) <= 120
+    big = side_by_side_diff("x\n" * 2_000_000, "y\n" * 2_000_000)
+    assert big["too_large"] and big["rows"] == []
