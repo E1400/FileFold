@@ -263,6 +263,7 @@ function renameWorkspace(name) {
     try {
       await api("PATCH", `/api/workspaces/${encodeURIComponent(name)}`, { name: newName });
       close();
+      await moveSaveFolder(name, newName);
       toast(`Renamed to "${newName}"`, "ok");
       state.selectedWs.delete(name);
       await loadWorkspaces();
@@ -287,22 +288,14 @@ function renameWorkspace(name) {
 }
 
 async function exportWsCard(name) {
-  try {
-    const blob = await api("GET", `/api/workspaces/${encodeURIComponent(name)}/export`);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${name}.zip`; a.click();
-    URL.revokeObjectURL(url);
-    toast(`${name}.zip downloaded`);
-  } catch(e) {
-    toastError("Couldn't export the workspace", e);
-  }
+  await saveWorkspaceFile(name);   // into the workspace's folder (saving.js)
 }
 
 async function deleteWsCard(name) {
   if (!confirm(`Delete workspace "${name}"? This cannot be undone.`)) return;
   try {
     await api("DELETE", `/api/workspaces/${encodeURIComponent(name)}`);
+    await moveSaveFolder(name, null);
     state.selectedWs.delete(name);
     toast(`Deleted ${name}`);
     await loadWorkspaces();
@@ -324,6 +317,7 @@ async function deleteSelected() {
   for (const name of names) {
     try {
       await api("DELETE", `/api/workspaces/${encodeURIComponent(name)}`);
+      await moveSaveFolder(name, null);
       state.selectedWs.delete(name);
     } catch(e) {
       toastError(`Couldn't delete "${name}"`, e);
@@ -351,6 +345,7 @@ async function openWorkspace(name) {
   document.getElementById("detail-files").innerHTML = "";
   // Clear stale splits content from any previously-opened workspace.
   document.getElementById("ws-split-config").innerHTML = "";
+  refreshSaveFolderButton(name);
 
   try {
     const data = await api("GET", `/api/workspaces/${encodeURIComponent(name)}`);
@@ -412,29 +407,29 @@ function renderDetail(data) {
       <td>${lineCount}</td>
       <td>${statusBadge}</td>
       <td>
-        <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}
+                  aria-label="Download ${esc(f.filename)}" title="Download ${esc(f.filename)}">⬇ Download</button>
+        </div>
       </td>
     </tr>`;
   }).join("");
 }
 
 async function exportWorkspace() {
-  try {
-    const blob = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}/export`);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${state.activeWs}.zip`; a.click();
-    URL.revokeObjectURL(url);
-    toast("Export downloaded");
-  } catch (e) {
-    toastError("Couldn't export the workspace", e);
-  }
+  await saveWorkspaceFile(state.activeWs);
+}
+
+async function downloadFile(filename) {
+  await saveWorkspaceFile(state.activeWs, filename);
 }
 
 async function deleteWorkspace() {
   if (!confirm(`Delete workspace "${state.activeWs}"? This cannot be undone.`)) return;
   try {
     await api("DELETE", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
+    await moveSaveFolder(state.activeWs, null);
     toast(`Deleted ${state.activeWs}`);
     state.activeWs = null;
     await loadWorkspaces();

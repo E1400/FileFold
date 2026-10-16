@@ -100,3 +100,31 @@ def test_smoke_test_mode_starts_the_server_and_renders_the_ui(tmp_path):
                          env=env, capture_output=True, text=True, timeout=120)
     assert out.returncode == 0, out.stdout + out.stderr
     assert "SMOKE OK" in out.stdout
+
+
+def test_the_folder_dialog_opens_on_the_main_thread_for_the_server(tmp_path, monkeypatch, qapp_offscreen):
+    """The server thread asks for a folder; the dialog must run on Qt's main thread (a dialog
+    from another thread crashes Qt) and the server thread gets the answer back."""
+    import threading
+    from PySide6.QtCore import QEventLoop, QTimer
+    from PySide6.QtWidgets import QFileDialog
+
+    seen = {}
+
+    def fake_dialog(parent, caption, start):
+        seen["thread"] = threading.current_thread() is threading.main_thread()
+        seen["caption"], seen["start"] = caption, start
+        return str(tmp_path)
+
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(fake_dialog))
+    chooser = desktop._make_dir_chooser(lambda: None)
+    result = {}
+    worker = threading.Thread(target=lambda: result.setdefault("dir", chooser("Job-1", tmp_path / "start")))
+    loop = QEventLoop()
+    worker.start()
+    timer = QTimer(); timer.timeout.connect(lambda: (not worker.is_alive()) and loop.quit()); timer.start(20)
+    QTimer.singleShot(10_000, loop.quit)
+    loop.exec()
+    worker.join(1)
+    assert result["dir"] == tmp_path
+    assert seen == {"thread": True, "caption": "Choose where to save Job-1", "start": str(tmp_path / "start")}

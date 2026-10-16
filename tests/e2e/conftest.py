@@ -105,6 +105,26 @@ def clean_workspaces(workspace_dir):
 @pytest.fixture()
 def app(page, base_url):
     """A page on the app that fails the test on any browser-side error."""
+    errors = open_app(page, base_url)
+    yield page
+    assert errors == [], "browser-side errors:\n" + "\n".join(errors)
+
+
+@pytest.fixture()
+def persistent_app(browser_type, base_url, tmp_path, browser_type_launch_args):
+    """Like `app`, in a browser with a real on-disk profile. Playwright's default contexts are
+    private (incognito-like), where storing a file-system folder handle in IndexedDB crashes
+    the page; saving to a remembered folder needs a normal profile, as people have."""
+    context = browser_type.launch_persistent_context(tmp_path / "profile", **browser_type_launch_args)
+    page = context.pages[0] if context.pages else context.new_page()
+    errors = open_app(page, base_url)
+    yield page
+    context.close()
+    assert errors == [], "browser-side errors:\n" + "\n".join(errors)
+
+
+def open_app(page, base_url) -> list[str]:
+    """Load the app in `page`, collecting every browser-side error into the returned list."""
     errors: list[str] = []
     page.on("console", lambda m: errors.append(f"console.error: {m.text}") if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
@@ -130,8 +150,7 @@ def app(page, base_url):
     if TARGET == "static":   # Python is starting in a worker; the banner goes away when ready
         page.wait_for_selector("#static-banner", state="detached", timeout=90_000)
     page.expected_errors = errors  # tests that deliberately provoke an error clear this
-    yield page
-    assert errors == [], "browser-side errors:\n" + "\n".join(errors)
+    return errors
 
 
 def fixture_path(name: str) -> Path:

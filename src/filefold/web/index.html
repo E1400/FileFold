@@ -283,6 +283,8 @@
       <h1 id="detail-title">Workspace</h1>
       <span class="spacer"></span>
       <button class="btn btn-ghost btn-sm" onclick="exportWorkspace()">⬇ Export ZIP</button>
+      <button id="save-folder-btn" class="btn btn-ghost btn-sm save-folder-btn" onclick="changeSaveFolder()" hidden
+              aria-label="Folder this workspace saves to"><span aria-hidden="true">📁</span> <span class="lbl">Choose folder…</span></button>
       <button class="btn btn-ghost btn-sm" onclick="startReimp()">↑ Re-import</button>
       <button class="btn btn-danger btn-sm" onclick="deleteWorkspace()">Delete</button>
     </div>
@@ -448,6 +450,7 @@
 <div id="toast-container"></div>
 <script src="static/core.js"></script>
 <script src="static/views.js"></script>
+<script src="static/saving.js"></script>
 <script src="static/splits.js"></script>
 <script src="static/create.js"></script>
 <script src="static/reimport.js"></script>

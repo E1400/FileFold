@@ -501,6 +501,11 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
   vertical-align: middle;
 }
 .file-table tr:last-child td { border-bottom: none; }
+.file-table .row-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+/* Folder this workspace saves to: a long path must not push the topbar buttons off screen. */
+.save-folder-btn { max-width: 220px; }
+.save-folder-btn[hidden] { display: none; }   /* .btn sets display, which beats the hidden attribute */
+.save-folder-btn .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-table tr:hover td { background: var(--surface2); }
 .file-table .filename { font-family: var(--mono); font-size: var(--fs-sm); }
 /* Filenames read as floating text without a baseline to sit on. */
