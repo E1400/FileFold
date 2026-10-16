@@ -5,7 +5,7 @@ decision, a changed invariant, a new known gap. One or two lines, dated, newest 
 Do not rewrite history. `CLAUDE.md` holds the rules that follow from these decisions; keep
 it true, keep this file as it happened.
 
-## Where main stands (2026-10-15)
+## Where main stands (2026-10-16)
 
 Trunk-based, old branches pruned. `main` contains everything through: theme redesign,
 static Pages build, guidance features (sample data, (i) reminders, tour, Info tab), the
@@ -40,4 +40,4 @@ branch.
 - 2026-10-12: Merged feature/desktop-app: Apple Silicon/Intel/Windows builds tested in CI (smoke + built-app e2e), stable port + persistent profile, downloads, Dock reopen; README rewritten; landing download buttons -> `releases/latest/download/<asset>`. Released v0.1.0 (unsigned). Apple Developer ID signing/notarization offered to the user ($99/yr), pending their decision. The CI docker job can fail on Docker Hub 429 rate limits (infra, rerun).
 - 2026-10-15: Merged tour/Info wording (no redundant "Nothing is created" lines; tour steps 3-6 wait for a loaded deck, pointing at Sample data) and form-style errors: server errors carry `code`/`field`/`value` (`ServiceError`/`UnsafeName` `.payload()`, same via `browser.py`); the UI words them (`errorText` in `core.js`), marks the wrong field (`showFieldError`), and error toasts stay until closed. User-facing text uses US spelling.
 - 2026-10-15: Released desktop v0.1.1 (tour/Info wording, form-style errors, US spelling).
-- 2026-10-16: Moved the Claude context file from `SWE/CLAUDE.md` into the repo as `FileFold/CLAUDE.md`, trimmed to commands/invariants/gotchas; the decision log and the full-deployment backlog split out into `docs/DECISIONS.md` and `docs/BACKLOG.md`, read on demand.
+- 2026-10-16: Merged docs/claude-md-into-repo. The Claude context file moved from `SWE/CLAUDE.md` into the repo as `FileFold/CLAUDE.md`, trimmed to commands/invariants/gotchas; the decision log and the full-deployment backlog split out into `docs/DECISIONS.md` and `docs/BACKLOG.md`, read on demand. No `SWE/CLAUDE.md` any more — a session started in `SWE/` picks the context up on first touching a file here.
