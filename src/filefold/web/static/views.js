@@ -2,6 +2,10 @@
 // View router
 // ═══════════════════════════════════════════════════════════════════════════════
 function showView(name) {
+  // Leaving a workspace with split choices not applied yet: ask first. The editor is
+  // not "leaving" (Back returns to the same Splits tab, choices intact).
+  if (state.view === "detail" && name !== "detail" && name !== "editor"
+      && !guardLeaveSplits(() => showView(name))) return;
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById(`view-${name}`).classList.add("active");
   state.view = name;
@@ -338,6 +342,7 @@ async function deleteSelected() {
 // Workspace detail
 // ═══════════════════════════════════════════════════════════════════════════════
 async function openWorkspace(name) {
+  if (state.view === "detail" && name !== state.activeWs && !guardLeaveSplits(() => openWorkspace(name))) return;
   state.activeWs = name;
   // Drop the previous workspace's detail immediately. Leaving it in place means a
   // failed fetch below would strand activeWs and wsData pointing at different

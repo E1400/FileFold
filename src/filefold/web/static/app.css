@@ -897,3 +897,20 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .field-error::before { content: "⚠ "; }
 /* a flex row holding a message wraps it onto its own line instead of squeezing the field */
 :has(> .field-error) { flex-wrap: wrap; }
+
+/* ── Splits tab: pending changes ─────────────────────────────────────────────── */
+/* Sticky so Apply is reachable however long the list of categories is. */
+.pending-bar {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 16px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 -4px 12px rgba(0,0,0,.08);
+}
+.pending-count { font-size: var(--fs-sm); color: var(--muted); }
+.pending-bar.has-changes .pending-count { color: var(--text); font-weight: 600; }
+.pending-mark { font-size: var(--fs-micro); padding: 1px 6px; border-radius: var(--radius); border: 1px solid currentColor; white-space: nowrap; }
+.pending-mark.is-new     { color: var(--success); }
+.pending-mark.is-fold    { color: var(--warn); }
+.pending-mark.is-rename  { color: var(--accent); }
+.pending-mark-sub { font-size: var(--fs-micro); color: var(--muted); font-style: italic; }

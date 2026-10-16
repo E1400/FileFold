@@ -179,7 +179,7 @@
 
           <section id="help-splits">
             <h2>The Splits tab</h2>
-            <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model.</p>
+            <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model. Nothing changes until you press <b>Apply changes</b>: the bar at the bottom counts what will change, each changed row says what will happen (new, folds back, renamed), <b>Discard</b> undoes your choices, and leaving the workspace with choices not applied asks first.</p>
           </section>
 
           <section id="help-reimport">
@@ -316,9 +316,12 @@
         <button type="button" class="info-btn" data-info="splits" aria-label="About the Splits tab" aria-expanded="false">i</button>
       </p>
       <div id="ws-split-config" class="split-grid"></div>
-      <div class="row" style="margin-top:24px">
+      <!-- Always on screen while the tab is open: what Apply will do, and the way out. -->
+      <div id="splits-pending-bar" class="pending-bar" role="status" aria-live="polite">
+        <span id="splits-pending-count" class="pending-count">No changes</span>
         <span class="spacer"></span>
-        <button id="ws-splits-apply-btn" class="btn btn-primary" onclick="applyEditSplits()">Apply changes</button>
+        <button id="splits-discard-btn" class="btn btn-ghost btn-sm" type="button" onclick="discardSplitChanges()" disabled>Discard</button>
+        <button id="ws-splits-apply-btn" class="btn btn-primary btn-sm" type="button" onclick="applyEditSplits()" disabled>Apply changes</button>
       </div>
     </div>
   </div>
@@ -439,6 +442,16 @@
   <p>You have unsaved edits to <span class="mono" id="unsaved-dialog-file"></span>.</p>
   <div class="dialog-actions">
     <button class="btn btn-primary btn-sm" id="unsaved-save-btn" data-choice="save">Save and close</button>
+    <button class="btn btn-danger btn-sm" data-choice="discard">Discard changes</button>
+    <button class="btn btn-ghost btn-sm" data-choice="cancel" autofocus>Keep editing</button>
+  </div>
+</dialog>
+
+<dialog id="pending-dialog" aria-labelledby="pending-dialog-title">
+  <h2 id="pending-dialog-title">Unapplied split changes</h2>
+  <p><span id="pending-dialog-count"></span> on the Splits tab of <span class="mono" id="pending-dialog-ws"></span> are not applied yet.</p>
+  <div class="dialog-actions">
+    <button class="btn btn-primary btn-sm" data-choice="apply">Apply and leave</button>
     <button class="btn btn-danger btn-sm" data-choice="discard">Discard changes</button>
     <button class="btn btn-ghost btn-sm" data-choice="cancel" autofocus>Keep editing</button>
   </div>

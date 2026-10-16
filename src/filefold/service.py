@@ -340,6 +340,18 @@ def get_workspace(name: str) -> dict:
         if b.category.value not in NON_EXTRACTABLE:
             available_cats.add(b.category.value)
 
+    # Deck order, like the New Workspace screen: where each category first appears in the
+    # mother file; an extracted category sits where its *INCLUDE line is.
+    child_cat = {sel.filename: sel.category.value for sel in ws.selections}
+    deck_order: list[str] = []
+    for b in mother_blocks:
+        cat = b.category.value
+        if b.keyword == "INCLUDE":
+            cat = child_cat.get((b.params.get("INPUT") or "").strip().strip('"'), cat)
+        if cat in available_cats and cat not in deck_order:
+            deck_order.append(cat)
+    deck_order += sorted(available_cats - set(deck_order))
+
     # Sub-split options per category, from what is actually in the deck.
     # Already extracted: scan the child with its sub-files folded back in, which is exactly
     # what "Apply changes" re-splits (recombine, then split again). Still in the mother:
@@ -347,7 +359,7 @@ def get_workspace(name: str) -> dict:
     sub_options: dict[str, list[dict[str, str]]] = {}
     sub_claims: dict[str, list[list[str]]] = {}
     sel_by_cat = {s.category.value: s for s in ws.selections}
-    for cat_str in sorted(available_cats):
+    for cat_str in deck_order:
         try:
             cat_enum = Category(cat_str)
         except ValueError:
@@ -383,7 +395,7 @@ def get_workspace(name: str) -> dict:
         ],
         "updated_at": ws.updated_at,
         "files": files,
-        "available_categories": sorted(available_cats),
+        "available_categories": deck_order,
         "available_sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in sub_options.items()},
         "sub_options": sub_options,
         "sub_claims": sub_claims,

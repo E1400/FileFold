@@ -6,6 +6,7 @@ const state = {
   workspaces: [],       // list of workspace names
   activeWs: null,       // name of open workspace
   wsData: null,         // full detail response for the open workspace
+  splitsRenderedFor: null, // workspace name the Splits tab currently shows (keeps unapplied choices)
   inspectResult: null,  // { filename, blocks }
   uploadedFile: null,   // File object
   wsSummary: {},        // { [name]: {file_count, split_count, bytes, categories[]} }
@@ -183,6 +184,28 @@ function showApiErrorOnField(e, fields) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Toast
 // ═══════════════════════════════════════════════════════════════════════════════
+// Show an app dialog whose buttons carry data-choice; resolves with that choice.
+// Esc and clicking the backdrop count as "cancel".
+function askDialogChoice(dlg) {
+  return new Promise(resolve => {
+    const done = choice => {
+      dlg.removeEventListener("click", onClick);
+      dlg.removeEventListener("cancel", onCancel);
+      if (dlg.open) dlg.close();
+      resolve(choice);
+    };
+    const onClick = e => {
+      const choice = e.target.closest("[data-choice]")?.dataset.choice;
+      if (choice) done(choice);
+      else if (e.target === dlg) done("cancel");   // click on the backdrop
+    };
+    const onCancel = e => { e.preventDefault(); done("cancel"); };
+    dlg.addEventListener("click", onClick);
+    dlg.addEventListener("cancel", onCancel);
+    dlg.showModal();
+  });
+}
+
 // Short confirmations fade on their own; a warning stays a little longer; an error stays
 // until it is closed, so there is time to read it. `msg` is plain text, never HTML.
 function toast(msg, type = "ok", title = "") {

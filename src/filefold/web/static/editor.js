@@ -510,25 +510,8 @@ function discardEdits() {
 
 // Resolves "save" | "discard" | "cancel". Esc and clicking away count as cancel.
 function askUnsavedChoice() {
-  const dlg = document.getElementById("unsaved-dialog");
   document.getElementById("unsaved-dialog-file").textContent = _modalFile ?? "";
-  return new Promise(resolve => {
-    const done = choice => {
-      dlg.removeEventListener("click", onClick);
-      dlg.removeEventListener("cancel", onCancel);
-      if (dlg.open) dlg.close();
-      resolve(choice);
-    };
-    const onClick = e => {
-      const choice = e.target.closest("[data-choice]")?.dataset.choice;
-      if (choice) done(choice);
-      else if (e.target === dlg) done("cancel");   // click on the backdrop
-    };
-    const onCancel = e => { e.preventDefault(); done("cancel"); };
-    dlg.addEventListener("click", onClick);
-    dlg.addEventListener("cancel", onCancel);
-    dlg.showModal();
-  });
+  return askDialogChoice(document.getElementById("unsaved-dialog"));
 }
 
 async function closeEditor() {
