@@ -206,9 +206,18 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ws-item:hover { background: var(--hairline); color: var(--text); }
-.ws-item.active { background: var(--hairline); color: var(--text); box-shadow: inset 2px 0 0 var(--text); }
+/* The open workspace must read at a glance, in both themes: an ink-tinted fill (not the
+   hover grey), a semibold label, a 3 px ink bar and a solid marker instead of the dash. */
+.ws-item.active,
+.ws-item.active:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .ws-item .lbl { overflow: hidden; text-overflow: ellipsis; }
 .ws-item .dot { width: 6px; height: 1px; background: currentColor; flex-shrink: 0; }
+.ws-item.active .dot { height: 6px; }
 .search-box { padding: 8px 12px; }
 .search-box input { width: 100%; }
 

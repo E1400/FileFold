@@ -43,7 +43,7 @@ function renderSidebar() {
     el.innerHTML = `<div class="panel-empty">No workspaces yet</div>`;
   } else {
     el.innerHTML = state.workspaces.map(name =>
-      `<div class="ws-item ${name === state.activeWs ? "active" : ""}" onclick="openWorkspace('${esc(name).replace(/'/g, "\\'")}')">
+      `<div class="ws-item ${name === state.activeWs ? "active" : ""}"${name === state.activeWs ? ' aria-current="true"' : ""} onclick="openWorkspace('${esc(name).replace(/'/g, "\\'")}')">
          <span class="dot"></span><span class="lbl">${esc(name)}</span>
        </div>`
     ).join("");
