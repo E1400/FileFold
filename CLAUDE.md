@@ -155,5 +155,9 @@ executed by `tests/test_docs.py`.
   200 MB did not finish create in Chromium; the UI warns above 100 MB.
 - The app shell is not phone-responsive (fixed 220 px sidebar); it squeezes below ~700 px.
 - The CI `docker` job can fail on Docker Hub 429 rate limits — infra, just rerun.
+- Caching: the server sends `Cache-Control: no-store` on `/api/*` and `no-cache` on the UI, and
+  the desktop window has no HTTP cache. Without it an updated desktop app kept running the old
+  build's scripts. A desktop bug seen only there: first check the build (tray menu shows the
+  version) — the user once ran a local pre-release build from `~/Downloads`.
 - Server hardening done: streaming uploads, filename path-traversal fixed, read-only parses
   use `keep_lines=False`, optional `FILEFOLD_MAX_UPLOAD_MB` and `FILEFOLD_BASIC_AUTH`.

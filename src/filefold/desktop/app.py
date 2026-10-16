@@ -84,6 +84,11 @@ def unique_download_path(directory: Path, name: str) -> Path:
     return candidate
 
 
+def app_version() -> str:
+    from filefold.api.main import app as fastapi_app   # the version the bundle was built from
+    return fastapi_app.version
+
+
 def _download_dir() -> Path:
     if os.environ.get("FILEFOLD_DOWNLOAD_DIR"):
         return Path(os.environ["FILEFOLD_DOWNLOAD_DIR"])
@@ -191,6 +196,9 @@ def _build_qt(port: int, smoke: bool):
     profile = QWebEngineProfile("FileFold")
     profile.setPersistentStoragePath(str(data / "web"))
     profile.setCachePath(str(data / "cache"))
+    # No HTTP cache: the server is on this computer, so caching saves nothing, and a cache that
+    # outlives an update would keep running the old build's scripts against the new server.
+    profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
     profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
     return profile, _Window, QIcon(app_icon.make_pixmap(256)), QUrl
 
@@ -241,6 +249,11 @@ class FileFoldApp:
             return
         tray = QSystemTrayIcon(self.icon, self.qt)
         menu = QMenu()
+        # Which build is running, so a stale copy is easy to spot.
+        version_act = QAction(f"FileFold {app_version()}", menu)
+        version_act.setEnabled(False)
+        menu.addAction(version_act)
+        menu.addSeparator()
         open_act = QAction("Open FileFold", menu)
         open_act.triggered.connect(self.show_window)
         menu.addAction(open_act)

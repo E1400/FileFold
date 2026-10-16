@@ -100,3 +100,18 @@ def test_smoke_test_mode_starts_the_server_and_renders_the_ui(tmp_path):
                          env=env, capture_output=True, text=True, timeout=120)
     assert out.returncode == 0, out.stdout + out.stderr
     assert "SMOKE OK" in out.stdout
+
+
+def test_the_window_keeps_no_http_cache(tmp_path, monkeypatch, qapp_offscreen):
+    """The server is local, so a cache saves nothing; and a cache that survives an update
+    keeps serving the old build's scripts (the Splits tab then disagrees with the web app)."""
+    monkeypatch.setenv("FILEFOLD_DESKTOP_DATA", str(tmp_path))
+    from PySide6.QtWebEngineCore import QWebEngineProfile
+    profile, *_ = desktop._build_qt(47321, smoke=True)
+    assert profile.httpCacheType() == QWebEngineProfile.HttpCacheType.NoCache
+
+
+def test_the_menu_shows_which_version_is_running():
+    import tomllib
+    version = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text())["project"]["version"]
+    assert desktop.app_version() == version
