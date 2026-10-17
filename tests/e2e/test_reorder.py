@@ -167,14 +167,15 @@ def test_files_tab_moves_a_file_with_its_sub_files_straight_away(app):
     assert file_rows(app) == ["Job-1.inp", "mesh.inp", "mesh-nodes.inp", "section.inp", "material.inp"]
     expect(app.get_by_role("button", name="Move mesh.inp up")).to_be_disabled()
     app.get_by_role("button", name="Move mesh.inp down").click()
-    expect(app.locator(".toast", has_text="File order changed")).to_be_visible()
     expect(app.locator("#detail-files .filename-text").nth(1)).to_have_text("section.inp")
+    app.wait_for_function("() => state.wsData.include_order[0] === 'section.inp'")     # saved and reloaded
+    expect(app.locator(".toast")).to_have_count(1)                                    # only "created": a swap is quiet
     assert file_rows(app) == ["Job-1.inp", "section.inp", "mesh.inp", "mesh-nodes.inp", "material.inp"]
     assert includes(app) == ["section.inp", "mesh.inp", "material.inp"]
     # drag material.inp to the top of the files
     drag(app, row(app, "material.inp").locator(".grip"), row(app, "section.inp"))
-    expect(app.locator(".toast", has_text="File order changed")).to_have_count(2)
     expect(app.locator("#detail-files .filename-text").nth(1)).to_have_text("material.inp")
+    app.wait_for_function("() => state.wsData.include_order[0] === 'material.inp'")
     assert includes(app) == ["material.inp", "section.inp", "mesh.inp"]
     # the Splits tab shows the new order too
     app.locator("#tab-btn-splits").click()

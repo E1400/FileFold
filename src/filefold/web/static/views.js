@@ -461,8 +461,7 @@ function _fileItems() {
 async function _filesReordered(order) {
   const ws = state.activeWs;
   try {
-    await api("POST", `/api/workspaces/${encodeURIComponent(ws)}/reorder`, { order });
-    toast("File order changed", "ok");
+    await api("POST", `/api/workspaces/${encodeURIComponent(ws)}/reorder`, { order });   // quiet: the table shows it
   } catch (e) {
     toastError("Couldn't change the file order", e);
   }
