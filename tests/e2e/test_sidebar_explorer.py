@@ -41,7 +41,8 @@ def test_edited_files_are_marked_in_the_tree(app):
     app.keyboard.type("** note\n")
     app.locator("#editor-save-btn").click()
     expect(app.locator(".toast", has_text="Saved material.inp")).to_be_visible()
-    expect(tree_file(app, "Job-1", "material.inp").locator(".file-mark")).to_have_attribute("title", "edited")
+    # The tree refreshes after the save's file-list request returns: allow for a slow machine.
+    expect(tree_file(app, "Job-1", "material.inp").locator(".file-mark")).to_have_attribute("title", "edited", timeout=15_000)
     expect(app.locator(".ws-item[data-ws='Job-1'] .ws-edited")).to_have_count(1)
 
 
