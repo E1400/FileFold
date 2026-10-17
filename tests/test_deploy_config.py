@@ -66,3 +66,19 @@ def test_the_api_reports_the_package_version():
     from filefold.api.main import app
     version = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text())["project"]["version"]
     assert app.version == version
+
+
+def test_api_responses_are_never_cached():
+    """A cached workspace status shows splits that no longer exist (or hides new ones)."""
+    from filefold.api.main import app
+    client = TestClient(app)
+    assert client.get("/api/workspaces").headers["cache-control"] == "no-store"
+
+
+def test_the_ui_is_revalidated_on_every_load():
+    """Without this a browser (the desktop window included) may keep running an old build's
+    scripts for hours after an update, against a newer server."""
+    from filefold.api.main import app
+    client = TestClient(app)
+    for path in ("/", "/static/core.js", "/static/app.css"):
+        assert client.get(path).headers["cache-control"] == "no-cache", path
