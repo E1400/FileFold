@@ -905,6 +905,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-base);
 }
 #tour-prompt span { color: var(--muted); font-size: var(--fs-sm); }
+/* The offer floats bottom-right: while it shows, the page keeps room below its content and
+   scrolls things clear of it, so it never covers a button (Create sits at the bottom). */
+body:has(#tour-prompt) #main { scroll-padding-bottom: 140px; }
+body:has(#tour-prompt) .view.active > .content { padding-bottom: 140px; }
 .tour-prompt-actions { display: flex; gap: 6px; margin-top: 6px; }
 @media (prefers-reduced-motion: reduce) { #tour-spot { transition: none; } }
 

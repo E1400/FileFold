@@ -178,8 +178,8 @@ def test_export_zip_contains_mother_and_children(app):
     upload(app, "Job-1.inp")
     app.locator("#sel-mesh").check()
     create(app)
-    # As a browser without folder access (Chromium would ask for a folder: see test_saving.py)
-    app.evaluate("delete Window.prototype.showDirectoryPicker; delete window.showDirectoryPicker")
+    # As a browser without a Save dialog for pages (Chromium opens one: see test_saving.py)
+    app.evaluate("delete Window.prototype.showSaveFilePicker; delete window.showSaveFilePicker")
     with app.expect_download() as dl:
         app.get_by_role("button", name="Export ZIP").click()
     names = zipfile.ZipFile(dl.value.path()).namelist()
