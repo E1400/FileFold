@@ -599,9 +599,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .detail-tab:hover:not(.active) { color: var(--text); }
 
 /* ── Toast ──────────────────────────────────────────────── */
+/* Top right, under the toolbar: the bottom edge holds sticky action bars (Splits tab
+   Apply, re-import Apply) that a toast must never cover. */
 #toast-container {
   position: fixed;
-  bottom: 20px;
+  top: 64px;
   right: 20px;
   display: flex;
   flex-direction: column;
@@ -972,7 +974,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* ── Sidebar file explorer ───────────────────────────────────────────────────── */
 .ws-item { padding-left: 8px; }
-.ws-twisty { background: none; border: 0; color: var(--muted); width: 18px; padding: 0; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+.ws-twisty { background: none; border: 0; color: var(--muted); width: 18px; padding: 0; font-size: 13px; cursor: pointer; flex-shrink: 0; }
 .ws-twisty:hover { color: var(--text); }
 .ws-edited { margin-left: auto; color: var(--warn); font-size: 9px; }
 .ws-tree { padding-bottom: 4px; }
@@ -988,3 +990,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .file-mark { margin-left: auto; font-size: 9px; flex-shrink: 0; }
 .file-mark.is-edited { color: var(--warn); }
 .file-mark.is-missing { color: var(--danger); font-weight: 700; font-size: var(--fs-micro); }
+/* A message may sit over content for a moment; clicks pass through it to what is
+   underneath (only its close button takes clicks). */
+#toast-container, .toast { pointer-events: none; }
+.toast-close { pointer-events: auto; }

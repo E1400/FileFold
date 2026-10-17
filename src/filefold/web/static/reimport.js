@@ -113,6 +113,9 @@ function renderDiff(diff) {
       right += line(cls[1], row.right[i]);
     }
   }
+  if (!diff.rows.length && diff.added === 0 && diff.removed === 0) {
+    return `<p class="text-muted text-sm diff-note">The text is the same; only the line endings differ (Windows vs Mac/Linux files).</p>`;
+  }
   const note = diff.truncated ? `<p class="text-muted text-sm diff-note">Showing the first changes only.</p>` : "";
   return `<div class="diff">
       <div class="diff-side yours"><div class="diff-head">Your version (now)</div>${left}</div>
@@ -122,6 +125,7 @@ function renderDiff(diff) {
 
 function _diffSize(diff) {
   if (!diff || diff.too_large || diff.added == null) return "";
+  if (diff.added === 0 && diff.removed === 0) return `<span class="diff-size">line endings only</span>`;
   return `<span class="diff-size"><span class="add">+${diff.added}</span> <span class="del">−${diff.removed}</span></span>`;
 }
 

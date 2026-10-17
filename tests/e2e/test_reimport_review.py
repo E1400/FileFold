@@ -85,3 +85,25 @@ def test_a_safe_update_can_be_inspected_before_applying(app):
     expect(row.get_by_role("checkbox")).to_be_checked()
     row.get_by_role("button", name="Show changes").click()
     expect(row.locator(".diff-side.incoming")).to_contain_text("** changed upstream")
+
+
+def test_a_change_of_line_endings_only_is_named_as_such(app):
+    make_workspace(app, "Job-1.inp", cats=("mesh", "material"))
+    lf = Path(tempfile.mkdtemp()) / "Job-1.inp"
+    lf.write_bytes(fixture_path("Job-1.inp").read_bytes().replace(b"\r\n", b"\n"))   # Job-1 is CRLF
+    app.get_by_role("button", name="Re-import").click()
+    app.set_input_files("#reimp-input", str(lf))
+    expect(app.locator("#reimp-preview-section")).to_be_visible(timeout=30_000)
+    row = app.locator(".reimp-item.is-update", has_text="material.inp")
+    expect(row).to_contain_text("line endings only")
+    row.get_by_role("button", name="Show changes").click()
+    expect(row).to_contain_text("only the line endings differ")
+
+
+def test_messages_never_cover_the_apply_bar(app):
+    make_workspace(app, "Job-1.inp", cats=("mesh",))       # leaves a "created" toast on screen
+    app.locator("#tab-btn-splits").click()
+    app.locator("#ws-sel-material").check()
+    toast_box = app.locator(".toast").first.bounding_box()
+    bar_box = app.locator("#splits-pending-bar").bounding_box()
+    assert toast_box["y"] + toast_box["height"] <= bar_box["y"] or toast_box["y"] >= bar_box["y"] + bar_box["height"]

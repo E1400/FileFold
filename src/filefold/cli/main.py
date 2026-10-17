@@ -430,6 +430,8 @@ def workspace_reimport(
         d = s.get("diff") or {}
         if d.get("too_large"):
             return "  (too large to compare)"
+        if d.get("added") == 0 and d.get("removed") == 0:
+            return "  (line endings only)"
         return f"  (+{d['added']} -{d['removed']} lines)" if d.get("added") is not None else ""
 
     for s in preview["safe_to_update"]:
