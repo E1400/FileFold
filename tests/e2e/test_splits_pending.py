@@ -111,3 +111,15 @@ def test_splits_tab_lists_categories_in_the_same_order_as_new_workspace(app):
     splits(app)
     tab_order = [i.get_attribute("id")[len("ws-sel-"):] for i in app.locator("#ws-split-config input[id^='ws-sel-']").all()]
     assert [c for c in tab_order if c in create_order] == create_order
+
+
+def test_the_leave_dialog_looks_like_the_editors_dialog(app):
+    make_workspace(app, "Job-1.inp", cats=("mesh",))
+    splits(app)
+    app.locator("#ws-sel-material").check()
+    app.get_by_role("button", name="← Back").first.click()
+    style = lambda sel: app.evaluate(f"""() => {{ const d = document.querySelector('{sel}'); const s = getComputedStyle(d);
+        return [s.paddingTop, s.borderTopWidth, s.maxWidth]; }}""")
+    pending = style("#pending-dialog")
+    assert pending[0] != "0px", pending                       # styled, not the browser default
+    app.locator("#pending-dialog").get_by_role("button", name="Keep editing").click()

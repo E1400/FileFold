@@ -782,15 +782,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .unsaved-dot.visible { display: inline-block; }
 
 /* ── Unsaved-changes dialog ─────────────────────────────── */
-#unsaved-dialog {
+#unsaved-dialog, #pending-dialog {
   background: var(--surface); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--radius);
   padding: 20px 22px; max-width: 420px; width: calc(100% - 32px);
+  margin: auto;   /* the global reset removes the browser's centering */
 }
-#unsaved-dialog::backdrop { background: rgba(0, 0, 0, .45); }
-#unsaved-dialog h2 { font-size: var(--fs-lg); margin: 0 0 8px; }
-#unsaved-dialog p { font-size: var(--fs-base); color: var(--muted); margin: 0 0 16px; }
-#unsaved-dialog .dialog-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+#unsaved-dialog::backdrop, #pending-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+#unsaved-dialog h2, #pending-dialog h2 { font-size: var(--fs-lg); margin: 0 0 8px; }
+#unsaved-dialog p, #pending-dialog p { font-size: var(--fs-base); color: var(--muted); margin: 0 0 16px; }
+#unsaved-dialog .dialog-actions, #pending-dialog .dialog-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
 /* ── (i) reminders ────────────────────────────────────────────────────────────
    Small, quiet, available when wanted. The popover is short by design. */
