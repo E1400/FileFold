@@ -88,8 +88,19 @@ def test_moving_back_to_the_original_order_is_no_change(app):
     up(app, "material").click()
     down(app, "material").click()
     expect(app.locator("#ws-order-hint")).to_be_hidden()
-    app.locator("#ws-splits-apply-btn").click()
-    expect(app.locator(".toast", has_text="No changes to apply")).to_be_visible()
+    # The pending-changes bar says so before any click, and Apply has nothing to do.
+    expect(app.locator("#splits-pending-count")).to_have_text("No changes")
+    expect(app.locator("#ws-splits-apply-btn")).to_be_disabled()
+
+
+def test_a_moved_file_counts_as_a_change_in_the_bar_and_the_result(app):
+    open_splits(app)
+    up(app, "material").click()
+    expect(app.locator("#splits-pending-count")).to_contain_text("1 change")
+    names = [r.get_attribute("data-file") for r in app.locator("#ws-result-tree .result-row.role-child").all()]
+    assert names.index("material.inp") < names.index("constraint.inp"), names   # After Apply follows the new order
+    app.locator("#splits-discard-btn").click()
+    expect(app.locator("#splits-pending-count")).to_have_text("No changes")
 
 
 def test_dragging_rearranges_live_and_shows_the_landing_slot(app):

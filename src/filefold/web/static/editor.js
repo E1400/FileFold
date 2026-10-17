@@ -495,25 +495,31 @@ function discardEdits() {
 
 // Resolves "save" | "discard" | "cancel". Esc and clicking away count as cancel.
 function askUnsavedChoice() {
-  const dlg = document.getElementById("unsaved-dialog");
   document.getElementById("unsaved-dialog-file").textContent = _modalFile ?? "";
-  return new Promise(resolve => {
-    const done = choice => {
-      dlg.removeEventListener("click", onClick);
-      dlg.removeEventListener("cancel", onCancel);
-      if (dlg.open) dlg.close();
-      resolve(choice);
-    };
-    const onClick = e => {
-      const choice = e.target.closest("[data-choice]")?.dataset.choice;
-      if (choice) done(choice);
-      else if (e.target === dlg) done("cancel");   // click on the backdrop
-    };
-    const onCancel = e => { e.preventDefault(); done("cancel"); };
-    dlg.addEventListener("click", onClick);
-    dlg.addEventListener("cancel", onCancel);
-    dlg.showModal();
+  return askDialogChoice(document.getElementById("unsaved-dialog"));
+}
+
+function _editorDirty() {
+  const ta = _editorTa();
+  return !!(ta && _modalFile && _modalOrig !== null && ta.value !== _modalOrig);
+}
+
+// Going somewhere else from the editor (another file, the sidebar, another view):
+// unsaved edits are never dropped silently. Returns true when it is fine to go now;
+// otherwise asks and calls `proceed` after Save (if it worked) or Discard.
+function guardLeaveEditor(proceed) {
+  if (state.view !== "editor" || !_editorDirty()) return true;
+  askUnsavedChoice().then(async choice => {
+    if (choice === "cancel") return;
+    if (choice === "save" && !(await saveFile())) return;
+    if (choice === "discard") {
+      _editorTa().value = _modalOrig;
+      syncHighlight();
+      document.getElementById("unsaved-dot").classList.remove("visible");
+    }
+    proceed();
   });
+  return false;
 }
 
 async function closeEditor() {

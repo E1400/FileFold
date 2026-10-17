@@ -124,7 +124,7 @@
             <ol>
               <li><b>Upload.</b> Drop a <code>.inp</code> file, click to browse, or choose <b>Sample data</b>.</li>
               <li><b>Inspect.</b> The block inspector lists every keyword block with its line range, colored by category. A <code>▸</code> opens the blocks nested inside a <code>*STEP</code>, <code>*PART</code> or <code>*ASSEMBLY</code>.</li>
-              <li><b>Choose.</b> Tick the categories that should get their own file, and optionally finer splits (see below). Filenames can be changed.</li>
+              <li><b>Choose.</b> Tick the categories that should get their own file, and optionally finer splits (see below). Filenames can be changed. The <b>Result</b> panel shows the files you will get and the exact number of lines in each, as you tick.</li>
               <li><b>Create workspace.</b> The mother file keeps an <code>*INCLUDE, INPUT=file</code> line where each extracted block used to be.</li>
             </ol>
           </section>
@@ -165,6 +165,7 @@
           <section id="help-files">
             <h2>Files and statuses</h2>
             <p>A workspace has a <b>mother file</b> (your original name), <b>child</b> files (one per extracted category) and <b>sub-child</b> files (finer splits inside a child). FileFold remembers a fingerprint of everything it wrote.</p>
+            <p>The <b>Workspaces</b> panel on the left lists the open workspace's files in the same order; <b>▸</b> shows another workspace's files without opening it. Click a file to open it in the editor while the list stays in view. <b>●</b> marks an edited file (and a workspace with edits), <b>!</b> a missing one. Moving away from unsaved edits always asks first.</p>
             <dl class="help-defs">
               <dt>clean</dt><dd>The file is exactly as FileFold wrote it.</dd>
               <dt>edited</dt><dd>The file was changed since, for example in the editor.</dd>
@@ -179,19 +180,19 @@
 
           <section id="help-splits">
             <h2>The Splits tab</h2>
-            <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model.</p>
+            <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model. Nothing changes until you press <b>Apply changes</b>: the <b>After Apply</b> panel shows the files and line counts you will end up with, the bar at the bottom counts what will change, each changed row says what will happen (new, folds back, renamed), <b>Discard</b> undoes your choices, and leaving the workspace with choices not applied asks first.</p>
             <p>Categories are listed in the order of the deck. To change where a file comes in the deck, drag it by <b>⠿</b> or use <b>↑</b> and <b>↓</b> at the start of its row, then <b>Apply changes</b>; in the Files tab the same handles apply straight away, and sub-files move with their parent. The file's <code>*INCLUDE</code> line in the mother file moves, and everything still written in the mother stays where it is. Only files of their own can move: a category still in the mother file needs extracting first, and the step file stays after the others because model data must come before the first <code>*STEP</code>. A re-import keeps the order you chose.</p>
           </section>
 
           <section id="help-reimport">
             <h2>Reimporting a new version</h2>
-            <p>When the original model changes, <b>Re-import</b> the new file. Each existing child is compared with the new version:</p>
+            <p>When the original model changes, <b>Re-import</b> the new file. Nothing is written until you press <b>Apply updates</b>. The review lists each child file by the decision it needs:</p>
             <dl class="help-defs">
-              <dt>safe to update</dt><dd>Changed upstream, not edited here. Updated by default.</dd>
+              <dt>conflict</dt><dd>Changed upstream and edited here. Your version is shown next to the incoming one; choose <b>Keep my edits</b> (the default) or <b>Take incoming</b>.</dd>
+              <dt>will update</dt><dd>Changed upstream, not edited here. Updated by default; <b>Show changes</b> compares the two first.</dd>
               <dt>unchanged</dt><dd>Same in both. Left alone.</dd>
-              <dt>conflict</dt><dd>Changed upstream and edited here. You choose whether to overwrite your edits.</dd>
             </dl>
-            <p>Categories that are new in the file can be extracted at the same time.</p>
+            <p>Categories that are new in the file can be extracted at the same time. The mother file is always updated. Files too large to compare in the browser say so instead.</p>
           </section>
 
           <section id="help-export">
@@ -248,6 +249,11 @@
                 <div id="sample-menu" class="sample-menu" role="menu" aria-label="Sample data" hidden></div>
               </div>
             </div>
+          </div>
+
+          <div id="result-section" style="display:none">
+            <div class="section-title">Result <span class="section-sub" id="result-count"></span> <button type="button" class="info-btn" data-info="result" aria-label="About the result preview" aria-expanded="false">i</button></div>
+            <div id="result-tree" class="result-panel" aria-live="polite"></div>
           </div>
 
           <div id="inspector-section" style="display:none">
@@ -318,11 +324,20 @@
         Check categories to extract them into their own file. Uncheck existing splits to fold them back into the mother file.
         <button type="button" class="info-btn" data-info="splits" aria-label="About the Splits tab" aria-expanded="false">i</button>
       </p>
-      <div id="ws-split-config" class="split-grid"></div>
-      <div class="row" style="margin-top:24px">
+      <div class="splits-layout">
+        <div id="ws-split-config" class="split-grid"></div>
+        <aside class="splits-result" aria-label="Result after Apply">
+          <div class="section-title">After Apply <span class="section-sub" id="ws-result-count"></span></div>
+          <div id="ws-result-tree" class="result-panel" aria-live="polite"></div>
+        </aside>
+      </div>
+      <!-- Always on screen while the tab is open: what Apply will do, and the way out. -->
+      <div id="splits-pending-bar" class="pending-bar" role="status" aria-live="polite">
+        <span id="splits-pending-count" class="pending-count">No changes</span>
         <span id="ws-order-hint" class="text-muted text-sm" hidden>File order changed. Apply to update the *INCLUDE lines in the mother file.</span>
         <span class="spacer"></span>
-        <button id="ws-splits-apply-btn" class="btn btn-primary" onclick="applyEditSplits()">Apply changes</button>
+        <button id="splits-discard-btn" class="btn btn-ghost btn-sm" type="button" onclick="discardSplitChanges()" disabled>Discard</button>
+        <button id="ws-splits-apply-btn" class="btn btn-primary btn-sm" type="button" onclick="applyEditSplits()" disabled>Apply changes</button>
       </div>
     </div>
   </div>
@@ -346,40 +361,20 @@
         <input type="file" id="reimp-input" accept=".inp" style="display:none" onchange="handleReimpUpload(this.files[0])">
       </div>
 
-      <!-- Step 2: review -->
+      <!-- Step 2: review. One list, ordered by the decision each file needs. -->
       <div id="reimp-preview-section" style="display:none">
-        <div class="two-col" style="align-items:start; gap:28px">
+        <div class="section-title">Review the changes <button type="button" class="info-btn" data-info="reimport-status" aria-label="About the reimport statuses" aria-expanded="false">i</button></div>
+        <div id="reimp-results"></div>
 
-          <!-- left: inspector + new categories -->
-          <div class="stack">
-            <div>
-              <div class="section-title" style="cursor:pointer" onclick="toggleReimpInspector()">
-                Block tree — <span id="reimp-file-label" class="mono"></span>
-                <span id="reimp-insp-toggle" style="float:right;color:var(--muted)">▸ show</span>
-              </div>
-              <div id="reimp-inspector-tree" class="inspector-tree" style="display:none"></div>
-            </div>
+        <details class="reimp-blocks">
+          <summary>Keyword blocks in <span id="reimp-file-label" class="mono"></span></summary>
+          <div id="reimp-inspector-tree" class="inspector-tree"></div>
+        </details>
 
-            <div id="reimp-new-cats-section" style="display:none">
-              <div class="section-title">Add new sections</div>
-              <p class="text-muted text-sm" style="margin-bottom:10px">
-                These categories exist in the new file but aren't extracted in this workspace yet.
-                Check any you want to add — a new child file will be created.
-              </p>
-              <div id="reimp-new-cats" class="split-grid"></div>
-            </div>
-          </div>
-
-          <!-- right: conflict preview -->
-          <div>
-            <div class="section-title">Existing sections <button type="button" class="info-btn" data-info="reimport-status" aria-label="About the reimport statuses" aria-expanded="false">i</button></div>
-            <div id="reimp-results"></div>
-          </div>
-        </div>
-
-        <div class="row" style="margin-top:24px">
+        <div class="row reimp-actions">
           <button class="btn btn-ghost" onclick="resetReimp()">← Upload different file</button>
           <span class="spacer"></span>
+          <span id="reimp-summary" class="text-muted text-sm"></span>
           <button id="reimp-apply-btn" class="btn btn-primary" onclick="applyReimp()">Apply updates</button>
         </div>
       </div>
@@ -443,6 +438,16 @@
   <p>You have unsaved edits to <span class="mono" id="unsaved-dialog-file"></span>.</p>
   <div class="dialog-actions">
     <button class="btn btn-primary btn-sm" id="unsaved-save-btn" data-choice="save">Save and close</button>
+    <button class="btn btn-danger btn-sm" data-choice="discard">Discard changes</button>
+    <button class="btn btn-ghost btn-sm" data-choice="cancel" autofocus>Keep editing</button>
+  </div>
+</dialog>
+
+<dialog id="pending-dialog" aria-labelledby="pending-dialog-title">
+  <h2 id="pending-dialog-title">Unapplied split changes</h2>
+  <p><span id="pending-dialog-count"></span> on the Splits tab of <span class="mono" id="pending-dialog-ws"></span> are not applied yet.</p>
+  <div class="dialog-actions">
+    <button class="btn btn-primary btn-sm" data-choice="apply">Apply and leave</button>
     <button class="btn btn-danger btn-sm" data-choice="discard">Discard changes</button>
     <button class="btn btn-ghost btn-sm" data-choice="cancel" autofocus>Keep editing</button>
   </div>

@@ -2,16 +2,16 @@
 // Workspace detail tabs + Splits tab
 // ═══════════════════════════════════════════════════════════════════════════════
 function switchDetailTab(tab) {
-  const wasAlreadyActive = document.getElementById(`tab-btn-${tab}`)?.classList.contains("active");
   ["files", "splits"].forEach(t => {
     document.getElementById(`tab-content-${t}`).style.display = t === tab ? "" : "none";
     document.getElementById(`tab-btn-${t}`).classList.toggle("active", t === tab);
   });
   if (tab === "splits" && state.wsData) {
     const grid = document.getElementById("ws-split-config");
-    // Re-render when switching from another tab, or when the grid was cleared (workspace changed).
-    // Skip re-render only when already on Splits with content — that would wipe unsaved checkbox changes.
-    if (!wasAlreadyActive || !grid.children.length) renderSplitsTab(state.wsData);
+    // Render only when the grid is empty or shows another workspace. Coming back from the
+    // Files tab (or the editor) must keep choices that are not applied yet; Apply and
+    // Discard re-render explicitly.
+    if (!grid.children.length || state.splitsRenderedFor !== state.wsData.name) renderSplitsTab(state.wsData);
   }
 }
 
@@ -33,8 +33,15 @@ function renderSplitsTab(data) {
   allCats.sort((a, b) => deckRank(a) - deckRank(b));
 
   const el = document.getElementById("ws-split-config");
+  state.splitsRenderedFor = data.name;
+  if (!el.dataset.watching) {            // one listener for every checkbox and filename field
+    el.dataset.watching = "1";
+    el.addEventListener("input", refreshSplitsPending);
+    el.addEventListener("change", refreshSplitsPending);
+  }
   if (!allCats.length) {
     el.innerHTML = `<p class="text-muted">No categories available.</p>`;
+    refreshSplitsPending();
     return;
   }
 
@@ -95,6 +102,7 @@ function renderSplitsTab(data) {
             <label for="ws-sub-${cat}-${opt.sub_category}"
                    style="cursor:pointer;user-select:none">${esc(opt.label)}</label>
             <span class="sub-hint" id="ws-subhint-${cat}-${opt.sub_category}"></span>
+            <span class="pending-slot" id="ws-submark-${cat}-${opt.sub_category}"></span>
             <input type="text" id="ws-subfn-${cat}-${opt.sub_category}" value="${subFn}"
                    placeholder="${opt.default_filename}"
                    ${!subChecked || subDisabled ? "disabled" : ""}
@@ -122,6 +130,7 @@ function renderSplitsTab(data) {
         <label for="ws-sel-${cat}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
           <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
           ${isExtracted ? `<span class="badge badge-accent">extracted</span>` : ""}
+          <span class="pending-slot" id="ws-mark-${cat}"></span>
           ${oneWay ? `<span class="badge badge-warn"
                             title="${cat} owns the *INCLUDE directives. Unchecking folds it back into the mother permanently — it cannot be re-extracted.">can't re-split</span>` : ""}
         </label>
@@ -136,6 +145,7 @@ function renderSplitsTab(data) {
   allCats.forEach(cat => {
     if (document.getElementById(`ws-sel-${cat}`)?.checked) { _refreshWsSubs(cat); _syncSubAllBox(cat); }
   });
+  refreshSplitsPending();
 }
 
 function wsToggleSplitRow(cat) {
@@ -254,6 +264,7 @@ function _syncMoveButtons() {
   syncSortButtons(document.getElementById("ws-split-config"), _splitItems());
   const hint = document.getElementById("ws-order-hint");
   if (hint) hint.hidden = !_orderToApply();
+  if (state.wsData && state.splitsRenderedFor === state.wsData.name) refreshSplitsPending();   // count + After Apply order
 }
 
 makeSortable(document.getElementById("ws-split-config"), { items: _splitItems, onMove: _syncMoveButtons });
@@ -286,6 +297,208 @@ function wsToggleAllCategories() {
   });
 }
 
+// ── What Apply would do ──────────────────────────────────────────────────────────
+// Read the Splits tab against the workspace as it is. Used by Apply itself, by the
+// pending-changes bar, by the row marks and by the leave guard, so they always agree.
+// Returns { toMerge, toExtract, toResplit, toRename, count, marks: {cat: {kind, text}},
+// subMarks: {"cat:key": text} }.
+function planSplitChanges(data = state.wsData) {
+  const plan = { toMerge: [], toExtract: [], toResplit: [], toRename: [], toReorder: null, count: 0, marks: {}, subMarks: {} };
+  if (!data || state.splitsRenderedFor !== data.name) return plan;
+  plan.toReorder = _orderToApply();               // files moved up or down in the deck
+  if (plan.toReorder) plan.count++;
+  const existingByCategory = {};
+  data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
+  const actualGrandchildren = new Set(
+    (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
+  );
+  // Only real categories. Any master/decorative checkbox that ends up matching this
+  // selector must never reach the server as a category name.
+  const knownCats = new Set([...(data.available_categories || []), ...data.selections.map(s => s.category)]);
+  const val = id => document.getElementById(id)?.value.trim();
+
+  document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
+    const cat = cb.id.slice("ws-sel-".length);
+    if (!knownCats.has(cat)) return;
+    const existing = existingByCategory[cat];
+    const subOpts = data.sub_options?.[cat] ?? [];
+
+    if (existing && !cb.checked) {
+      // Fold the whole category (and any sub-splits) back into the mother
+      plan.toMerge.push(existing.filename);
+      existing.sub_selections.forEach(ss => plan.toMerge.push(ss.filename));
+      plan.marks[cat] = { kind: "fold", text: `folds back into ${data.source_name}` };
+      plan.count++;
+
+    } else if (!existing && cb.checked) {
+      // Extract a brand-new category from the mother file
+      const filename = val(`ws-fn-${cat}`) || `${cat}.inp`;
+      const ticked = new Set(subOpts.map(o => o.sub_category)
+        .filter(k => document.getElementById(`ws-sub-${cat}-${k}`)?.checked));
+      const effective = effectiveSubKeys(data.sub_claims?.[cat], subOpts, ticked);
+      const sub_selections = subOpts.filter(o => effective.has(o.sub_category)).map(o => ({
+        sub_category: o.sub_category,
+        filename: val(`ws-subfn-${cat}-${o.sub_category}`) || o.default_filename,
+      }));
+      sub_selections.forEach(ss => { plan.subMarks[`${cat}:${ss.sub_category}`] = "new file"; });
+      plan.toExtract.push({ category: cat, filename, sub_selections });
+      plan.marks[cat] = { kind: "new", text: "new" };
+      plan.count++;
+
+    } else if (existing && cb.checked) {
+      const currentFn = val(`ws-fn-${cat}`) || existing.filename;
+      if (currentFn !== existing.filename) {
+        plan.toRename.push({ old_filename: existing.filename, new_filename: currentFn });
+        plan.marks[cat] = { kind: "rename", text: `renamed from ${existing.filename}` };
+        plan.count++;
+      }
+      if (!subOpts.length) return;
+      const existingSubMap = {};
+      existing.sub_selections.forEach(ss => { existingSubMap[ss.sub_category] = ss; });
+      // A ticked parent its refinements emptied makes no file: not a change, not sent.
+      const ticked = new Set(subOpts.map(o => o.sub_category)
+        .filter(k => document.getElementById(`ws-sub-${cat}-${k}`)?.checked));
+      const effective = effectiveSubKeys(data.sub_claims?.[cat], subOpts, ticked);
+      let subChanged = false;
+      const newSubSelections = [];
+      subOpts.forEach(opt => {
+        const key = opt.sub_category;
+        const isOn = effective.has(key);
+        const entry = existingSubMap[key];
+        const wasOn = !!(entry && actualGrandchildren.has(entry.filename));
+        const fn = val(`ws-subfn-${cat}-${key}`) || (entry?.filename ?? opt.default_filename);
+        const renamed = isOn && wasOn && fn !== entry?.filename;
+        if (isOn !== wasOn || renamed) {
+          subChanged = true;
+          plan.count++;
+          plan.subMarks[`${cat}:${key}`] = !wasOn ? "new file" : !isOn ? `folds back into ${existing.filename}` : `renamed from ${entry.filename}`;
+        }
+        if (isOn) newSubSelections.push({ sub_category: key, filename: fn });
+      });
+      if (subChanged) plan.toResplit.push({ category: cat, sub_selections: newSubSelections });
+    }
+  });
+  return plan;
+}
+
+// The workspace's files after Apply, with exact line counts and what changes, computed in
+// the browser from the split plan (no request) whenever a choice changes.
+function renderWsResult(data = state.wsData) {
+  const el = document.getElementById("ws-result-tree");
+  const plan = data?.split_plan?.categories;
+  if (!el || !plan || state.splitsRenderedFor !== data.name) return;
+  const files = data.files || [];
+  const motherFile = files.find(f => f.role === "mother");
+  const existingByCategory = {};
+  data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
+  const onDisk = new Set(files.filter(f => f.exists).map(f => f.filename));
+  const val = id => document.getElementById(id)?.value.trim();
+  const rows = [];
+  let mother = motherFile?.line_count ?? 0;
+
+  document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
+    const cat = cb.id.slice("ws-sel-".length);
+    const nodes = plan[cat] || [];
+    const existing = existingByCategory[cat];
+    const oldSubs = existing ? existing.sub_selections.filter(ss => onDisk.has(ss.filename)) : [];
+    if (!cb.checked) {
+      if (!existing) return;
+      mother += categoryLines(nodes) - 1;                 // folds back, its *INCLUDE goes
+      rows.push({ name: existing.filename, role: "child", cat, mark: `folds back into ${data.source_name}`, markKind: "fold" });
+      oldSubs.forEach(ss => rows.push({ name: ss.filename, role: "sub", cat, mark: "folds back", markKind: "fold" }));
+      return;
+    }
+    if (!nodes.length) return;
+    const filename = val(`ws-fn-${cat}`) || existing?.filename || `${cat}.inp`;
+    const subOpts = data.sub_options?.[cat] ?? [];
+    const ticked = new Set(subOpts.map(o => o.sub_category)
+      .filter(k => document.getElementById(`ws-sub-${cat}-${k}`)?.checked));
+    const effective = effectiveSubKeys(data.sub_claims?.[cat], subOpts, ticked);
+    const subs = {};
+    subOpts.filter(o => effective.has(o.sub_category)).forEach(o => {
+      const old = oldSubs.find(ss => ss.sub_category === o.sub_category);
+      subs[o.sub_category] = val(`ws-subfn-${cat}-${o.sub_category}`) || old?.filename || o.default_filename;
+    });
+    const lines = splitCategoryLines(nodes, filename, subs);
+    if (!existing) mother -= categoryLines(nodes) - 1;     // newly extracted
+    const childMark = !existing ? ["new", "new"] : filename !== existing.filename ? [`renamed from ${existing.filename}`, "rename"] : [];
+    rows.push({ name: filename, role: "child", cat, lines: lines[filename], mark: childMark[0], markKind: childMark[1] });
+    Object.entries(subs).forEach(([key, fn]) => {
+      if (!lines[fn]) return;
+      const old = oldSubs.find(ss => ss.sub_category === key);
+      const m = !old ? ["new", "new"] : old.filename !== fn ? [`renamed from ${old.filename}`, "rename"] : [];
+      rows.push({ name: fn, role: "sub", cat, lines: lines[fn], mark: m[0], markKind: m[1] });
+    });
+    oldSubs.filter(ss => !(ss.sub_category in subs)).forEach(ss =>
+      rows.push({ name: ss.filename, role: "sub", cat, mark: `folds back into ${filename}`, markKind: "fold" }));
+  });
+  rows.unshift({ name: data.source_name, role: "mother", lines: mother });
+  renderResultTree(el, rows);
+  const n = rows.filter(r => r.markKind !== "fold").length;
+  document.getElementById("ws-result-count").textContent = `${n} file${n === 1 ? "" : "s"}`;
+}
+
+// Update the pending-changes bar, the marks next to each changed row and the result tree.
+function refreshSplitsPending() {
+  renderWsResult();
+  const plan = planSplitChanges();
+  const bar = document.getElementById("splits-pending-bar");
+  if (!bar) return plan;
+  const n = plan.count;
+  document.getElementById("splits-pending-count").textContent = n ? `${n} change${n === 1 ? "" : "s"} not applied yet` : "No changes";
+  bar.classList.toggle("has-changes", n > 0);
+  const apply = document.getElementById("ws-splits-apply-btn");
+  if (!apply.querySelector(".spinner")) apply.disabled = n === 0;
+  document.getElementById("splits-discard-btn").disabled = n === 0;
+  document.querySelectorAll("#ws-split-config .pending-slot").forEach(slot => {
+    const id = slot.id;
+    let html = "";
+    if (id.startsWith("ws-mark-")) {
+      const m = plan.marks[id.slice("ws-mark-".length)];
+      if (m) html = `<span class="pending-mark is-${m.kind}">${esc(m.text)}</span>`;
+    } else {
+      const [cat, ...rest] = id.slice("ws-submark-".length).split("-");
+      const text = plan.subMarks[`${cat}:${rest.join("-")}`];
+      if (text) html = `<span class="pending-mark-sub">${esc(text)}</span>`;
+    }
+    if (slot.innerHTML !== html) slot.innerHTML = html;
+  });
+  return plan;
+}
+
+function discardSplitChanges() {
+  if (state.wsData) renderSplitsTab(state.wsData);
+}
+
+function hasPendingSplitChanges() {
+  return !!state.wsData && planSplitChanges().count > 0;
+}
+
+// Leaving the workspace with choices that are not applied: ask, like the editor does.
+// Returns true when it is fine to leave now; otherwise shows the dialog and calls
+// `proceed` later if the person chooses Apply (and it worked) or Discard.
+function guardLeaveSplits(proceed) {
+  const plan = planSplitChanges();
+  if (!plan.count) return true;
+  const dlg = document.getElementById("pending-dialog");
+  document.getElementById("pending-dialog-count").textContent = `${plan.count} change${plan.count === 1 ? "" : "s"}`;
+  document.getElementById("pending-dialog-ws").textContent = state.wsData.name;
+  askDialogChoice(dlg).then(async choice => {
+    if (choice === "apply") {
+      await applyEditSplits();
+      if (!hasPendingSplitChanges()) proceed();
+    } else if (choice === "discard") {
+      discardSplitChanges();
+      proceed();
+    }
+  });
+  return false;
+}
+
+window.addEventListener("beforeunload", e => {
+  if (state.view === "detail" && hasPendingSplitChanges()) { e.preventDefault(); e.returnValue = ""; }
+});
+
 async function applyEditSplits() {
   const data = state.wsData;
   if (!data) return;
@@ -315,92 +528,8 @@ async function applyEditSplits() {
     used.set(fn, input);
   }
 
-  const existingByCategory = {};
-  data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
-
-  const toMerge   = [];
-  const toExtract = [];
-  const toResplit = [];  // sub-split checkbox/filename changes within extracted categories
-  const toRename  = [];  // simple file renames (no re-extraction needed)
-  const toReorder = _orderToApply();   // files moved up or down in the deck
-
-  const actualGrandchildren = new Set(
-    (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
-  );
-
-  // Only real categories. Any master/decorative checkbox that ends up matching this
-  // selector must never reach the server as a category name — that fails the whole
-  // batch and the refresh afterwards looks like the selection silently resetting.
-  const knownCats = new Set([
-    ...(data.available_categories || []),
-    ...data.selections.map(s => s.category),
-  ]);
-
-  document.querySelectorAll("#ws-split-config input[type=checkbox][id^='ws-sel-']").forEach(cb => {
-    const cat = cb.id.slice("ws-sel-".length);
-    if (!knownCats.has(cat)) return;
-    const isChecked = cb.checked;
-    const wasExtracted = !!existingByCategory[cat];
-
-    if (wasExtracted && !isChecked) {
-      // Fold the whole category (and any sub-splits) back into the mother
-      toMerge.push(existingByCategory[cat].filename);
-      existingByCategory[cat].sub_selections.forEach(ss => toMerge.push(ss.filename));
-
-    } else if (!wasExtracted && isChecked) {
-      // Extract a brand-new category from the mother file
-      const fn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || `${cat}.inp`;
-      const subOpts = data.sub_options?.[cat] ?? [];  // per-deck: only what exists
-      const sub_selections = subOpts
-        .filter(opt => document.getElementById(`ws-sub-${cat}-${opt.sub_category}`)?.checked)
-        .map(opt => ({
-          sub_category: opt.sub_category,
-          filename: document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim() || opt.default_filename,
-        }));
-      toExtract.push({ category: cat, filename: fn, sub_selections });
-
-    } else if (wasExtracted && isChecked) {
-      const existingSel = existingByCategory[cat];
-
-      // Check if the parent child filename was renamed
-      const currentFn = document.getElementById(`ws-fn-${cat}`)?.value.trim() || existingSel.filename;
-      if (currentFn !== existingSel.filename) {
-        toRename.push({ old_filename: existingSel.filename, new_filename: currentFn });
-      }
-
-      // Check sub-split checkbox and filename changes
-      const subOpts = data.sub_options?.[cat] ?? [];  // per-deck: only what exists
-      if (!subOpts.length) return;  // no sub-options for this category
-
-      const existingSubMap = {};
-      existingSel.sub_selections.forEach(ss => { existingSubMap[ss.sub_category] = ss; });
-
-      let subChanged = false;
-      const newSubSelections = [];
-      // A ticked parent its refinements emptied makes no file: not a change, not sent.
-      const ticked = new Set(subOpts.map(o => o.sub_category)
-        .filter(k => document.getElementById(`ws-sub-${cat}-${k}`)?.checked));
-      const effective = effectiveSubKeys(data.sub_claims?.[cat], subOpts, ticked);
-      subOpts.forEach(opt => {
-        const isSubChecked = effective.has(opt.sub_category);
-        const existingEntry = existingSubMap[opt.sub_category];
-        const wasSubExtracted = !!(existingEntry && actualGrandchildren.has(existingEntry.filename));
-
-        // Detect both checkbox change AND filename change (for already-extracted sub-splits)
-        const currentSubFn = document.getElementById(`ws-subfn-${cat}-${opt.sub_category}`)?.value.trim()
-                             || (existingEntry?.filename ?? opt.default_filename);
-        const fnChanged = isSubChecked && wasSubExtracted && currentSubFn !== existingEntry?.filename;
-
-        if (isSubChecked !== wasSubExtracted || fnChanged) subChanged = true;
-        if (isSubChecked) {
-          newSubSelections.push({ sub_category: opt.sub_category, filename: currentSubFn });
-        }
-      });
-      if (subChanged) toResplit.push({ category: cat, sub_selections: newSubSelections });
-    }
-  });
-
-  if (!toMerge.length && !toExtract.length && !toResplit.length && !toRename.length && !toReorder) {
+  const { toMerge, toExtract, toResplit, toRename, toReorder, count } = planSplitChanges(data);
+  if (!count) {
     toast("No changes to apply", "warn");
     return;
   }
@@ -440,8 +569,8 @@ async function applyEditSplits() {
       renderDetail(freshData);
       renderSplitsTab(freshData);
     } catch (_) {}
-    btn.disabled = false;
     btn.textContent = "Apply changes";
+    refreshSplitsPending();
   }
   // After the re-render, so a field error lands on the input that is now on screen.
   if (failed) {

@@ -17,7 +17,8 @@ const _REIMP_DROP_IDLE = `
   <div class="hint">This becomes the new mother file</div>`;
 
 function resetReimp() {
-  state.reimp = { file: null, preview: null, checked: new Set(), availableNewCats: [] };
+  // choice: conflicts -> "keep" | "take"; update: safe files ticked for updating
+  state.reimp = { file: null, preview: null, choice: new Map(), update: new Set(), availableNewCats: [] };
   document.getElementById("reimp-upload-section").style.display = "";
   document.getElementById("reimp-preview-section").style.display = "none";
   document.getElementById("reimp-input").value = "";
@@ -41,11 +42,12 @@ async function handleReimpUpload(file) {
     fd.append("file", file);
     const data = await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/reimport/preview`, fd);
     state.reimp.preview = data;
-    state.reimp.checked = new Set((data.safe_to_update ?? []).map(s => s.filename));
+    // Safe updates are ticked; conflicts keep your edits unless you choose otherwise.
+    state.reimp.update = new Set((data.safe_to_update ?? []).map(s => s.filename));
+    state.reimp.choice = new Map((data.needs_attention ?? []).map(s => [s.filename, "keep"]));
 
     document.getElementById("reimp-file-label").textContent = data.filename ?? file.name;
     renderReimpInspector(data.blocks ?? []);
-    renderReimpNewCats(data.blocks ?? []);
     renderReimportPreview(data);
 
     document.getElementById("reimp-upload-section").style.display = "none";
@@ -55,14 +57,6 @@ async function handleReimpUpload(file) {
     showFieldError(zone, plainError(e));
     if (!(e instanceof ApiError)) console.error(e);
   }
-}
-
-function toggleReimpInspector() {
-  const tree = document.getElementById("reimp-inspector-tree");
-  const tog  = document.getElementById("reimp-insp-toggle");
-  const open = tree.style.display === "none";
-  tree.style.display = open ? "" : "none";
-  tog.textContent = open ? "▾ hide" : "▸ show";
 }
 
 function renderReimpInspector(blocks) {
@@ -78,34 +72,13 @@ function renderReimpInspector(blocks) {
   });
 }
 
-function renderReimpNewCats(blocks) {
+// Categories in the new file that this workspace has not extracted yet. Top level only
+// (what compute_split can route); never NON_EXTRACTABLE (the server rejects those).
+function _reimpNewCats(blocks) {
   const existingCats = new Set((state.wsData?.selections ?? []).map(s => s.category));
-  // Top-level only — matches what compute_split can actually route. NON_EXTRACTABLE
-  // (not just "unknown"): the server rejects those, so offering them here only
-  // produces a checkbox that errors on apply.
-  const fileCats = new Set();
-  blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category)) fileCats.add(b.category); });
-
-  const newCats = [...fileCats].filter(c => !existingCats.has(c));
-  state.reimp.availableNewCats = newCats;
-
-  const section = document.getElementById("reimp-new-cats-section");
-  const el = document.getElementById("reimp-new-cats");
-
-  if (!newCats.length) { section.style.display = "none"; return; }
-
-  section.style.display = "";
-  el.innerHTML = newCats.map(cat => {
-    const c = CAT_COLORS_var(cat);
-    return `<div class="split-row" id="reimp-row-${cat}">
-      <label>
-        <input type="checkbox" id="reimp-sel-${cat}" onchange="toggleReimpNewCat('${cat}')">
-        <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
-      </label>
-      <input type="text" id="reimp-fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
-      <span class="text-muted text-sm mono">new</span>
-    </div>`;
-  }).join("");
+  const fileCats = [];
+  blocks.forEach(b => { if (!NON_EXTRACTABLE.has(b.category) && !fileCats.includes(b.category)) fileCats.push(b.category); });
+  return fileCats.filter(c => !existingCats.has(c));
 }
 
 function toggleReimpNewCat(cat) {
@@ -115,63 +88,170 @@ function toggleReimpNewCat(cat) {
   row.classList.toggle("selected", checked);
   fnInput.disabled = !checked;
   fnInput.style.opacity = checked ? "1" : ".4";
+  _refreshReimpSummary();
+}
+
+// Your version and the incoming one, side by side, lines aligned per change.
+function renderDiff(diff) {
+  if (!diff) return "";
+  if (diff.too_large) {
+    return `<p class="text-muted text-sm diff-note">Too large to compare here (${diff.old_lines.toLocaleString()} lines now, ${diff.new_lines.toLocaleString()} incoming). Export the workspace to compare the files in another tool.</p>`;
+  }
+  const line = (cls, item) => item
+    ? `<div class="dl ${cls}"><span class="ln">${item[0]}</span><span class="lt">${esc(item[1]) || "&nbsp;"}</span></div>`
+    : `<div class="dl pad"><span class="ln"></span><span class="lt">&nbsp;</span></div>`;
+  let left = "", right = "";
+  for (const row of diff.rows) {
+    if (row.type === "gap") {
+      left += `<div class="dl gap">⋯</div>`; right += `<div class="dl gap">⋯</div>`;
+      continue;
+    }
+    const n = Math.max(row.left.length, row.right.length);
+    const cls = row.type === "equal" ? ["ctx", "ctx"] : ["del", "add"];
+    for (let i = 0; i < n; i++) {
+      left += line(cls[0], row.left[i]);
+      right += line(cls[1], row.right[i]);
+    }
+  }
+  if (!diff.rows.length && diff.added === 0 && diff.removed === 0) {
+    return `<p class="text-muted text-sm diff-note">The text is the same; only the line endings differ (Windows vs Mac/Linux files).</p>`;
+  }
+  const note = diff.truncated ? `<p class="text-muted text-sm diff-note">Showing the first changes only.</p>` : "";
+  return `<div class="diff">
+      <div class="diff-side yours"><div class="diff-head">Your version (now)</div>${left}</div>
+      <div class="diff-side incoming"><div class="diff-head">Incoming</div>${right}</div>
+    </div>${note}`;
+}
+
+function _diffSize(diff) {
+  if (!diff || diff.too_large || diff.added == null) return "";
+  if (diff.added === 0 && diff.removed === 0) return `<span class="diff-size">line endings only</span>`;
+  return `<span class="diff-size"><span class="add">+${diff.added}</span> <span class="del">−${diff.removed}</span></span>`;
+}
+
+function toggleReimpDiff(btn) {
+  const panel = btn.closest(".reimp-item").querySelector(".reimp-diff");
+  const open = panel.hidden;
+  panel.hidden = !open;
+  btn.textContent = open ? "Hide changes" : "Show changes";
+  btn.setAttribute("aria-expanded", String(open));
 }
 
 function renderReimportPreview(data) {
   const el = document.getElementById("reimp-results");
-  const safe      = data.safe_to_update ?? [];
-  const attn      = data.needs_attention ?? [];
+  const conflicts = data.needs_attention ?? [];
+  const updates   = data.safe_to_update ?? [];
   const unchanged = data.unchanged ?? [];
+  const newCats   = _reimpNewCats(data.blocks ?? []);
+  state.reimp.availableNewCats = newCats;
+  const id = name => name.replace(/[^A-Za-z0-9_-]/g, "_");
   let html = "";
 
-  if (!safe.length && !attn.length && !unchanged.length) {
-    html = `<div class="text-muted text-sm" style="padding:12px 0">No existing sections to update. The mother file will still be refreshed.</div>`;
+  if (conflicts.length) {
+    html += `<section class="reimp-group" data-group="conflict">
+      <h3><span class="badge badge-warn">Conflict</span> ${conflicts.length} — you edited ${conflicts.length === 1 ? "this file" : "these files"} and ${conflicts.length === 1 ? "it" : "they"} also changed in the new file</h3>
+      ${conflicts.map(s => `
+        <div class="reimp-item is-conflict">
+          <div class="reimp-item-head">
+            <span class="fname">${esc(s.filename)}</span>${catChip(s.category)}${_diffSize(s.diff)}
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-ghost btn-sm" aria-expanded="true" onclick="toggleReimpDiff(this)">Hide changes</button>
+          </div>
+          <div class="reimp-diff">${renderDiff(s.diff)}</div>
+          <div class="reimp-choice" role="radiogroup" aria-label="What to do with ${esc(s.filename)}">
+            <label><input type="radio" name="reimp-choice-${id(s.filename)}" value="keep" checked
+                   onchange="setReimpChoice('${esc(s.filename)}', 'keep')"> Keep my edits</label>
+            <label><input type="radio" name="reimp-choice-${id(s.filename)}" value="take"
+                   onchange="setReimpChoice('${esc(s.filename)}', 'take')"> Take incoming</label>
+          </div>
+        </div>`).join("")}
+    </section>`;
   }
 
-  if (safe.length) {
-    html += `<div class="reimport-section">
-      <h3><span class="badge badge-ok">Safe to update</span></h3>
-      ${safe.map(s => `
-        <div class="reimport-row safe">
-          <input type="checkbox" checked onchange="toggleReimpCheck('${esc(s.filename)}', this.checked)" style="accent-color:var(--success)">
-          <span class="fname">${esc(s.filename)}</span>
-          ${catChip(s.category)}
+  if (updates.length) {
+    html += `<section class="reimp-group" data-group="update">
+      <h3><span class="badge badge-ok">Will update</span> ${updates.length} — changed in the new file, not edited here</h3>
+      ${updates.map(s => `
+        <div class="reimp-item is-update">
+          <div class="reimp-item-head">
+            <label class="reimp-check"><input type="checkbox" checked aria-label="Update ${esc(s.filename)}"
+                   onchange="toggleReimpUpdate('${esc(s.filename)}', this.checked)">
+              <span class="fname">${esc(s.filename)}</span></label>${catChip(s.category)}${_diffSize(s.diff)}
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-ghost btn-sm" aria-expanded="false" onclick="toggleReimpDiff(this)">Show changes</button>
+          </div>
+          <div class="reimp-diff" hidden>${renderDiff(s.diff)}</div>
         </div>`).join("")}
-    </div>`;
+    </section>`;
   }
 
-  if (attn.length) {
-    html += `<div class="reimport-section">
-      <h3><span class="badge badge-warn">Conflict</span> — changed in new file AND manually edited</h3>
-      <p class="text-muted text-sm" style="margin-bottom:8px">Check to overwrite with new version, uncheck to keep your edits.</p>
-      ${attn.map(s => `
-        <div class="reimport-row pending">
-          <input type="checkbox" onchange="toggleReimpCheck('${esc(s.filename)}', this.checked)" style="accent-color:var(--warn)">
-          <span class="fname">${esc(s.filename)}</span>
-          ${catChip(s.category)}
-          <span class="badge badge-warn">conflict</span>
-        </div>`).join("")}
-    </div>`;
+  if (newCats.length) {
+    html += `<section class="reimp-group" data-group="new">
+      <h3>New categories — in the new file, not extracted here yet. Tick any to give it its own child file.</h3>
+      <div class="split-grid">${newCats.map(cat => {
+        const c = CAT_COLORS_var(cat);
+        return `<div class="split-row" id="reimp-row-${cat}">
+          <label>
+            <input type="checkbox" id="reimp-sel-${cat}" onchange="toggleReimpNewCat('${cat}')">
+            <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
+          </label>
+          <input type="text" id="reimp-fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
+          <span class="text-muted text-sm mono">new</span>
+        </div>`;
+      }).join("")}</div>
+    </section>`;
   }
 
   if (unchanged.length) {
-    html += `<div class="reimport-section">
-      <h3><span class="badge badge-muted">Unchanged</span></h3>
-      ${unchanged.map(s => `
-        <div class="reimport-row">
-          <span class="fname">${esc(s.filename)}</span>
-          ${catChip(s.category)}
-          <span class="badge badge-muted">no change</span>
-        </div>`).join("")}
-    </div>`;
+    html += `<section class="reimp-group" data-group="unchanged">
+      <h3><span class="badge badge-muted">Unchanged</span> ${unchanged.length} — same in both, left alone</h3>
+      <p class="reimp-unchanged">${unchanged.map(s => `<span class="fname">${esc(s.filename)}</span>`).join(" · ")}</p>
+    </section>`;
+  }
+
+  const mother = data.mother;
+  if (mother) {
+    html += `<section class="reimp-group" data-group="mother">
+      <h3>Mother file</h3>
+      <p><span class="fname">${esc(mother.filename)}</span> is always updated from the new file${mother.changed ? "." : " (no change in it)."}</p>
+    </section>`;
   }
 
   el.innerHTML = html;
+  _refreshReimpSummary();
 }
 
-function toggleReimpCheck(filename, checked) {
-  if (checked) state.reimp.checked.add(filename);
-  else state.reimp.checked.delete(filename);
+function setReimpChoice(filename, choice) {
+  state.reimp.choice.set(filename, choice);
+  _refreshReimpSummary();
+}
+
+function toggleReimpUpdate(filename, checked) {
+  if (checked) state.reimp.update.add(filename);
+  else state.reimp.update.delete(filename);
+  _refreshReimpSummary();
+}
+
+function _reimpNewSelections() {
+  return state.reimp.availableNewCats
+    .filter(cat => document.getElementById(`reimp-sel-${cat}`)?.checked)
+    .map(cat => ({ category: cat, filename: document.getElementById(`reimp-fn-${cat}`)?.value.trim() || `${cat}.inp` }));
+}
+
+// What Apply will do, in words, next to the button.
+function _refreshReimpSummary() {
+  const el = document.getElementById("reimp-summary");
+  if (!el) return;
+  const choices = [...state.reimp.choice.values()];
+  const kept = choices.filter(c => c === "keep").length;
+  const replaced = choices.filter(c => c === "take").length;
+  const parts = [];
+  if (kept) parts.push(`${kept} kept`);
+  if (replaced) parts.push(`${replaced} replaced`);
+  if (state.reimp.update.size) parts.push(`${state.reimp.update.size} updated`);
+  const added = _reimpNewSelections().length;
+  if (added) parts.push(`${added} new`);
+  el.textContent = parts.length ? `Apply: ${parts.join(", ")}, mother updated` : "Apply: mother updated";
 }
 
 async function applyReimp() {
@@ -180,21 +260,14 @@ async function applyReimp() {
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner"></span> Applying…`;
 
-  // Collect newly selected categories
-  const addedSelections = [];
-  for (const cat of state.reimp.availableNewCats) {
-    const cb = document.getElementById(`reimp-sel-${cat}`);
-    if (cb && cb.checked) {
-      const fn = document.getElementById(`reimp-fn-${cat}`)?.value.trim() || `${cat}.inp`;
-      addedSelections.push({ category: cat, filename: fn });
-    }
-  }
+  const toUpdate = [...state.reimp.update,
+    ...[...state.reimp.choice].filter(([, c]) => c === "take").map(([f]) => f)];
 
   try {
     const fd = new FormData();
     fd.append("file", state.reimp.file);
-    fd.append("filenames", JSON.stringify([...state.reimp.checked]));
-    fd.append("added_selections", JSON.stringify(addedSelections));
+    fd.append("filenames", JSON.stringify(toUpdate));
+    fd.append("added_selections", JSON.stringify(_reimpNewSelections()));
     const result = await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/reimport/apply`, fd);
     const wsName = result.workspace ?? state.activeWs;
     toast(`Reimport applied`, "ok");

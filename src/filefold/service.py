@@ -10,6 +10,7 @@ UnsafeName (a client error, status 400).
 """
 from __future__ import annotations
 
+import difflib
 import hashlib
 import io
 import re
@@ -22,6 +23,7 @@ from pathlib import Path
 from filefold.api.server import UnsafeName, child_path, list_workspaces, safe_segment, workspace_path
 from filefold.core.keywords import CATEGORY_SUB_OPTIONS, Category
 from filefold.core.parser import parse
+from filefold.core.preview import route_plan, split_plan
 from filefold.core.splitter import (
     SplitSelection, SubSplitSelection, read_raw, split_with_includes,
 )
@@ -219,6 +221,7 @@ def inspect(filename: str, data: bytes | Path) -> dict:
         blocks = parse(tmp_path, keep_lines=False)
         opts, claims = sub_split_info(blocks)
         return {
+            "split_plan": split_plan(blocks),   # live Result preview (core/preview.py)
             "filename": filename,
             "blocks": blocks_to_json(blocks),
             "sub_options": opts,
@@ -341,14 +344,27 @@ def get_workspace(name: str) -> dict:
         if b.category.value not in NON_EXTRACTABLE:
             available_cats.add(b.category.value)
 
+    # The deck's order: each child where the mother *INCLUDEs it, each category still in the
+    # mother where its first block is. The Splits tab lists categories in this order
+    # (and builds their options in it).
+    child_cat = {fn: r.category for fn, r in ws.file_records.items() if r.role == "child"}
+    category_order: list[str] = []
+    for b in mother_blocks:
+        cat = b.category.value
+        if b.keyword == "INCLUDE":
+            cat = child_cat.get(str(b.params.get("INPUT", "")).strip(), cat)
+        if cat in available_cats and cat not in category_order:
+            category_order.append(cat)
+    category_order += sorted(available_cats - set(category_order))
     # Sub-split options per category, from what is actually in the deck.
     # Already extracted: scan the child with its sub-files folded back in, which is exactly
     # what "Apply changes" re-splits (recombine, then split again). Still in the mother:
     # scan only that category's top-level blocks.
     sub_options: dict[str, list[dict[str, str]]] = {}
     sub_claims: dict[str, list[list[str]]] = {}
+    route_plans: dict[str, list[dict]] = {}   # for the Splits tab's live Result preview
     sel_by_cat = {s.category.value: s for s in ws.selections}
-    for cat_str in sorted(available_cats):
+    for cat_str in category_order:
         try:
             cat_enum = Category(cat_str)
         except ValueError:
@@ -359,6 +375,7 @@ def get_workspace(name: str) -> dict:
         else:
             blocks = [b for b in mother_blocks if b.category == cat_enum]
         opts, claims = discover(cat_enum, blocks)
+        route_plans[cat_str] = route_plan(cat_enum, blocks)
         if sel:
             # A split that already exists stays listed even if the menus no longer offer
             # that kind of split (e.g. element type), so applying changes never folds it
@@ -371,17 +388,6 @@ def get_workspace(name: str) -> dict:
             sub_options[cat_str] = [o.as_dict() for o in opts]
             sub_claims[cat_str] = claims
 
-    # The deck's order: each child where the mother *INCLUDEs it, each category still in the
-    # mother where its first block is. The Splits tab lists categories in this order.
-    child_cat = {fn: r.category for fn, r in ws.file_records.items() if r.role == "child"}
-    category_order: list[str] = []
-    for b in mother_blocks:
-        cat = b.category.value
-        if b.keyword == "INCLUDE":
-            cat = child_cat.get(str(b.params.get("INPUT", "")).strip(), cat)
-        if cat in available_cats and cat not in category_order:
-            category_order.append(cat)
-    category_order += sorted(available_cats - set(category_order))
 
     return {
         "name": ws.name,
@@ -398,10 +404,11 @@ def get_workspace(name: str) -> dict:
         ],
         "updated_at": ws.updated_at,
         "files": files,
-        "available_categories": sorted(available_cats),
+        "available_categories": category_order,
         "available_sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in sub_options.items()},
         "sub_options": sub_options,
         "sub_claims": sub_claims,
+        "split_plan": {"categories": route_plans},
     }
 
 
@@ -584,27 +591,84 @@ def recombine(name: str, filenames: list[str]) -> dict:
 # Re-import
 # ---------------------------------------------------------------------------
 
-def _status_json(s) -> dict:
-    return {
+def _status_json(s, current: str | None = None) -> dict:
+    out = {
         "filename": s.filename,
         "category": s.category.value,
         "changed_in_new_mother": s.changed_in_new_mother,
         "manually_edited": s.manually_edited,
     }
+    if current is not None:          # changed upstream: show what would change
+        out["diff"] = side_by_side_diff(current, s.new_content)
+    return out
+
+
+# Diffs are for people to read before deciding; past this size (a 100 MB mesh, in the
+# browser build) they only say how big the files are.
+DIFF_MAX_CHARS = 1_000_000
+
+
+def side_by_side_diff(old: str, new: str, context: int = 2, max_rows: int = 300) -> dict:
+    """Your text vs the incoming text as aligned rows for a two-column view.
+
+    rows: [{"type": "equal"|"replace"|"delete"|"insert"|"gap", "left": [[lineno, text]],
+    "right": [[lineno, text]]}] with `context` unchanged lines around each change and a
+    "gap" row where unchanged lines are skipped. At most ~max_rows lines are returned
+    (`truncated`); `added` / `removed` always count the whole difference.
+    """
+    if len(old) > DIFF_MAX_CHARS or len(new) > DIFF_MAX_CHARS:
+        return {"rows": [], "added": None, "removed": None, "truncated": False, "too_large": True,
+                "old_lines": old.count("\n"), "new_lines": new.count("\n")}
+    a, b = old.splitlines(), new.splitlines()
+    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+    added = removed = 0
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag in ("replace", "delete"):
+            removed += i2 - i1
+        if tag in ("replace", "insert"):
+            added += j2 - j1
+    rows: list[dict] = []
+    budget, truncated = max_rows, False
+    for group in sm.get_grouped_opcodes(context):
+        if budget <= 0:
+            truncated = True
+            break
+        if rows:
+            rows.append({"type": "gap", "left": [], "right": []})
+        for tag, i1, i2, j1, j2 in group:
+            left = [[i + 1, a[i]] for i in range(i1, i2)] if tag != "insert" else []
+            right = [[j + 1, b[j]] for j in range(j1, j2)] if tag != "delete" else []
+            size = max(len(left), len(right))
+            if size > budget:
+                left, right, truncated = left[:budget], right[:budget], True
+            rows.append({"type": tag, "left": left, "right": right})
+            budget -= min(size, budget)
+            if budget <= 0:
+                truncated = truncated or size > 0
+                break
+    return {"rows": rows, "added": added, "removed": removed, "truncated": truncated, "too_large": False}
 
 
 def reimport_preview(name: str, filename: str, data: bytes | Path) -> dict:
     """Upload a new mother file and get a preview of what would change."""
-    _, ws = _load(name)
+    ws_dir, ws = _load(name)
+
+    def current(fname: str) -> str:
+        path = ws_dir / fname
+        return path.read_bytes().decode("utf-8", errors="replace") if path.exists() else ""
+
     with _staged(filename, data) as tmp_path:
         blocks = parse(tmp_path, keep_lines=False)
         preview = ws.reimport_preview(tmp_path)
         return {
             "filename": filename or "upload.inp",
             "blocks": blocks_to_json(blocks),
-            "safe_to_update": [_status_json(s) for s in preview.safe_to_update],
-            "needs_attention": [_status_json(s) for s in preview.needs_attention],
+            "safe_to_update": [_status_json(s, current(s.filename)) for s in preview.safe_to_update],
+            "needs_attention": [_status_json(s, current(s.filename)) for s in preview.needs_attention],
             "unchanged": [_status_json(s) for s in preview.unchanged],
+            # The mother file is always rewritten (its *INCLUDE lines and model set-up).
+            "mother": {"filename": ws.source_name,
+                       "changed": current(ws.source_name) != preview.new_mother_content},
         }
 
 

@@ -279,7 +279,7 @@ def _apply_splits(page: Page) -> None:
     btn = page.locator("#ws-splits-apply-btn")
     btn.click()
     expect(btn).to_have_text("Apply changes", timeout=30_000)      # finished, tab re-rendered
-    expect(btn).to_be_enabled()
+    expect(page.locator("#splits-pending-count")).to_have_text("No changes")   # nothing left to apply
 
 
 def test_elements_and_element_type_tick_together_and_never_disappear(app):
