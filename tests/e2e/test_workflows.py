@@ -410,3 +410,47 @@ def test_javascript_parent_rule_agrees_with_python(app):
                 ok, covered = app.evaluate(js_can_tick, [claims, sorted(ticked), key])
                 assert ok == can_tick(claims, ticked, key), (claims, ticked, key)
                 assert set(covered) == covered_parents(claims, ticked), (claims, ticked)
+
+
+def _menu_options(page: Page, prefix: str) -> set[str]:
+    """Every category and sub-split option a menu lists, ticked or not ('all' boxes excluded)."""
+    return set(page.evaluate("""p => [...document.querySelectorAll(`input[type=checkbox][id^='${p}']`)]
+        .map(cb => cb.id.slice(p.length)).filter(id => !id.startsWith('master') && !id.startsWith('submaster'))""", prefix))
+
+
+def test_splits_menu_keeps_every_option_ticked_or_not_across_updates(app):
+    """User-reported (desktop): after updating a workspace, unticked split options (element
+    type) were gone from the Splits menu for good. Every option the create menu offers for the
+    deck must stay listed, whatever was applied before."""
+    open_new_workspace(app)
+    upload(app, "Job-1.inp")
+    app.locator("#master-cats").check()
+    offered = _menu_options(app, "sel-") | _menu_options(app, "sub-")
+    assert "mesh-etype.cps4r" in offered
+    app.locator("#master-cats").uncheck()
+    app.locator("#sel-mesh").check()
+    app.locator("#sub-mesh-etype\\.cps4r").check()
+    create(app)
+    expect(app.locator("#detail-files tr").first).to_be_visible()
+
+    def splits_menu() -> set[str]:
+        app.locator("#tab-btn-splits").click()
+        expect(app.locator("#ws-sel-mesh")).to_be_visible()
+        return _menu_options(app, "ws-sel-") | _menu_options(app, "ws-sub-")
+
+    assert splits_menu() == offered
+    # Update 1: fold element type back in and split nodes instead.
+    app.locator("#ws-sub-mesh-etype\\.cps4r").uncheck()
+    app.locator("#ws-sub-mesh-elements").uncheck()
+    app.locator("#ws-sub-mesh-nodes").check()
+    app.locator("#ws-splits-apply-btn").click()
+    expect(app.locator("#ws-splits-apply-btn")).to_have_text("Apply changes", timeout=60_000)
+    assert splits_menu() == offered
+    # Update 2: extract another category; the unticked options are all still there.
+    app.locator("#ws-sel-material").check()
+    app.locator("#ws-splits-apply-btn").click()
+    expect(app.locator("#ws-splits-apply-btn")).to_have_text("Apply changes", timeout=60_000)
+    app.locator("#tab-btn-files").click()
+    assert splits_menu() == offered
+    expect(app.locator("#ws-sub-mesh-etype\\.cps4r")).not_to_be_checked()
+    expect(app.locator("#ws-sub-mesh-nodes")).to_be_checked()

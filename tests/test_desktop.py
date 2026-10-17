@@ -128,3 +128,18 @@ def test_the_save_dialog_opens_on_the_main_thread_for_the_server(tmp_path, monke
     worker.join(1)
     assert result["path"] == tmp_path / "out" / "Job-1.zip"
     assert seen == {"thread": True, "caption": "Save Job-1.zip", "start": str(tmp_path / "Job-1.zip")}
+
+
+def test_the_window_keeps_no_http_cache(tmp_path, monkeypatch, qapp_offscreen):
+    """The server is local, so a cache saves nothing; and a cache that survives an update
+    keeps serving the old build's scripts (the Splits tab then disagrees with the web app)."""
+    monkeypatch.setenv("FILEFOLD_DESKTOP_DATA", str(tmp_path))
+    from PySide6.QtWebEngineCore import QWebEngineProfile
+    profile, *_ = desktop._build_qt(47321, smoke=True)
+    assert profile.httpCacheType() == QWebEngineProfile.HttpCacheType.NoCache
+
+
+def test_the_menu_shows_which_version_is_running():
+    import tomllib
+    version = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text())["project"]["version"]
+    assert desktop.app_version() == version

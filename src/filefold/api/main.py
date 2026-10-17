@@ -45,6 +45,21 @@ async def _optional_basic_auth(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def _cache_policy(request: Request, call_next):
+    """Never serve a stale UI or workspace state.
+
+    Without explicit headers browsers cache heuristically (about a tenth of a file's age), so
+    after an update a window could keep running the previous build's scripts for hours
+    against the new server; the desktop app did exactly that. API answers describe files
+    that change on every action and are never stored; the page and its scripts are stored
+    but checked with the server (a cheap 304) on every load.
+    """
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store" if request.url.path.startswith("/api/") else "no-cache"
+    return response
+
+
 @app.exception_handler(UnsafeName)
 async def _unsafe_name_handler(request: Request, exc: UnsafeName) -> JSONResponse:
     """A rejected name is a client error, not a crash."""
