@@ -102,6 +102,34 @@ def test_smoke_test_mode_starts_the_server_and_renders_the_ui(tmp_path):
     assert "SMOKE OK" in out.stdout
 
 
+def test_the_save_dialog_opens_on_the_main_thread_for_the_server(tmp_path, monkeypatch, qapp_offscreen):
+    """The server thread asks where to save; the dialog must run on Qt's main thread (a dialog
+    from another thread crashes Qt) and the server thread gets the answer back."""
+    import threading
+    from PySide6.QtCore import QEventLoop, QTimer
+    from PySide6.QtWidgets import QFileDialog
+
+    seen = {}
+
+    def fake_dialog(parent, caption, start):
+        seen["thread"] = threading.current_thread() is threading.main_thread()
+        seen["caption"], seen["start"] = caption, start
+        return str(tmp_path / "out" / "Job-1.zip"), ""
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(fake_dialog))
+    dialog = desktop._make_save_dialog(lambda: None)
+    result = {}
+    worker = threading.Thread(target=lambda: result.setdefault("path", dialog("Save Job-1.zip", tmp_path / "Job-1.zip")))
+    loop = QEventLoop()
+    worker.start()
+    timer = QTimer(); timer.timeout.connect(lambda: (not worker.is_alive()) and loop.quit()); timer.start(20)
+    QTimer.singleShot(10_000, loop.quit)
+    loop.exec()
+    worker.join(1)
+    assert result["path"] == tmp_path / "out" / "Job-1.zip"
+    assert seen == {"thread": True, "caption": "Save Job-1.zip", "start": str(tmp_path / "Job-1.zip")}
+
+
 def test_the_window_keeps_no_http_cache(tmp_path, monkeypatch, qapp_offscreen):
     """The server is local, so a cache saves nothing; and a cache that survives an update
     keeps serving the old build's scripts (the Splits tab then disagrees with the web app)."""

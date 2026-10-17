@@ -26,7 +26,7 @@ from filefold.core.splitter import (
     SplitSelection, SubSplitSelection, read_raw, split_with_includes,
 )
 from filefold.core.subsplits import discover, option_from_key
-from filefold.core.workspace import Workspace
+from filefold.core.workspace import Workspace, planned_order
 
 __all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE", "OPERATIONS"]
 
@@ -37,7 +37,8 @@ __all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE", "OPERATIONS"]
 OPERATIONS = (
     "inspect", "static_sub_options", "list_all_workspaces", "create_workspace", "get_workspace",
     "rename_workspace", "delete_workspace", "extract_splits", "resplit_child", "rename_file",
-    "recombine", "reimport_preview", "reimport_apply", "export_zip", "read_file", "write_file",
+    "recombine", "reorder_files", "reimport_preview", "reimport_apply", "export_zip", "read_file",
+    "write_file",
 )
 
 # Categories that must never be extracted into their own file.
@@ -370,9 +371,23 @@ def get_workspace(name: str) -> dict:
             sub_options[cat_str] = [o.as_dict() for o in opts]
             sub_claims[cat_str] = claims
 
+    # The deck's order: each child where the mother *INCLUDEs it, each category still in the
+    # mother where its first block is. The Splits tab lists categories in this order.
+    child_cat = {fn: r.category for fn, r in ws.file_records.items() if r.role == "child"}
+    category_order: list[str] = []
+    for b in mother_blocks:
+        cat = b.category.value
+        if b.keyword == "INCLUDE":
+            cat = child_cat.get(str(b.params.get("INPUT", "")).strip(), cat)
+        if cat in available_cats and cat not in category_order:
+            category_order.append(cat)
+    category_order += sorted(available_cats - set(category_order))
+
     return {
         "name": ws.name,
         "source_name": ws.source_name,
+        "include_order": ws.include_order(),
+        "category_order": category_order,
         "selections": [
             {
                 "category": s.category.value,
@@ -513,6 +528,34 @@ def rename_file(name: str, old_filename: str, new_filename: str) -> dict:
     except (ValueError, FileNotFoundError) as e:
         raise ServiceError(400, str(e))
     return {"renamed": new_filename, "workspace": name}
+
+
+def reorder_files(name: str, order: list[str]) -> dict:
+    """Change the order of the child files in the deck (the mother's *INCLUDE lines).
+
+    `order` lists child files in the order wanted; they swap places among the positions they
+    hold, files not listed stay put. Model data must stay before the first *STEP, so no file
+    may cross the step file.
+    """
+    order = [safe_segment(f, "filename") for f in order or []]
+    ws_dir, ws = _load(name)
+    if not (ws_dir / ws.source_name).exists():
+        raise ServiceError(404, f"Mother file '{ws.source_name}' not found", "mother_missing")
+    current = ws.include_order()
+    unknown = [f for f in order if f not in current]
+    if unknown:
+        raise ServiceError(400, f"Not an extracted file in this workspace: {unknown[0]!r}",
+                           "not_extracted", "filename", unknown[0])
+    new = planned_order(current, order)
+    for step in (s.filename for s in ws.selections if s.category == Category.STEP):
+        if step in current:
+            k = current.index(step)
+            if new[k] != step or set(new[:k]) != set(current[:k]):
+                moved = next((f for f in new[:k] + new[k + 1:] if (f in current[:k]) != (f in new[:k])), step)
+                raise ServiceError(400, f"'{moved}' cannot move past the step file '{step}': model data "
+                                   "must come before the first *STEP", "step_order", "filename", moved)
+    ws.reorder_children(order)
+    return {"order": ws.include_order(), "workspace": name}
 
 
 def recombine(name: str, filenames: list[str]) -> dict:

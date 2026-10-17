@@ -1,4 +1,4 @@
-"""Edit an existing workspace's splits: extract, re-split, rename, recombine."""
+"""Edit an existing workspace's splits: extract, re-split, rename, reorder, recombine."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
@@ -27,6 +27,13 @@ async def rename_file(name: str, request: Request):
     """Rename a child or grandchild file without re-extracting it."""
     body = await request.json()
     return service.rename_file(name, body.get("old_filename", ""), body.get("new_filename", ""))
+
+
+@router.post("/api/workspaces/{name}/reorder")
+async def reorder_files(name: str, request: Request):
+    """Change the order of child files in the deck (the mother's *INCLUDE lines)."""
+    body = await request.json()
+    return service.reorder_files(name, body.get("order", []))
 
 
 @router.post("/api/workspaces/{name}/recombine")

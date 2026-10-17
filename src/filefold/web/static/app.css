@@ -206,9 +206,18 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ws-item:hover { background: var(--hairline); color: var(--text); }
-.ws-item.active { background: var(--hairline); color: var(--text); box-shadow: inset 2px 0 0 var(--text); }
+/* The open workspace must read at a glance, in both themes: an ink-tinted fill (not the
+   hover grey), a semibold label, a 3 px ink bar and a solid marker instead of the dash. */
+.ws-item.active,
+.ws-item.active:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .ws-item .lbl { overflow: hidden; text-overflow: ellipsis; }
 .ws-item .dot { width: 6px; height: 1px; background: currentColor; flex-shrink: 0; }
+.ws-item.active .dot { height: 6px; }
 .search-box { padding: 8px 12px; }
 .search-box input { width: 100%; }
 
@@ -228,7 +237,9 @@ body {
   background: var(--surface);
   flex-shrink: 0;
 }
-.topbar h1 { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.012em; flex: 1; }
+.topbar h1 { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.012em; flex: 1; min-width: 4em;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .btn { flex-shrink: 0; }
 .content { padding: 28px 32px; flex: 1; }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -415,32 +426,59 @@ body {
 .tree-children.open { display: block; }
 
 /* ── Split config ───────────────────────────────────────── */
-.split-grid {
-  display: grid;
-  gap: 8px;
-}
+.split-grid { display: grid; gap: 10px; }
+/* "Select all" is a plain line above the list, not another card. */
+.split-master { padding: 2px 4px 6px; }
+/* One card per category. Its 2 px edge (ink once the category has its own file) is the only
+   line a card needs; the fields inside stay quiet until hovered or focused. */
 .split-row {
   display: grid;
-  grid-template-columns: auto 1fr 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--surface2);
-  border-radius: var(--radius);
-  border: 1px solid transparent;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 2px solid var(--border);
 }
 .split-row.selected { border-color: var(--accent); }
+.split-row.sortable-row { grid-template-columns: 44px auto minmax(0, 1fr); padding-left: 8px; }
+.split-row-header { display: flex; align-items: center; gap: 8px; }
+.split-row input[type="text"] { background: var(--surface2); border-color: transparent; }
+.split-row input[type="text"]:hover:not(:disabled) { border-color: var(--border); }
+.split-row input[type="text"]:focus { border-color: var(--accent); }
 .sub-options {
   display: none;
   grid-column: 1 / -1;
-  margin-left: 20px;
-  padding: 8px 12px;
-  border-left: 2px solid var(--accent);
-  background: var(--surface);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 2px 0 0 26px;
   flex-direction: column;
   gap: 6px;
 }
+.sortable-row .sub-options { grid-column: 2 / -1; }
+
+/* ── File order (sortable.js): grip and up/down at the start of a row ── */
+.sort-handle { display: inline-flex; align-items: center; gap: 2px; }
+.grip {
+  width: 18px; padding: 4px 0; border-radius: 4px; text-align: center;
+  font-size: 16px; line-height: 1; color: var(--muted); cursor: grab; user-select: none;
+}
+.grip:hover { color: var(--text); background: var(--hairline); }
+.sort-handle.fixed .grip { opacity: .35; cursor: not-allowed; }
+.sort-arrows { display: inline-flex; flex-direction: column; width: 22px; }
+.sort-btn {
+  width: 22px; height: 18px; padding: 0; border: none; border-radius: 3px;
+  background: transparent; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer;
+}
+.sort-btn:hover:not(:disabled) { color: var(--text); background: var(--hairline); }
+.sort-btn:focus-visible { outline: 1px solid var(--text); outline-offset: 0; }
+.sort-btn:disabled { opacity: .25; cursor: default; }
+.sorting, .sorting .grip { cursor: grabbing; }
+/* While dragging, the dragged item is drawn as the empty slot it will land in. */
+.split-row.sort-slot { border-style: dashed; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.split-row.sort-slot > *, tr.sort-slot td > * { visibility: hidden; }
+tr.sort-slot td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+tr.sort-slot td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .sub-options.visible { display: flex; }
 /* Name-based sub-splits can number in the dozens (one per material): scroll, don't stretch the page. */
 .sub-options { max-height: 260px; overflow-y: auto; }
@@ -492,6 +530,8 @@ input[type="text"]:focus { outline: none; border-color: var(--accent); }
   vertical-align: middle;
 }
 .file-table tr:last-child td { border-bottom: none; }
+.file-table .sort-cell { width: 52px; padding-right: 0; }
+.file-table .row-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
 .file-table tr:hover td { background: var(--surface2); }
 .file-table .filename { font-family: var(--mono); font-size: var(--fs-sm); }
 /* Filenames read as floating text without a baseline to sit on. */
@@ -865,6 +905,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-base);
 }
 #tour-prompt span { color: var(--muted); font-size: var(--fs-sm); }
+/* The offer floats bottom-right: while it shows, the page keeps room below its content and
+   scrolls things clear of it, so it never covers a button (Create sits at the bottom). */
+body:has(#tour-prompt) #main { scroll-padding-bottom: 140px; }
+body:has(#tour-prompt) .view.active > .content { padding-bottom: 140px; }
 .tour-prompt-actions { display: flex; gap: 6px; margin-top: 6px; }
 @media (prefers-reduced-motion: reduce) { #tour-spot { transition: none; } }
 

@@ -117,15 +117,18 @@ def _wait_for_server(port: int, timeout: float = 30.0) -> None:
 # ---------------------------------------------------------------------------
 
 class _ServerThread(threading.Thread):
-    def __init__(self, port: int) -> None:
+    def __init__(self, port: int, extra_router=None) -> None:
         super().__init__(daemon=True, name="filefold-server")
         self.port = port
+        self.extra_router = extra_router
         self._server = None
 
     def run(self) -> None:
         import uvicorn
 
         from filefold.api.main import app as fastapi_app   # a real import, so bundlers find it
+        if self.extra_router is not None:                    # desktop-only routes (saving to a folder)
+            fastapi_app.include_router(self.extra_router)
         # log_config=None: no console to log to in a windowed app
         config = uvicorn.Config(fastapi_app, host="127.0.0.1", port=self.port, log_config=None, log_level="warning")
         self._server = uvicorn.Server(config)
@@ -203,6 +206,38 @@ def _build_qt(port: int, smoke: bool):
     return profile, _Window, QIcon(app_icon.make_pixmap(256)), QUrl
 
 
+def _make_save_dialog(parent):
+    """A Save dialog the server thread can call: the dialog itself must run on Qt's main
+    thread, so the call is handed over there and the server thread waits for the answer."""
+    from PySide6.QtCore import QObject, Qt, Signal, Slot
+    from PySide6.QtWidgets import QFileDialog
+
+    class _SaveDialog(QObject):
+        asked = Signal(str, str)
+
+        def __init__(self):
+            super().__init__()
+            self._lock = threading.Lock()
+            self._answer = None
+            self.asked.connect(self._ask, Qt.ConnectionType.BlockingQueuedConnection)
+
+        @Slot(str, str)
+        def _ask(self, title, start):
+            window = parent()
+            if window is not None and not window.isVisible():
+                window.show()
+            found, _filter = QFileDialog.getSaveFileName(window, title, start)   # asks before replacing
+            self._answer = Path(found) if found else None
+
+        def __call__(self, title, start):
+            with self._lock:                    # one dialog at a time
+                self._answer = None
+                self.asked.emit(title, str(start))
+                return self._answer
+
+    return _SaveDialog()
+
+
 class FileFoldApp:
     def __init__(self, smoke: bool = False) -> None:
         from PySide6.QtWidgets import QApplication
@@ -213,7 +248,10 @@ class FileFoldApp:
         self.qt.setQuitOnLastWindowClosed(smoke)
         preferred = int(os.environ.get("FILEFOLD_DESKTOP_PORT", DEFAULT_PORT))
         self.port = choose_port(preferred)
-        self.server = _ServerThread(self.port)
+        from filefold.desktop.saving import SaveDirs, make_router
+        self._save_dialog = _make_save_dialog(lambda: self.window)
+        self.server = _ServerThread(self.port, make_router(
+            self._save_dialog, SaveDirs(_data_dir() / "save_dirs.json"), _download_dir))
         self.profile, self._Window, self.icon, self._QUrl = _build_qt(self.port, smoke)
         self.qt.setWindowIcon(self.icon)
         self.profile.downloadRequested.connect(self._on_download)
