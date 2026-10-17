@@ -7,6 +7,9 @@ const state = {
   activeWs: null,       // name of open workspace
   wsData: null,         // full detail response for the open workspace
   splitsRenderedFor: null, // workspace name the Splits tab currently shows (keeps unapplied choices)
+  wsFiles: {},           // workspace name -> files, for the sidebar tree
+  wsOpen: new Set(),     // workspaces expanded in the sidebar (besides the open one)
+  wsFilesLoading: new Set(),
   inspectResult: null,  // { filename, blocks }
   uploadedFile: null,   // File object
   wsSummary: {},        // { [name]: {file_count, split_count, bytes, categories[]} }

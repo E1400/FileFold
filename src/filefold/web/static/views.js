@@ -2,9 +2,11 @@
 // View router
 // ═══════════════════════════════════════════════════════════════════════════════
 function showView(name) {
+  // Unsaved edits in the editor: ask before going anywhere else.
+  if (state.view === "editor" && name !== "editor" && !guardLeaveEditor(() => showView(name))) return;
   // Leaving a workspace with split choices not applied yet: ask first. The editor is
   // not "leaving" (Back returns to the same Splits tab, choices intact).
-  if (state.view === "detail" && name !== "detail" && name !== "editor"
+  if ((state.view === "detail" || state.view === "editor") && name !== "detail" && name !== "editor"
       && !guardLeaveSplits(() => showView(name))) return;
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById(`view-${name}`).classList.add("active");
@@ -40,19 +42,78 @@ async function loadWorkspaces() {
   }
 }
 
+// The Workspaces panel is a file explorer: the open workspace (and any the person
+// expands) lists its files; a click opens one in the editor while the tree stays.
 function renderSidebar() {
   const el = document.getElementById("ws-list");
   document.getElementById("ws-count").textContent = state.workspaces.length || "";
   if (!state.workspaces.length) {
     el.innerHTML = `<div class="panel-empty">No workspaces yet</div>`;
   } else {
-    el.innerHTML = state.workspaces.map(name =>
-      `<div class="ws-item ${name === state.activeWs ? "active" : ""}" onclick="openWorkspace('${esc(name).replace(/'/g, "\\'")}')">
-         <span class="dot"></span><span class="lbl">${esc(name)}</span>
-       </div>`
-    ).join("");
+    const js = v => esc(v).replace(/'/g, "\\'");
+    el.innerHTML = state.workspaces.map(name => {
+      const open = name === state.activeWs || state.wsOpen.has(name);
+      const files = state.wsFiles[name];
+      const edited = (files || []).some(f => f.manually_edited);
+      const head = `<div class="ws-item ${name === state.activeWs ? "active" : ""}" data-ws="${esc(name)}"
+             onclick="openWorkspace('${js(name)}')">
+          <button type="button" class="ws-twisty" aria-expanded="${open}" aria-label="${open ? "Hide files" : "Show files"}"
+                  onclick="event.stopPropagation(); toggleWsFiles('${js(name)}')">${open ? "▾" : "▸"}</button>
+          <span class="lbl">${esc(name)}</span>
+          ${edited ? `<span class="ws-edited" title="has edited files">●</span>` : ""}
+        </div>`;
+      if (!open) return head;
+      if (!files) { _loadWsFiles(name); return head + `<div class="ws-tree" data-ws="${esc(name)}"><div class="panel-empty">Loading…</div></div>`; }
+      const rows = orderedFiles(files).map(f => {
+        const current = state.view === "editor" && name === state.activeWs && f.filename === _modalFile;
+        const mark = !f.exists ? `<span class="file-mark is-missing" title="missing">!</span>`
+                   : f.manually_edited ? `<span class="file-mark is-edited" title="edited">●</span>` : "";
+        return `<div class="ws-file role-${f.role}" data-file="${esc(f.filename)}" role="button" tabindex="0"
+                     ${current ? 'aria-current="true"' : ""} title="${esc(f.filename)}"
+                     onclick="openFileFromTree('${js(name)}', '${js(f.filename)}')"
+                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openFileFromTree('${js(name)}', '${js(f.filename)}')}">
+            <span class="lbl">${esc(f.filename)}</span>${mark}</div>`;
+      }).join("");
+      return head + `<div class="ws-tree" data-ws="${esc(name)}">${rows}</div>`;
+    }).join("");
   }
   renderSearch();
+}
+
+function toggleWsFiles(name) {
+  const open = name === state.activeWs || state.wsOpen.has(name);
+  if (open && name === state.activeWs) return;     // the open workspace always shows its files
+  if (open) state.wsOpen.delete(name); else state.wsOpen.add(name);
+  renderSidebar();
+}
+
+async function _loadWsFiles(name) {
+  if (state.wsFilesLoading.has(name)) return;
+  state.wsFilesLoading.add(name);
+  try {
+    const data = await api("GET", `/api/workspaces/${encodeURIComponent(name)}`);
+    state.wsFiles[name] = data.files;
+  } catch (e) {
+    state.wsOpen.delete(name);
+    toastError(`Couldn't list the files of "${name}"`, e);
+  } finally {
+    state.wsFilesLoading.delete(name);
+    renderSidebar();
+  }
+}
+
+// Open a file from the tree: keep unsaved edits safe, switch workspace if needed.
+async function openFileFromTree(ws, filename) {
+  const go = async () => {
+    if (ws !== state.activeWs) {
+      await openWorkspace(ws);
+      if (state.activeWs !== ws) return;           // the person stayed (pending split changes)
+    }
+    viewFile(filename);
+  };
+  if (state.view === "editor" && filename === _modalFile && ws === state.activeWs) return;
+  if (!guardLeaveEditor(go)) return;
+  go();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -342,7 +403,9 @@ async function deleteSelected() {
 // Workspace detail
 // ═══════════════════════════════════════════════════════════════════════════════
 async function openWorkspace(name) {
-  if (state.view === "detail" && name !== state.activeWs && !guardLeaveSplits(() => openWorkspace(name))) return;
+  if (state.view === "editor" && !guardLeaveEditor(() => openWorkspace(name))) return;
+  if ((state.view === "detail" || state.view === "editor") && name !== state.activeWs
+      && !guardLeaveSplits(() => openWorkspace(name))) return;
   state.activeWs = name;
   // Drop the previous workspace's detail immediately. Leaving it in place means a
   // failed fetch below would strand activeWs and wsData pointing at different
@@ -370,24 +433,27 @@ async function openWorkspace(name) {
   }
 }
 
-function renderDetail(data) {
-  document.getElementById("detail-meta").innerHTML =
-    `Source: <span class="mono">${esc(data.source_name)}</span> &nbsp;·&nbsp; Updated: ${esc(data.updated_at)}`;
-
-  // Sort files: mother first, then children (no parent), then grandchildren
-  // immediately after the child they belong to.
-  const mothers = data.files.filter(f => f.role === "mother");
-  const children = data.files.filter(f => f.role === "child");
-  const grandchildren = data.files.filter(f => f.role === "grandchild");
-
-  const ordered = [...mothers];
+// Mother first, then each child followed by its sub-children (grandchildren).
+function orderedFiles(files) {
+  const children = files.filter(f => f.role === "child");
+  const grandchildren = files.filter(f => f.role === "grandchild");
+  const ordered = files.filter(f => f.role === "mother");
   children.forEach(child => {
     ordered.push(child);
     grandchildren.filter(gc => gc.parent === child.filename).forEach(gc => ordered.push(gc));
   });
   // Any grandchildren whose parent wasn't in children list (shouldn't happen, but safe)
-  grandchildren.filter(gc => !children.some(c => c.filename === gc.parent))
-    .forEach(gc => ordered.push(gc));
+  grandchildren.filter(gc => !children.some(c => c.filename === gc.parent)).forEach(gc => ordered.push(gc));
+  return ordered;
+}
+
+function renderDetail(data) {
+  document.getElementById("detail-meta").innerHTML =
+    `Source: <span class="mono">${esc(data.source_name)}</span> &nbsp;·&nbsp; Updated: ${esc(data.updated_at)}`;
+
+  const ordered = orderedFiles(data.files);
+  state.wsFiles[data.name] = data.files;     // the sidebar tree shows the same files
+  renderSidebar();
 
   const tbody = document.getElementById("detail-files");
   tbody.innerHTML = ordered.map(f => {

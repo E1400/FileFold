@@ -514,6 +514,29 @@ function askUnsavedChoice() {
   return askDialogChoice(document.getElementById("unsaved-dialog"));
 }
 
+function _editorDirty() {
+  const ta = _editorTa();
+  return !!(ta && _modalFile && _modalOrig !== null && ta.value !== _modalOrig);
+}
+
+// Going somewhere else from the editor (another file, the sidebar, another view):
+// unsaved edits are never dropped silently. Returns true when it is fine to go now;
+// otherwise asks and calls `proceed` after Save (if it worked) or Discard.
+function guardLeaveEditor(proceed) {
+  if (state.view !== "editor" || !_editorDirty()) return true;
+  askUnsavedChoice().then(async choice => {
+    if (choice === "cancel") return;
+    if (choice === "save" && !(await saveFile())) return;
+    if (choice === "discard") {
+      _editorTa().value = _modalOrig;
+      syncHighlight();
+      document.getElementById("unsaved-dot").classList.remove("visible");
+    }
+    proceed();
+  });
+  return false;
+}
+
 async function closeEditor() {
   const ta = _editorTa();
   if (ta && ta.value !== _modalOrig) {

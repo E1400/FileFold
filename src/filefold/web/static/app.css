@@ -969,3 +969,22 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .splits-layout { grid-template-columns: minmax(0, 1fr); }
   .splits-result { position: static; order: -1; }
 }
+
+/* ── Sidebar file explorer ───────────────────────────────────────────────────── */
+.ws-item { padding-left: 8px; }
+.ws-twisty { background: none; border: 0; color: var(--muted); width: 18px; padding: 0; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+.ws-twisty:hover { color: var(--text); }
+.ws-edited { margin-left: auto; color: var(--warn); font-size: 9px; }
+.ws-tree { padding-bottom: 4px; }
+.ws-file { display: flex; align-items: center; gap: 6px; padding: 3px 12px 3px 34px; font-family: var(--mono);
+           font-size: var(--fs-micro); color: var(--muted); cursor: pointer; white-space: nowrap; overflow: hidden; }
+.ws-file.role-child { padding-left: 44px; }
+.ws-file.role-grandchild { padding-left: 56px; }
+.ws-file.role-mother { color: var(--text); }
+.ws-file:hover { background: var(--hairline); color: var(--text); }
+.ws-file[aria-current="true"] { background: var(--hairline); color: var(--text); box-shadow: inset 2px 0 0 var(--text); }
+.ws-file:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ws-file .lbl { overflow: hidden; text-overflow: ellipsis; }
+.file-mark { margin-left: auto; font-size: 9px; flex-shrink: 0; }
+.file-mark.is-edited { color: var(--warn); }
+.file-mark.is-missing { color: var(--danger); font-weight: 700; font-size: var(--fs-micro); }
