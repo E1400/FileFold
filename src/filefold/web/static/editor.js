@@ -30,24 +30,9 @@ async function viewFile(filename) {
   const discBtn = document.getElementById("editor-discard-btn");
   const dot     = document.getElementById("unsaved-dot");
 
-  // Download through fetch rather than a direct link, so it also works where /api/ is
-  // served from inside the page (static build) instead of by a real server.
+  // Saved like every other download: a Save dialog where this workspace last saved (saving.js).
   dlBtn.href = "#";
-  dlBtn.onclick = async ev => {
-    ev.preventDefault();
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw await apiErrorFrom(res);
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (err) {
-      toastError("Couldn't download the file", err);
-    }
-  };
+  dlBtn.onclick = ev => { ev.preventDefault(); saveWorkspaceFile(state.activeWs, filename); };
   saveBtn.style.display = "none";
   discBtn.style.display = "none";
   dot.classList.remove("visible");

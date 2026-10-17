@@ -13,6 +13,44 @@ from .splitter import SplitResult, SplitSelection, SubSplitSelection, _sha256, c
 _MANIFEST_DIR = ".filefold"
 _MANIFEST_FILE = "workspace.json"
 
+# One *INCLUDE line: (prefix)(file name)(trailing blanks and \r, if any)
+_INCLUDE_LINE = _re.compile(r"^(\*INCLUDE\s*,\s*INPUT\s*=\s*)(.+?)([ \t]*\r?)$", _re.IGNORECASE | _re.MULTILINE)
+
+
+def included_files(text: str, names: set[str]) -> list[str]:
+    """The files among `names` that `text` *INCLUDEs, in the order it includes them."""
+    return [m.group(2) for m in _INCLUDE_LINE.finditer(text) if m.group(2) in names]
+
+
+def planned_order(current: list[str], order: list[str]) -> list[str]:
+    """The include order after moving the files listed in `order` into that order.
+
+    The listed files swap places among the positions they already hold; files not listed
+    keep theirs. So a file added since the order was chosen never moves.
+    """
+    wanted = list(dict.fromkeys(f for f in order if f in current))
+    listed = set(wanted)
+    slots = [i for i, f in enumerate(current) if f in listed]
+    new = list(current)
+    for slot, name in zip(slots, wanted):
+        new[slot] = name
+    return new
+
+
+def permute_includes(text: str, names: set[str], order: list[str]) -> str:
+    """`text` with its *INCLUDE lines for `names` put in `order` (see planned_order).
+
+    Only the file names on those lines change places: every other line, and each line's
+    own spacing and line ending, stays exactly as it was.
+    """
+    matches = [m for m in _INCLUDE_LINE.finditer(text) if m.group(2) in names]
+    new = planned_order([m.group(2) for m in matches], order)
+    out, pos = [], 0
+    for m, name in zip(matches, new):
+        out += [text[pos:m.start(2)], name]
+        pos = m.end(2)
+    return "".join(out) + text[pos:]
+
 
 # ---------------------------------------------------------------------------
 # Manifest records
@@ -241,6 +279,10 @@ class Workspace:
         else:
             new_mother_content = preview.new_mother_content
             new_child_contents = {s.filename: s.new_content for s in preview.statuses}
+        # The new mother has each *INCLUDE at its category's first block; keep the order the
+        # person chose for the children that were already here.
+        new_mother_content = permute_includes(
+            new_mother_content, {s.filename for s in all_selections}, self.include_order())
 
         # preview.statuses flattens children and sub-children into one list, so the
         # role/parent of each file has to come from the selections, not the status.
@@ -300,6 +342,53 @@ class Workspace:
             sha256=_sha256(new_mother_content), role="mother"
         )
         self._save()
+
+    # ------------------------------------------------------------------
+    # Include order
+    # ------------------------------------------------------------------
+
+    def _child_names(self) -> set[str]:
+        return {n for n, r in self.file_records.items() if r.role == "child"}
+
+    def include_order(self) -> list[str]:
+        """Child files in the order the mother *INCLUDEs them (the order of the deck)."""
+        mother = self.path / self.source_name
+        return included_files(read_raw(mother), self._child_names()) if mother.exists() else []
+
+    def reorder_children(self, order: list[str]) -> None:
+        """Change the order in which the mother *INCLUDEs the listed child files.
+
+        The *INCLUDE lines swap places among the lines they already occupy; everything
+        else in the mother stays put. Recombining afterwards gives the deck in the new
+        order. The manifest lists the children in the same order.
+        """
+        mother = self.path / self.source_name
+        text = read_raw(mother)
+        new_text = permute_includes(text, self._child_names(), order)
+        if new_text == text:
+            return
+        with open(mother, "w", encoding="utf-8", errors="surrogateescape", newline="") as fh:
+            fh.write(new_text)
+        rec = self.file_records.get(self.source_name)
+        # FileFold made this change, so it is not an edit, unless the mother was already
+        # edited by hand (then it stays marked as edited).
+        if rec and rec.sha256 == _sha256(text):
+            self.file_records[self.source_name] = FileRecord(_sha256(new_text), rec.role, rec.category, rec.parent)
+        self._sort_by_include_order(included_files(new_text, self._child_names()))
+        self._save()
+
+    def _sort_by_include_order(self, order: list[str]) -> None:
+        rank = {name: i for i, name in enumerate(order)}
+        last = len(order)
+        self.selections.sort(key=lambda s: rank.get(s.filename, last))
+
+        def key(item):
+            name, rec = item
+            if rec.role == "mother":
+                return (-1, 0)
+            owner = rec.parent if rec.role == "grandchild" else name
+            return (rank.get(owner, last), 0 if rec.role == "child" else 1)
+        self.file_records = dict(sorted(self.file_records.items(), key=key))
 
     # ------------------------------------------------------------------
     # Recombine

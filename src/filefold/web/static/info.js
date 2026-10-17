@@ -12,7 +12,7 @@ const INFO = {
   result: "The files your choices will make and how many lines each will have, updated as you tick. Exact, not an estimate.",
   subsplit: "Split this category further. Only options that would make a file are shown; ones that overlap grey out once you pick one.",
   status: "clean: exactly as FileFold wrote it. edited: changed since. missing: the file is gone.",
-  splits: "Change how this workspace is split. Unticking a category or sub-file folds it back into its parent.",
+  splits: "Change how this workspace is split. Unticking a category or sub-file folds it back into its parent. Drag ⠿ or use ↑ ↓ to change where a file comes in the deck.",
   reimport: "Upload a newer version of the original file. Existing children are compared against it before anything changes.",
   "reimport-status": "Conflict: edited here and changed upstream; compare both, then keep yours or take the incoming one. Will update: changed upstream only. Unchanged: same in both.",
   editor: "Ctrl/Cmd+S save, +F find, +G select a line range, +/ comment. Leaving with unsaved edits asks first.",

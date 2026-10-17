@@ -28,7 +28,7 @@ from filefold.core.splitter import (
     SplitSelection, SubSplitSelection, read_raw, split_with_includes,
 )
 from filefold.core.subsplits import discover, option_from_key
-from filefold.core.workspace import Workspace
+from filefold.core.workspace import Workspace, planned_order
 
 __all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE", "OPERATIONS"]
 
@@ -39,7 +39,8 @@ __all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE", "OPERATIONS"]
 OPERATIONS = (
     "inspect", "static_sub_options", "list_all_workspaces", "create_workspace", "get_workspace",
     "rename_workspace", "delete_workspace", "extract_splits", "resplit_child", "rename_file",
-    "recombine", "reimport_preview", "reimport_apply", "export_zip", "read_file", "write_file",
+    "recombine", "reorder_files", "reimport_preview", "reimport_apply", "export_zip", "read_file",
+    "write_file",
 )
 
 # Categories that must never be extracted into their own file.
@@ -343,18 +344,18 @@ def get_workspace(name: str) -> dict:
         if b.category.value not in NON_EXTRACTABLE:
             available_cats.add(b.category.value)
 
-    # Deck order, like the New Workspace screen: where each category first appears in the
-    # mother file; an extracted category sits where its *INCLUDE line is.
-    child_cat = {sel.filename: sel.category.value for sel in ws.selections}
-    deck_order: list[str] = []
+    # The deck's order: each child where the mother *INCLUDEs it, each category still in the
+    # mother where its first block is. The Splits tab lists categories in this order
+    # (and builds their options in it).
+    child_cat = {fn: r.category for fn, r in ws.file_records.items() if r.role == "child"}
+    category_order: list[str] = []
     for b in mother_blocks:
         cat = b.category.value
         if b.keyword == "INCLUDE":
-            cat = child_cat.get((b.params.get("INPUT") or "").strip().strip('"'), cat)
-        if cat in available_cats and cat not in deck_order:
-            deck_order.append(cat)
-    deck_order += sorted(available_cats - set(deck_order))
-
+            cat = child_cat.get(str(b.params.get("INPUT", "")).strip(), cat)
+        if cat in available_cats and cat not in category_order:
+            category_order.append(cat)
+    category_order += sorted(available_cats - set(category_order))
     # Sub-split options per category, from what is actually in the deck.
     # Already extracted: scan the child with its sub-files folded back in, which is exactly
     # what "Apply changes" re-splits (recombine, then split again). Still in the mother:
@@ -363,7 +364,7 @@ def get_workspace(name: str) -> dict:
     sub_claims: dict[str, list[list[str]]] = {}
     route_plans: dict[str, list[dict]] = {}   # for the Splits tab's live Result preview
     sel_by_cat = {s.category.value: s for s in ws.selections}
-    for cat_str in deck_order:
+    for cat_str in category_order:
         try:
             cat_enum = Category(cat_str)
         except ValueError:
@@ -387,9 +388,12 @@ def get_workspace(name: str) -> dict:
             sub_options[cat_str] = [o.as_dict() for o in opts]
             sub_claims[cat_str] = claims
 
+
     return {
         "name": ws.name,
         "source_name": ws.source_name,
+        "include_order": ws.include_order(),
+        "category_order": category_order,
         "selections": [
             {
                 "category": s.category.value,
@@ -400,7 +404,7 @@ def get_workspace(name: str) -> dict:
         ],
         "updated_at": ws.updated_at,
         "files": files,
-        "available_categories": deck_order,
+        "available_categories": category_order,
         "available_sub_cats": {c: [o["sub_category"] for o in os_] for c, os_ in sub_options.items()},
         "sub_options": sub_options,
         "sub_claims": sub_claims,
@@ -531,6 +535,34 @@ def rename_file(name: str, old_filename: str, new_filename: str) -> dict:
     except (ValueError, FileNotFoundError) as e:
         raise ServiceError(400, str(e))
     return {"renamed": new_filename, "workspace": name}
+
+
+def reorder_files(name: str, order: list[str]) -> dict:
+    """Change the order of the child files in the deck (the mother's *INCLUDE lines).
+
+    `order` lists child files in the order wanted; they swap places among the positions they
+    hold, files not listed stay put. Model data must stay before the first *STEP, so no file
+    may cross the step file.
+    """
+    order = [safe_segment(f, "filename") for f in order or []]
+    ws_dir, ws = _load(name)
+    if not (ws_dir / ws.source_name).exists():
+        raise ServiceError(404, f"Mother file '{ws.source_name}' not found", "mother_missing")
+    current = ws.include_order()
+    unknown = [f for f in order if f not in current]
+    if unknown:
+        raise ServiceError(400, f"Not an extracted file in this workspace: {unknown[0]!r}",
+                           "not_extracted", "filename", unknown[0])
+    new = planned_order(current, order)
+    for step in (s.filename for s in ws.selections if s.category == Category.STEP):
+        if step in current:
+            k = current.index(step)
+            if new[k] != step or set(new[:k]) != set(current[:k]):
+                moved = next((f for f in new[:k] + new[k + 1:] if (f in current[:k]) != (f in new[:k])), step)
+                raise ServiceError(400, f"'{moved}' cannot move past the step file '{step}': model data "
+                                   "must come before the first *STEP", "step_order", "filename", moved)
+    ws.reorder_children(order)
+    return {"order": ws.include_order(), "workspace": name}
 
 
 def recombine(name: str, filenames: list[str]) -> dict:

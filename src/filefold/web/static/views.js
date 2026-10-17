@@ -55,7 +55,7 @@ function renderSidebar() {
       const open = name === state.activeWs || state.wsOpen.has(name);
       const files = state.wsFiles[name];
       const edited = (files || []).some(f => f.manually_edited);
-      const head = `<div class="ws-item ${name === state.activeWs ? "active" : ""}" data-ws="${esc(name)}"
+      const head = `<div class="ws-item ${name === state.activeWs ? "active" : ""}" data-ws="${esc(name)}"${name === state.activeWs ? ' aria-current="true"' : ""}
              onclick="openWorkspace('${js(name)}')">
           <button type="button" class="ws-twisty" aria-expanded="${open}" aria-label="${open ? "Hide files" : "Show files"}"
                   onclick="event.stopPropagation(); toggleWsFiles('${js(name)}')">${open ? "▾" : "▸"}</button>
@@ -64,7 +64,7 @@ function renderSidebar() {
         </div>`;
       if (!open) return head;
       if (!files) { _loadWsFiles(name); return head + `<div class="ws-tree" data-ws="${esc(name)}"><div class="panel-empty">Loading…</div></div>`; }
-      const rows = orderedFiles(files).map(f => {
+      const rows = orderedFiles(files, state.wsIncludeOrder[name]).map(f => {
         const current = state.view === "editor" && name === state.activeWs && f.filename === _modalFile;
         const mark = !f.exists ? `<span class="file-mark is-missing" title="missing">!</span>`
                    : f.manually_edited ? `<span class="file-mark is-edited" title="edited">●</span>` : "";
@@ -93,6 +93,7 @@ async function _loadWsFiles(name) {
   try {
     const data = await api("GET", `/api/workspaces/${encodeURIComponent(name)}`);
     state.wsFiles[name] = data.files;
+    state.wsIncludeOrder[name] = data.include_order || [];
   } catch (e) {
     state.wsOpen.delete(name);
     toastError(`Couldn't list the files of "${name}"`, e);
@@ -352,16 +353,7 @@ function renameWorkspace(name) {
 }
 
 async function exportWsCard(name) {
-  try {
-    const blob = await api("GET", `/api/workspaces/${encodeURIComponent(name)}/export`);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${name}.zip`; a.click();
-    URL.revokeObjectURL(url);
-    toast(`${name}.zip downloaded`);
-  } catch(e) {
-    toastError("Couldn't export the workspace", e);
-  }
+  await saveWorkspaceFile(name);   // Save dialog (saving.js)
 }
 
 async function deleteWsCard(name) {
@@ -433,9 +425,11 @@ async function openWorkspace(name) {
   }
 }
 
-// Mother first, then each child followed by its sub-children (grandchildren).
-function orderedFiles(files) {
-  const children = files.filter(f => f.role === "child");
+// Mother first, then each child (in the order the mother includes them, i.e. the deck's)
+// followed by its sub-children (grandchildren).
+function orderedFiles(files, includeOrder = []) {
+  const rank = f => { const i = includeOrder.indexOf(f.filename); return i < 0 ? Infinity : i; };
+  const children = files.filter(f => f.role === "child").sort((a, b) => rank(a) - rank(b));
   const grandchildren = files.filter(f => f.role === "grandchild");
   const ordered = files.filter(f => f.role === "mother");
   children.forEach(child => {
@@ -451,9 +445,26 @@ function renderDetail(data) {
   document.getElementById("detail-meta").innerHTML =
     `Source: <span class="mono">${esc(data.source_name)}</span> &nbsp;·&nbsp; Updated: ${esc(data.updated_at)}`;
 
-  const ordered = orderedFiles(data.files);
-  state.wsFiles[data.name] = data.files;     // the sidebar tree shows the same files
+  const ordered = orderedFiles(data.files, data.include_order);
+  state.wsFiles[data.name] = data.files;     // the sidebar tree shows the same files, same order
+  state.wsIncludeOrder[data.name] = data.include_order || [];
   renderSidebar();
+
+  // File order: a child file and its sub-file rows move as one item (sortable.js). The step
+  // file is the fence, as in the Splits tab: model data must stay before the first *STEP.
+  const included = new Set(data.include_order || []);
+  const stepFile = data.selections.find(s => s.category === "step")?.filename;
+  const sortCell = f => {
+    if (f.role === "mother") return sortHandle(`mother:${f.filename}`, f.filename, false,
+      "The mother file includes the others, so it stays at the top.");
+    if (f.role === "grandchild") return sortHandle(`sub:${f.filename}`, f.filename, false,
+      `Sub-files move with their parent file. Move ${f.parent} instead.`);
+    if (f.filename === stepFile) return sortHandle(f.filename, f.filename, false,
+      "The step file stays last: model data must come before the first *STEP.");
+    if (!included.has(f.filename)) return sortHandle(f.filename, f.filename, false,
+      "This file isn't included by the mother file, so it has no place in the deck.");
+    return sortHandle(f.filename, f.filename, true, "");
+  };
 
   const tbody = document.getElementById("detail-files");
   tbody.innerHTML = ordered.map(f => {
@@ -476,30 +487,74 @@ function renderDetail(data) {
       ? `<span class="tree-indent">└</span>`
       : "";
 
-    return `<tr>
+    const owner = f.role === "grandchild" ? f.parent : f.role === "mother" ? `mother:${f.filename}` : f.filename;
+    return `<tr data-sort-key="${esc(owner)}" data-role="${f.role}">
+      <td class="sort-cell">${sortCell(f)}</td>
       <td class="filename"><div class="filename-cell">${indent}<span class="filename-text">${esc(f.filename)}</span></div></td>
       <td>${roleBadge}</td>
       <td>${f.category ? catChip(f.category) : "—"}</td>
       <td>${lineCount}</td>
       <td>${statusBadge}</td>
       <td>
-        <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}
+                  aria-label="Download ${esc(f.filename)}" title="Download ${esc(f.filename)}">⬇</button>
+        </div>
       </td>
     </tr>`;
   }).join("");
+  syncSortButtons(tbody, _fileItems());
 }
 
-async function exportWorkspace() {
+// The Files table as sortable items: each child with its sub-file rows.
+function _fileItems() {
+  const data = state.wsData;
+  const included = new Set(data?.include_order || []);
+  const stepFile = data?.selections.find(s => s.category === "step")?.filename;
+  const items = [];
+  let group = 0;
+  document.querySelectorAll("#detail-files tr[data-sort-key]").forEach(tr => {
+    const key = tr.dataset.sortKey, role = tr.dataset.role;
+    if (role === "grandchild") {
+      items.find(it => it.key === key)?.els.push(tr);
+      const grip = tr.querySelector(".grip");
+      items.push({ key: grip.dataset.key, els: [tr], movable: false, reason: grip.title, group: -1 });
+      return;
+    }
+    if (key === stepFile) group++;
+    const grip = tr.querySelector(".grip");
+    const movable = role === "child" && key !== stepFile && included.has(key);
+    items.push({ key: grip.dataset.key, els: [tr], movable, reason: grip.title, group });
+  });
+  return items;
+}
+
+// A file moved in the Files tab: applied straight away (this tab has no Apply button).
+async function _filesReordered(order) {
+  const ws = state.activeWs;
   try {
-    const blob = await api("GET", `/api/workspaces/${encodeURIComponent(state.activeWs)}/export`);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${state.activeWs}.zip`; a.click();
-    URL.revokeObjectURL(url);
-    toast("Export downloaded");
+    await api("POST", `/api/workspaces/${encodeURIComponent(ws)}/reorder`, { order });   // quiet: the table shows it
   } catch (e) {
-    toastError("Couldn't export the workspace", e);
+    toastError("Couldn't change the file order", e);
   }
+  try {
+    const fresh = await api("GET", `/api/workspaces/${encodeURIComponent(ws)}`);
+    if (ws !== state.activeWs) return;
+    state.wsData = fresh;
+    renderDetail(fresh);
+    document.getElementById("ws-split-config").innerHTML = "";   // the Splits tab re-renders on its next visit
+  } catch (_) { /* the next open shows the real state */ }
+}
+
+makeSortable(document.getElementById("detail-files"), { items: _fileItems, onMove: _filesReordered });
+
+async function exportWorkspace() {
+  await saveWorkspaceFile(state.activeWs);
+}
+
+async function downloadFile(filename) {
+  await saveWorkspaceFile(state.activeWs, filename);
 }
 
 async function deleteWorkspace() {

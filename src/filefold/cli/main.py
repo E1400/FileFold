@@ -43,6 +43,7 @@ OPERATION_COMMANDS = {
     "resplit_child": "workspace resplit",
     "rename_file": "workspace rename-file",
     "recombine": "workspace recombine",
+    "reorder_files": "workspace reorder",
     "reimport_preview": "workspace reimport",
     "reimport_apply": "workspace reimport",
     "export_zip": "workspace export",
@@ -354,6 +355,19 @@ def workspace_recombine(
     """Fold files back into their parent file (the reverse of a split)."""
     result = _call(service.recombine, _workspace_name(name), files)
     console.print(f"[bold green]Recombined[/bold green] {', '.join(result['recombined'])}")
+
+
+@ws_app.command("reorder")
+def workspace_reorder(
+    name: str = typer.Argument(..., help="Workspace name (or folder path)"),
+    files: list[str] = typer.Argument(..., help="Child files in the order the deck should include them"),
+) -> None:
+    """Change the order of child files in the deck (the mother's *INCLUDE lines).
+
+    The listed files swap places among the positions they hold; the others stay put.
+    """
+    result = _call(service.reorder_files, _workspace_name(name), files)
+    console.print(f"[bold green]Order[/bold green]: {' → '.join(result['order'])}")
 
 
 @ws_app.command("rename")

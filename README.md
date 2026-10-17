@@ -118,6 +118,7 @@ uv run filefold workspace resplit demo mesh -s mesh:nodes -s mesh:elements
 uv run filefold workspace resplit demo mesh        # no -s: fold the sub-files back
 uv run filefold workspace recombine demo mesh-nodes.inp
 uv run filefold workspace rename-file demo mesh.inp geometry.inp
+uv run filefold workspace reorder demo loads.inp geometry.inp   # loads now included before the mesh
 uv run filefold workspace cat demo geometry.inp > copy.inp
 uv run filefold workspace put demo geometry.inp edited.inp
 uv run filefold workspace reimport demo updated_model.inp [--force] [-e newcategory]

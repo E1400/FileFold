@@ -25,9 +25,12 @@ function renderSplitsTab(data) {
     (data.files || []).filter(f => f.role === "grandchild" && f.exists).map(f => f.filename)
   );
 
-  // Only show categories that actually exist in this workspace's source file
+  // Only show categories that actually exist in this workspace's source file, in the order
+  // of the deck (where the mother includes each child, or holds each category's first block).
   const allCats = [...(data.available_categories || [])];
   data.selections.forEach(sel => { if (!allCats.includes(sel.category)) allCats.push(sel.category); });
+  const deckRank = cat => { const i = (data.category_order || []).indexOf(cat); return i < 0 ? Infinity : i; };
+  allCats.sort((a, b) => deckRank(a) - deckRank(b));
 
   const el = document.getElementById("ws-split-config");
   state.splitsRenderedFor = data.name;
@@ -49,7 +52,7 @@ function renderSplitsTab(data) {
   const togglable = allCats.filter(c => !NON_EXTRACTABLE.has(c));
   const allOn = togglable.length > 0 && togglable.every(c => !!existingByCategory[c]);
   const masterRow = `
-    <div class="split-row" style="background:transparent;border-style:dashed">
+    <div class="split-master">
       <div class="split-row-header">
         <input type="checkbox" id="ws-master-cats" ${allOn ? "checked" : ""}
                onchange="wsToggleAllCategories()">
@@ -112,8 +115,15 @@ function renderSplitsTab(data) {
     // build. It can still be folded back, but not re-extracted — say so, rather
     // than letting the row silently disappear after the next apply.
     const oneWay = NON_EXTRACTABLE.has(cat) && isExtracted;
+    // An extracted file can change place in the deck (its *INCLUDE line moves). The step
+    // file is the fence: model data must stay before the first *STEP.
+    const movable = isExtracted && !NON_EXTRACTABLE.has(cat) && cat !== "step";
+    const fence = isExtracted && cat === "step";
 
-    return `<div class="split-row${isExtracted ? " selected" : ""}" id="ws-row-${cat}">
+    return `<div class="split-row sortable-row${isExtracted ? " selected" : ""}" id="ws-row-${cat}" data-cat="${cat}"
+                 data-sort-key="${cat}" ${movable ? 'data-movable="1"' : ""} ${fence ? 'data-fence="1"' : ""}
+                 ${isExtracted ? `data-file="${esc(existing.filename)}"` : ""}>
+      ${sortHandle(cat, `${cat} file`, movable, _fixedReason(cat))}
       <div class="split-row-header">
         <input type="checkbox" id="ws-sel-${cat}" ${isExtracted ? "checked" : ""}
                onchange="wsToggleSplitRow('${cat}')">
@@ -127,10 +137,10 @@ function renderSplitsTab(data) {
       </div>
       <input type="text" id="ws-fn-${cat}" value="${defaultFn}" placeholder="${cat}.inp"
              style="opacity:${isExtracted ? "1" : ".4"}" ${isExtracted ? "" : "disabled"}>
-      <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
       ${subPanel}
     </div>`;
   }).join("");
+  _syncMoveButtons();
   // Apply availability to extracted categories as rendered (their sub-files start ticked).
   allCats.forEach(cat => {
     if (document.getElementById(`ws-sel-${cat}`)?.checked) { _refreshWsSubs(cat); _syncSubAllBox(cat); }
@@ -146,6 +156,7 @@ function wsToggleSplitRow(cat) {
   fnInput.disabled = !checked;
   fnInput.style.opacity = checked ? "1" : ".4";
   _syncMasterCatBox();  // unchecking any single category must clear "select all"
+  _syncMoveButtons();
   const subPanel = document.getElementById(`ws-sub-opts-${cat}`);
   if (!subPanel) return;
   if (!checked) {
@@ -227,6 +238,50 @@ function _syncMasterCatBox() {
   master.checked = rows.length > 0 && rows.every(cb => cb.checked);
 }
 
+// ── File order ──────────────────────────────────────────────────────────────
+// Extracted files can swap places in the deck (sortable.js). Only their rows move;
+// categories still in the mother stay where their blocks are, exactly like the *INCLUDE
+// lines on Apply. The step row splits the files into groups that never mix (model data
+// before the first step). The new order is sent with Apply changes.
+function _fixedReason(cat) {
+  if (cat === "step") return "The step file stays last: model data must come before the first *STEP.";
+  if (NON_EXTRACTABLE.has(cat)) return "Model set-up stays in the mother file, so it can't be moved.";
+  if (document.getElementById(`ws-sel-${cat}`)?.checked)
+    return `Apply changes first. Then ${cat} has its own file and can be moved.`;
+  return `${cat} is still part of the mother file. Tick it and apply changes to give it its own file; then it can be moved.`;
+}
+
+function _splitItems() {
+  let group = 0;
+  return [...document.querySelectorAll("#ws-split-config .split-row[data-sort-key]")].map(row => {
+    if (row.dataset.fence) group++;
+    const cat = row.dataset.cat;
+    return { key: cat, els: [row], movable: !!row.dataset.movable, reason: _fixedReason(cat), group };
+  });
+}
+
+function _syncMoveButtons() {
+  syncSortButtons(document.getElementById("ws-split-config"), _splitItems());
+  const hint = document.getElementById("ws-order-hint");
+  if (hint) hint.hidden = !_orderToApply();
+  if (state.wsData && state.splitsRenderedFor === state.wsData.name) refreshSplitsPending();   // count + After Apply order
+}
+
+makeSortable(document.getElementById("ws-split-config"), { items: _splitItems, onMove: _syncMoveButtons });
+
+// The extracted files in the order shown, when that differs from the deck's; else null.
+// Names are the ones that will exist after Apply's renames.
+function _orderToApply() {
+  const data = state.wsData;
+  if (!data) return null;
+  const shown = [...document.querySelectorAll("#ws-split-config .split-row[data-file]")]
+    .filter(row => document.getElementById(`ws-sel-${row.dataset.cat}`)?.checked);
+  const was = shown.map(row => row.dataset.file);
+  const current = (data.include_order || []).filter(f => was.includes(f));
+  if (was.join("\n") === current.join("\n")) return null;
+  return shown.map(row => document.getElementById(`ws-fn-${row.dataset.cat}`)?.value.trim() || row.dataset.file);
+}
+
 function wsToggleAllCategories() {
   const master = document.getElementById("ws-master-cats");
   if (!master) return;
@@ -248,8 +303,10 @@ function wsToggleAllCategories() {
 // Returns { toMerge, toExtract, toResplit, toRename, count, marks: {cat: {kind, text}},
 // subMarks: {"cat:key": text} }.
 function planSplitChanges(data = state.wsData) {
-  const plan = { toMerge: [], toExtract: [], toResplit: [], toRename: [], count: 0, marks: {}, subMarks: {} };
+  const plan = { toMerge: [], toExtract: [], toResplit: [], toRename: [], toReorder: null, count: 0, marks: {}, subMarks: {} };
   if (!data || state.splitsRenderedFor !== data.name) return plan;
+  plan.toReorder = _orderToApply();               // files moved up or down in the deck
+  if (plan.toReorder) plan.count++;
   const existingByCategory = {};
   data.selections.forEach(sel => { existingByCategory[sel.category] = sel; });
   const actualGrandchildren = new Set(
@@ -471,7 +528,7 @@ async function applyEditSplits() {
     used.set(fn, input);
   }
 
-  const { toMerge, toExtract, toResplit, toRename, count } = planSplitChanges(data);
+  const { toMerge, toExtract, toResplit, toRename, toReorder, count } = planSplitChanges(data);
   if (!count) {
     toast("No changes to apply", "warn");
     return;
@@ -487,6 +544,7 @@ async function applyEditSplits() {
   if (toExtract.length) parts.push(`${toExtract.length} extracted`);
   if (toResplit.length) parts.push(`${toResplit.length} re-split`);
   if (toRename.length)  parts.push(`${toRename.length} renamed`);
+  if (toReorder)        parts.push("file order changed");
 
   try {
     if (toMerge.length)
@@ -497,6 +555,8 @@ async function applyEditSplits() {
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/resplit-child`, r);
     for (const r of toRename)
       await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/rename-file`, r);
+    if (toReorder)   // last: the names are final now
+      await api("POST", `/api/workspaces/${encodeURIComponent(state.activeWs)}/reorder`, { order: toReorder });
     toast(parts.join(", "), "ok");
   } catch (e) {
     failed = e;

@@ -68,3 +68,19 @@ def test_search_filters_workspace_titles(app):
     expect(app.locator("#search-results .panel-empty")).to_contain_text("No results")
     box.press("Escape")
     expect(box).to_have_value("")
+
+
+def test_open_workspace_stands_out_from_hover_in_both_themes(app):
+    """User-reported: the highlight on the open workspace was too faint (same grey as hover)."""
+    make_workspace(app)
+    active = app.locator("#ws-list .ws-item.active")
+    expect(active).to_have_attribute("aria-current", "true")
+    for theme in ("light", "dark"):
+        app.evaluate("t => document.documentElement.setAttribute('data-theme', t)", theme)
+        app.mouse.move(900, 500)
+        style = active.evaluate("e => { const s = getComputedStyle(e); return [s.backgroundColor, s.fontWeight, s.boxShadow]; }")
+        hover_bg = app.evaluate("""() => { const d = document.createElement('div'); d.style.background = 'var(--hairline)';
+            document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; }""")
+        assert style[0] != hover_bg, theme             # not the hover grey
+        assert style[1] == "600", theme                # semibold label
+        assert "3px" in style[2], theme                # thicker ink bar

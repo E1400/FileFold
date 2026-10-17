@@ -8,6 +8,7 @@ const state = {
   wsData: null,         // full detail response for the open workspace
   splitsRenderedFor: null, // workspace name the Splits tab currently shows (keeps unapplied choices)
   wsFiles: {},           // workspace name -> files, for the sidebar tree
+  wsIncludeOrder: {},    // workspace name -> child filenames in deck order
   wsOpen: new Set(),     // workspaces expanded in the sidebar (besides the open one)
   wsFilesLoading: new Set(),
   inspectResult: null,  // { filename, blocks }
@@ -104,6 +105,7 @@ function errorText({ code, field, value, status }) {
     case "mother_missing":      return "The workspace's mother file is missing, so nothing more can be extracted from it.";
     case "not_extractable":     return "Model set-up always stays in the mother file and can't get a file of its own.";
     case "not_extracted":       return "That file is no longer split out. Reopen the workspace and try again.";
+    case "step_order":          return `${v || "That file"} can't move below the step file: model data must come before the first *STEP.`;
     case "unknown_category":    return "FileFold didn't recognize one of the categories. Reload the page and try again.";
     case "file_too_large":      return "This file is larger than this server accepts.";
     case "auth_required":       return "You need to sign in again. Reload the page.";
