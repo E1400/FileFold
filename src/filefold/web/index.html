@@ -180,7 +180,7 @@
           <section id="help-splits">
             <h2>The Splits tab</h2>
             <p>Change how a workspace is split at any time: extract more categories, split further, fold files back into their parent by unticking them, or rename files. Lines are never lost or duplicated, so the pieces always add up to the original model.</p>
-            <p>Categories are listed in the order of the deck. To change where a file comes in the deck, drag it by <b>⠿</b> or use <b>↑</b> and <b>↓</b>, then <b>Apply changes</b>: its <code>*INCLUDE</code> line in the mother file moves, and everything still written in the mother stays where it is. The step file stays after the others, because model data must come before the first <code>*STEP</code>. A re-import keeps the order you chose.</p>
+            <p>Categories are listed in the order of the deck. To change where a file comes in the deck, drag it by <b>⠿</b> or use <b>↑</b> and <b>↓</b> at the start of its row, then <b>Apply changes</b>; in the Files tab the same handles apply straight away, and sub-files move with their parent. The file's <code>*INCLUDE</code> line in the mother file moves, and everything still written in the mother stays where it is. Only files of their own can move: a category still in the mother file needs extracting first, and the step file stays after the others because model data must come before the first <code>*STEP</code>. A re-import keeps the order you chose.</p>
           </section>
 
           <section id="help-reimport">
@@ -196,7 +196,7 @@
 
           <section id="help-export">
             <h2>Export and command line</h2>
-            <p><b>Export ZIP</b> saves the mother file and every child in one ZIP; <b>Download</b> on a row of the Files tab saves just that file. The first time, you choose a folder for the workspace (or set it beforehand with the <b>📁</b> button next to Export ZIP); after that, its exports and downloads go there without asking. A file that is already in the folder is only replaced if you confirm. Browsers that can't save to a folder (Firefox, Safari) use their normal downloads instead.</p>
+            <p><b>Export ZIP</b> saves the mother file and every child in one ZIP; <b>⬇</b> on a row of the Files tab saves just that file. Each time, a Save dialog opens in the folder this workspace was last saved to, so you can keep that place or pick another. Browsers without a Save dialog for web pages (Firefox, Safari) use their normal downloads instead.</p>
             <p>Everything the app does is also available as <code>filefold</code> commands (<code>inspect</code>, <code>split-partial</code>, <code>workspace create</code>, <code>extract</code>, <code>resplit</code>, <code>recombine</code>, <code>reimport</code>, <code>export</code>), and workspaces are shared with the app. Your files are kept
               <span data-mode="static">in this browser, on this device; nothing is uploaded anywhere. Decks up to 100 MB are tested here; use the desktop app or command line for larger ones.</span>
               <span data-mode="server">on the server, in this app's workspace folder.</span>
@@ -285,8 +285,6 @@
       <h1 id="detail-title">Workspace</h1>
       <span class="spacer"></span>
       <button class="btn btn-ghost btn-sm" onclick="exportWorkspace()">⬇ Export ZIP</button>
-      <button id="save-folder-btn" class="btn btn-ghost btn-sm save-folder-btn" onclick="changeSaveFolder()" hidden
-              aria-label="Folder this workspace saves to"><span aria-hidden="true">📁</span> <span class="lbl">Choose folder…</span></button>
       <button class="btn btn-ghost btn-sm" onclick="startReimp()">↑ Re-import</button>
       <button class="btn btn-danger btn-sm" onclick="deleteWorkspace()">Delete</button>
     </div>
@@ -301,6 +299,7 @@
         <table class="file-table">
           <thead>
             <tr>
+              <th class="sort-cell"><span class="visually-hidden">Order</span></th>
               <th>Filename</th>
               <th>Role</th>
               <th>Category</th>
@@ -452,6 +451,7 @@
 <!-- Toast container -->
 <div id="toast-container"></div>
 <script src="static/core.js"></script>
+<script src="static/sortable.js"></script>
 <script src="static/views.js"></script>
 <script src="static/saving.js"></script>
 <script src="static/splits.js"></script>

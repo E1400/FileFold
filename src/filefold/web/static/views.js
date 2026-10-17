@@ -263,7 +263,6 @@ function renameWorkspace(name) {
     try {
       await api("PATCH", `/api/workspaces/${encodeURIComponent(name)}`, { name: newName });
       close();
-      await moveSaveFolder(name, newName);
       toast(`Renamed to "${newName}"`, "ok");
       state.selectedWs.delete(name);
       await loadWorkspaces();
@@ -288,14 +287,13 @@ function renameWorkspace(name) {
 }
 
 async function exportWsCard(name) {
-  await saveWorkspaceFile(name);   // into the workspace's folder (saving.js)
+  await saveWorkspaceFile(name);   // Save dialog (saving.js)
 }
 
 async function deleteWsCard(name) {
   if (!confirm(`Delete workspace "${name}"? This cannot be undone.`)) return;
   try {
     await api("DELETE", `/api/workspaces/${encodeURIComponent(name)}`);
-    await moveSaveFolder(name, null);
     state.selectedWs.delete(name);
     toast(`Deleted ${name}`);
     await loadWorkspaces();
@@ -317,7 +315,6 @@ async function deleteSelected() {
   for (const name of names) {
     try {
       await api("DELETE", `/api/workspaces/${encodeURIComponent(name)}`);
-      await moveSaveFolder(name, null);
       state.selectedWs.delete(name);
     } catch(e) {
       toastError(`Couldn't delete "${name}"`, e);
@@ -345,7 +342,6 @@ async function openWorkspace(name) {
   document.getElementById("detail-files").innerHTML = "";
   // Clear stale splits content from any previously-opened workspace.
   document.getElementById("ws-split-config").innerHTML = "";
-  refreshSaveFolderButton(name);
 
   try {
     const data = await api("GET", `/api/workspaces/${encodeURIComponent(name)}`);
@@ -381,6 +377,22 @@ function renderDetail(data) {
   grandchildren.filter(gc => !children.some(c => c.filename === gc.parent))
     .forEach(gc => ordered.push(gc));
 
+  // File order: a child file and its sub-file rows move as one item (sortable.js). The step
+  // file is the fence, as in the Splits tab: model data must stay before the first *STEP.
+  const included = new Set(data.include_order || []);
+  const stepFile = data.selections.find(s => s.category === "step")?.filename;
+  const sortCell = f => {
+    if (f.role === "mother") return sortHandle(`mother:${f.filename}`, f.filename, false,
+      "The mother file includes the others, so it stays at the top.");
+    if (f.role === "grandchild") return sortHandle(`sub:${f.filename}`, f.filename, false,
+      `Sub-files move with their parent file. Move ${f.parent} instead.`);
+    if (f.filename === stepFile) return sortHandle(f.filename, f.filename, false,
+      "The step file stays last: model data must come before the first *STEP.");
+    if (!included.has(f.filename)) return sortHandle(f.filename, f.filename, false,
+      "This file isn't included by the mother file, so it has no place in the deck.");
+    return sortHandle(f.filename, f.filename, true, "");
+  };
+
   const tbody = document.getElementById("detail-files");
   tbody.innerHTML = ordered.map(f => {
     let statusBadge;
@@ -402,7 +414,9 @@ function renderDetail(data) {
       ? `<span class="tree-indent">└</span>`
       : "";
 
-    return `<tr>
+    const owner = f.role === "grandchild" ? f.parent : f.role === "mother" ? `mother:${f.filename}` : f.filename;
+    return `<tr data-sort-key="${esc(owner)}" data-role="${f.role}">
+      <td class="sort-cell">${sortCell(f)}</td>
       <td class="filename"><div class="filename-cell">${indent}<span class="filename-text">${esc(f.filename)}</span></div></td>
       <td>${roleBadge}</td>
       <td>${f.category ? catChip(f.category) : "—"}</td>
@@ -412,12 +426,56 @@ function renderDetail(data) {
         <div class="row-actions">
           <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
           <button class="btn btn-ghost btn-sm" onclick="downloadFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}
-                  aria-label="Download ${esc(f.filename)}" title="Download ${esc(f.filename)}">⬇ Download</button>
+                  aria-label="Download ${esc(f.filename)}" title="Download ${esc(f.filename)}">⬇</button>
         </div>
       </td>
     </tr>`;
   }).join("");
+  syncSortButtons(tbody, _fileItems());
 }
+
+// The Files table as sortable items: each child with its sub-file rows.
+function _fileItems() {
+  const data = state.wsData;
+  const included = new Set(data?.include_order || []);
+  const stepFile = data?.selections.find(s => s.category === "step")?.filename;
+  const items = [];
+  let group = 0;
+  document.querySelectorAll("#detail-files tr[data-sort-key]").forEach(tr => {
+    const key = tr.dataset.sortKey, role = tr.dataset.role;
+    if (role === "grandchild") {
+      items.find(it => it.key === key)?.els.push(tr);
+      const grip = tr.querySelector(".grip");
+      items.push({ key: grip.dataset.key, els: [tr], movable: false, reason: grip.title, group: -1 });
+      return;
+    }
+    if (key === stepFile) group++;
+    const grip = tr.querySelector(".grip");
+    const movable = role === "child" && key !== stepFile && included.has(key);
+    items.push({ key: grip.dataset.key, els: [tr], movable, reason: grip.title, group });
+  });
+  return items;
+}
+
+// A file moved in the Files tab: applied straight away (this tab has no Apply button).
+async function _filesReordered(order) {
+  const ws = state.activeWs;
+  try {
+    await api("POST", `/api/workspaces/${encodeURIComponent(ws)}/reorder`, { order });
+    toast("File order changed", "ok");
+  } catch (e) {
+    toastError("Couldn't change the file order", e);
+  }
+  try {
+    const fresh = await api("GET", `/api/workspaces/${encodeURIComponent(ws)}`);
+    if (ws !== state.activeWs) return;
+    state.wsData = fresh;
+    renderDetail(fresh);
+    document.getElementById("ws-split-config").innerHTML = "";   // the Splits tab re-renders on its next visit
+  } catch (_) { /* the next open shows the real state */ }
+}
+
+makeSortable(document.getElementById("detail-files"), { items: _fileItems, onMove: _filesReordered });
 
 async function exportWorkspace() {
   await saveWorkspaceFile(state.activeWs);
@@ -431,7 +489,6 @@ async function deleteWorkspace() {
   if (!confirm(`Delete workspace "${state.activeWs}"? This cannot be undone.`)) return;
   try {
     await api("DELETE", `/api/workspaces/${encodeURIComponent(state.activeWs)}`);
-    await moveSaveFolder(state.activeWs, null);
     toast(`Deleted ${state.activeWs}`);
     state.activeWs = null;
     await loadWorkspaces();

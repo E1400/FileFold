@@ -198,13 +198,13 @@ def _build_qt(port: int, smoke: bool):
     return profile, _Window, QIcon(app_icon.make_pixmap(256)), QUrl
 
 
-def _make_dir_chooser(parent):
-    """A folder picker the server thread can call: the dialog itself must run on Qt's main
+def _make_save_dialog(parent):
+    """A Save dialog the server thread can call: the dialog itself must run on Qt's main
     thread, so the call is handed over there and the server thread waits for the answer."""
     from PySide6.QtCore import QObject, Qt, Signal, Slot
     from PySide6.QtWidgets import QFileDialog
 
-    class _Chooser(QObject):
+    class _SaveDialog(QObject):
         asked = Signal(str, str)
 
         def __init__(self):
@@ -214,20 +214,20 @@ def _make_dir_chooser(parent):
             self.asked.connect(self._ask, Qt.ConnectionType.BlockingQueuedConnection)
 
         @Slot(str, str)
-        def _ask(self, name, start):
+        def _ask(self, title, start):
             window = parent()
             if window is not None and not window.isVisible():
                 window.show()
-            found = QFileDialog.getExistingDirectory(window, f"Choose where to save {name}", start)
+            found, _filter = QFileDialog.getSaveFileName(window, title, start)   # asks before replacing
             self._answer = Path(found) if found else None
 
-        def __call__(self, name, start):
+        def __call__(self, title, start):
             with self._lock:                    # one dialog at a time
                 self._answer = None
-                self.asked.emit(name, str(start or _download_dir()))
+                self.asked.emit(title, str(start))
                 return self._answer
 
-    return _Chooser()
+    return _SaveDialog()
 
 
 class FileFoldApp:
@@ -241,8 +241,9 @@ class FileFoldApp:
         preferred = int(os.environ.get("FILEFOLD_DESKTOP_PORT", DEFAULT_PORT))
         self.port = choose_port(preferred)
         from filefold.desktop.saving import SaveDirs, make_router
-        self._chooser = _make_dir_chooser(lambda: self.window)
-        self.server = _ServerThread(self.port, make_router(self._chooser, SaveDirs(_data_dir() / "save_dirs.json")))
+        self._save_dialog = _make_save_dialog(lambda: self.window)
+        self.server = _ServerThread(self.port, make_router(
+            self._save_dialog, SaveDirs(_data_dir() / "save_dirs.json"), _download_dir))
         self.profile, self._Window, self.icon, self._QUrl = _build_qt(self.port, smoke)
         self.qt.setWindowIcon(self.icon)
         self.profile.downloadRequested.connect(self._on_download)

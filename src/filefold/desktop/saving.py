@@ -1,10 +1,10 @@
-"""Desktop only: save exports and single files straight into a folder chosen per workspace.
+"""Desktop only: Export ZIP and single-file downloads through a native Save dialog.
 
-In a browser the page asks for a folder itself (File System Access API). The desktop window
+In a browser the page opens a Save dialog itself (showSaveFilePicker). The desktop window
 cannot, so the page asks this router instead, which the desktop app adds to its local server
 before starting it (never on a hosted server, where "a folder on this computer" would be the
-server's). The first save of a workspace asks for a folder with a native dialog; later saves
-go to the same folder without asking, until the person picks another.
+server's). Every save asks where to save, starting in the folder this workspace was last
+saved to, so Enter saves to the same place again. The dialog confirms replacing a file.
 
 Plain Python with the dialog passed in, so it is tested without a window.
 """
@@ -19,12 +19,12 @@ from fastapi import APIRouter, Request
 
 from filefold import service
 
-# (workspace name, folder to start in or None) -> the chosen folder, or None if canceled
-ChooseDir = Callable[[str, "Path | None"], "Path | None"]
+# (title, suggested path) -> the path chosen, or None if canceled
+AskSavePath = Callable[[str, Path], "Path | None"]
 
 
 class SaveDirs:
-    """Workspace name -> folder, kept in a small JSON file next to the window's other data."""
+    """Workspace name -> the folder it was last saved to, in a small JSON file."""
 
     def __init__(self, store: Path) -> None:
         self.store = Path(store)
@@ -47,30 +47,12 @@ class SaveDirs:
         self.store.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def make_router(choose_dir: ChooseDir, dirs: SaveDirs) -> APIRouter:
+def make_router(ask_save_path: AskSavePath, dirs: SaveDirs, default_dir: Callable[[], Path]) -> APIRouter:
     router = APIRouter()
-
-    @router.get("/api/desktop/workspaces/{name}/save-dir")
-    def get_save_dir(name: str):
-        folder = dirs.get(name)
-        return {"dir": str(folder) if folder else None}
-
-    # Plain `def`: FastAPI runs it on a worker thread, so waiting for the dialog never
-    # blocks the server's event loop.
-    @router.post("/api/desktop/workspaces/{name}/save-dir")
-    def choose_save_dir(name: str):
-        if not service.workspace_path(name).is_dir():
-            raise service.ServiceError(404, f"Workspace '{name}' not found", "workspace_not_found")
-        folder = choose_dir(name, dirs.get(name))
-        if folder is None:
-            return {"dir": None, "canceled": True}
-        dirs.set(name, folder)
-        return {"dir": str(folder)}
 
     @router.post("/api/desktop/workspaces/{name}/save")
     async def save(name: str, request: Request):
-        """Body: {"filename": one file, or omitted for the whole workspace as <name>.zip;
-        "replace": true to overwrite a file of that name already in the folder}."""
+        """Body: {"filename": one file, or omitted for the whole workspace as <name>.zip}."""
         body = await request.json()
         filename = body.get("filename")
         # Read first: an unknown workspace or file fails before any dialog opens.
@@ -78,18 +60,14 @@ def make_router(choose_dir: ChooseDir, dirs: SaveDirs) -> APIRouter:
             data, leaf = service.read_file(name, filename), Path(filename).name
         else:
             data, leaf = service.export_zip(name), f"{name}.zip"
-        folder = dirs.get(name)
-        if folder is None:
-            folder = await anyio.to_thread.run_sync(choose_dir, name, None)
-            if folder is None:
-                return {"saved": None, "canceled": True}
-            dirs.set(name, folder)
-        target = folder / leaf
-        # Never replace a file without asking: the folder may be the person's project folder,
-        # holding their original deck under the same name.
-        if target.exists() and not body.get("replace"):
-            return {"saved": None, "exists": True, "path": str(target), "dir": str(folder)}
+        start = (dirs.get(name) or default_dir()) / leaf
+        # On a worker thread: waiting for the dialog must not block the server's event loop.
+        target = await anyio.to_thread.run_sync(ask_save_path, f"Save {leaf}", start)
+        if target is None:
+            return {"saved": None, "canceled": True}
+        target = Path(target)
         target.write_bytes(data)
-        return {"saved": str(target), "dir": str(folder)}
+        dirs.set(name, target.parent)
+        return {"saved": str(target), "dir": str(target.parent)}
 
     return router

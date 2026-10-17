@@ -30,7 +30,7 @@ async function viewFile(filename) {
   const discBtn = document.getElementById("editor-discard-btn");
   const dot     = document.getElementById("unsaved-dot");
 
-  // Saved like every other download: into the workspace's folder (saving.js).
+  // Saved like every other download: a Save dialog where this workspace last saved (saving.js).
   dlBtn.href = "#";
   dlBtn.onclick = ev => { ev.preventDefault(); saveWorkspaceFile(state.activeWs, filename); };
   saveBtn.style.display = "none";

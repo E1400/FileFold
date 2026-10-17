@@ -115,7 +115,7 @@ function renderSplitConfig(blocks) {
   // createWorkspace uses to find real rows, and nothing reads these when building
   // the selections payload — they are purely a time-saver for ticking everything.
   const masterRow = `
-    <div class="split-row" style="background:transparent;border-style:dashed">
+    <div class="split-master">
       <label style="cursor:pointer;user-select:none;font-weight:600">
         <input type="checkbox" id="master-cats" onchange="toggleAllCategories()">
         Select all categories
