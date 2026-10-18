@@ -12,41 +12,52 @@ button, input, select, textarea { font: inherit; }
   --bg:        #D9DBD7;   /* ground */
   --surface:   #E8E9E5;   /* cards and bars sit a step lighter */
   --surface2:  #DFE1DC;   /* recessed fields */
-  --border:    #BABDB7;
-  --hairline:  #CBCEC8;
+  --border:    #B4B8B1;   /* structural thin line */
+  --hairline:  #CDD0CA;
+  --control:   #747872;   /* 3:1 boundary for inputs, checkboxes, fill-in lines, grips */
   --text:      #212523;
-  --muted:     #636763;
+  --muted:     #585C58;
   --accent:    #2A2E2B;   /* ink */
   --accent-ink:#E8E9E5;   /* text on accent fills */
-  --warn:      #8A6A2A;
-  --success:   #3E6B4A;
+  --warn:      #765A1F;
+  --success:   #35603F;
   --danger:    #8C3A32;
 
-  /* Muted pigments — distinguishable without any of them shouting. */
-  --cat-mesh:     #4A6B84;
-  --cat-material: #8A5340;
-  --cat-step:     #6B5B85;
-  --cat-loads:    #4A7A55;
-  --cat-contact:  #8A4453;
-  --cat-output:   #3A6E75;
-  --cat-model:    #7A6A3A;
-  --cat-section:  #6E5580;
-  --cat-unknown:  #636763;
-  --cat-constraint: #6B7F2F;
-  --cat-initial:  #A06A2A;
+  /* Muted pigments, each dark enough to pass 4.5:1 as 11 px text on the ground. */
+  --cat-mesh:     #3F5F78;
+  --cat-material: #80492F;
+  --cat-step:     #5F4F7A;
+  --cat-loads:    #3B6A46;
+  --cat-contact:  #80394A;
+  --cat-output:   #2F6168;
+  --cat-model:    #665828;
+  --cat-section:  #634A75;
+  --cat-unknown:  #585C58;
+  --cat-constraint: #4E621C;
+  --cat-initial:  #83561D;
+
+  /* Editor syntax: blue keywords, rust parameters, green comments. */
+  --syn-keyword: #0451A5;
+  --syn-param:   #A6461F;
+  --syn-comment: #1C6A34;
+
+  --guide: color-mix(in srgb, var(--muted) 45%, transparent);   /* tree connector line */
+  --raise: 0 1px 2px rgba(0,0,0,.10), 0 0 0 1px rgba(0,0,0,.06); /* sidebar tile */
+  --dim:   rgba(10,12,16,.42);                                      /* tour backdrop */
 
   /* Type scale. Four steps only — the previous sprawl of ten sizes and three
      weights is what made the page read as inconsistent. Weights are 400 and 600;
      nothing else. */
   --fs-micro: 11px;   /* uppercase labels, footer, badges */
   --fs-sm:    12px;   /* secondary and meta text */
-  --fs-base:  13px;   /* default UI text */
+  --fs-base:  13px;   /* default UI text, file names */
   --fs-lg:    15px;   /* titles: card names, screen titles, logo */
 
   --radius:   2px;
   --sidebar:  220px;
   --mono:     ui-monospace, "SF Mono", Menlo, "JetBrains Mono", Consolas, monospace;
-  --sans:     "Helvetica Neue", Helvetica, "Segoe UI", Arial, system-ui, sans-serif;
+  --sans:     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Ubuntu, sans-serif;
+  color-scheme: light;
 }
 
 /* Warm charcoal. Only tokens are redefined — every component reads through them,
@@ -56,54 +67,72 @@ button, input, select, textarea { font: inherit; }
     --bg:        #1B1A18;
     --surface:   #232220;
     --surface2:  #1F1E1C;
-    --border:    #35322F;
-    --hairline:  #2B2926;
+    --border:    #3A3733;
+    --hairline:  #2D2B28;
+    --control:   #7A766F;
     --text:      #E9E6E0;
-    --muted:     #9A9691;
+    --muted:     #ABA7A1;
     --accent:    #D8D4CD;
     --accent-ink:#1B1A18;
-    --warn:      #C7A768;
-    --success:   #85B394;
-    --danger:    #D98878;
+    --warn:      #D9B44A;
+    --success:   #73C991;
+    --danger:    #F48771;
 
-    --cat-mesh:     #7FA3C4;
-    --cat-material: #C4866B;
-    --cat-step:     #A294C4;
-    --cat-loads:    #87B397;
-    --cat-contact:  #C98596;
-    --cat-output:   #74AEB5;
-    --cat-model:    #BFAE79;
-    --cat-section:  #B39BC4;
-    --cat-unknown:  #9A9691;
-    --cat-constraint: #AFC278;
-    --cat-initial:  #D6A46A;
+    /* Clear, saturated hues: on charcoal the muted pigments blurred together. */
+    --cat-mesh:     #6FA8DC;
+    --cat-material: #E0875F;
+    --cat-step:     #B392F0;
+    --cat-loads:    #6CC48A;
+    --cat-contact:  #E57AA0;
+    --cat-output:   #4FC1C9;
+    --cat-model:    #D4B85A;
+    --cat-section:  #C792EA;
+    --cat-unknown:  #A6A29C;
+    --cat-constraint: #A8C95A;
+    --cat-initial:  #E8A65A;
+
+    --syn-keyword: #569CD6;
+    --syn-param:   #E0875F;
+    --syn-comment: #6CC48A;
+    --raise: 0 1px 2px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06);
+    --dim:   rgba(0,0,0,.66);
+    color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg:        #1B1A18;
   --surface:   #232220;
   --surface2:  #1F1E1C;
-  --border:    #35322F;
-  --hairline:  #2B2926;
+  --border:    #3A3733;
+  --hairline:  #2D2B28;
+  --control:   #7A766F;
   --text:      #E9E6E0;
-  --muted:     #9A9691;
+  --muted:     #ABA7A1;
   --accent:    #D8D4CD;
   --accent-ink:#1B1A18;
-  --warn:      #C7A768;
-  --success:   #85B394;
-  --danger:    #D98878;
+  --warn:      #D9B44A;
+  --success:   #73C991;
+  --danger:    #F48771;
 
-  --cat-mesh:     #7FA3C4;
-  --cat-material: #C4866B;
-  --cat-step:     #A294C4;
-  --cat-loads:    #87B397;
-  --cat-contact:  #C98596;
-  --cat-output:   #74AEB5;
-  --cat-model:    #BFAE79;
-  --cat-section:  #B39BC4;
-  --cat-unknown:  #9A9691;
-  --cat-constraint: #AFC278;
-  --cat-initial:  #D6A46A;
+  /* Clear, saturated hues: on charcoal the muted pigments blurred together. */
+  --cat-mesh:     #6FA8DC;
+  --cat-material: #E0875F;
+  --cat-step:     #B392F0;
+  --cat-loads:    #6CC48A;
+  --cat-contact:  #E57AA0;
+  --cat-output:   #4FC1C9;
+  --cat-model:    #D4B85A;
+  --cat-section:  #C792EA;
+  --cat-unknown:  #A6A29C;
+  --cat-constraint: #A8C95A;
+  --cat-initial:  #E8A65A;
+
+  --syn-keyword: #569CD6;
+  --syn-param:   #E0875F;
+  --syn-comment: #6CC48A;
+  --raise: 0 1px 2px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06);
+  --dim:   rgba(0,0,0,.66);
+  color-scheme: dark;
 }
 
 /* ── Base ───────────────────────────────────────────────── */
@@ -179,6 +208,7 @@ body {
   font-size: var(--fs-micro); font-weight: 600;
   letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
 }
+.panel-count { margin-right: auto; margin-left: 6px; font-size: var(--fs-micro); color: var(--muted); font-variant-numeric: tabular-nums; }
 .panel-act {
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
   background: none; border: 0; border-radius: var(--radius); color: var(--muted); cursor: pointer;
@@ -186,16 +216,6 @@ body {
 .panel-act:hover { background: var(--hairline); color: var(--text); }
 .panel-act svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .panel-body { flex: 1; overflow-y: auto; padding: 6px 0 10px; }
-.tree-group {
-  width: 100%; display: flex; align-items: center; gap: 4px;
-  padding: 4px 10px; background: none; border: 0; border-radius: 0;
-  color: var(--text); font: inherit; font-size: var(--fs-micro); font-weight: 600;
-  letter-spacing: .08em; text-transform: uppercase; cursor: pointer; text-align: left;
-}
-.tree-group:hover { background: var(--hairline); }
-.tree-group .chev { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .1s; }
-.tree-group[aria-expanded="true"] .chev { transform: rotate(90deg); }
-.tree-group .count { margin-left: auto; font-weight: 400; color: var(--muted); letter-spacing: 0; }
 .panel-empty { padding: 8px 16px; color: var(--muted); font-size: var(--fs-sm); }
 .ws-item {
   display: flex; align-items: center; gap: 8px;
@@ -493,10 +513,20 @@ tr.sort-slot td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .sub-option-row input[type="text"] { font-size: var(--fs-micro); padding: 4px 8px; width: 160px; }
 /* A refinement ("Element type: X") sits indented under the option it refines ("Elements"). */
 .sub-option-row.sub-child { padding-left: 22px; }
-.sub-option-row.sub-child::before { content: "\2514"; margin-left: -16px; width: 10px; color: var(--muted); font-family: var(--mono); }
+/* A thin rounded elbow from the parent option down into this one (drawn, not a glyph). */
+.sub-option-row.sub-child::before {
+  content: ""; flex: none; width: 9px; height: 14px; margin: -6px 4px 0 -16px; align-self: flex-start;
+  border-left: 1.5px solid var(--guide); border-bottom: 1.5px solid var(--guide); border-bottom-left-radius: 6px;
+}
 .sub-hint { font-size: var(--fs-micro); color: var(--muted); font-style: italic; }
 .sub-hint:empty { display: none; }
-.tree-indent { width: 20px; flex-shrink: 0; color: var(--muted); font-family: var(--mono); font-size: var(--fs-sm); text-align: center; }
+/* Tree connector (Files table, result tree): the elbow comes down from the parent row and
+   turns into the middle of the name it points to, so parent -> child reads as one soft line. */
+.tree-indent, .tree-branch { position: relative; display: inline-block; flex: none; width: 18px; height: 18px; margin-left: 2px; }
+.tree-indent::before, .tree-branch::before {
+  content: ""; position: absolute; left: 5px; top: -9px; width: 8px; height: 17px;
+  border-left: 1.5px solid var(--guide); border-bottom: 1.5px solid var(--guide); border-bottom-left-radius: 6px;
+}
 .filename-cell { display: flex; align-items: center; }
 input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 input[type="text"] {
@@ -690,13 +720,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 .field input[type="text"] { font-size: var(--fs-base); padding: 8px 10px; }
 
 /* ── Empty state ────────────────────────────────────────── */
-.empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--muted);
-}
-.empty .icon { font-size: 40px; margin-bottom: 12px; }
-.empty p { font-size: var(--fs-lg); margin-bottom: 16px; }
+/* What FileFold does and the two ways to start. */
+.empty { text-align: left; padding: 48px 8px; max-width: 520px; }
+.empty .empty-title { font-size: var(--fs-lg); font-weight: 600; margin: 0 0 6px; }
+.empty p { color: var(--muted); margin: 0 0 16px; }
+.empty .empty-actions { display: flex; gap: 8px; }
 
 .modal-loading {
   display: flex;
@@ -806,9 +834,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 /* Syntax colours come from tokens so they invert with the blueprint theme —
    hardcoded values here previously assumed a dark ground and went unreadable
    on paper. */
-.hl-comment { color: var(--muted); font-style: italic; }
-.hl-keyword  { color: var(--blue); font-weight: 600; }
-.hl-param    { color: var(--cat-step); }
+.hl-comment { color: var(--syn-comment); }
+.hl-keyword  { color: var(--syn-keyword); font-weight: 600; }
+.hl-param    { color: var(--syn-param); }
 /* Find highlights (background, not colour, so they work on any syntax class) */
 .hl-match     { background: color-mix(in srgb, var(--warn) 32%, transparent); border-radius: 2px; }
 .hl-match-cur { background: var(--warn); color: var(--surface) !important; border-radius: 2px; }
@@ -882,7 +910,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
    The dimming is visual only (pointer-events: none) so the page stays usable. */
 #tour-spot {
   position: fixed; z-index: 880; pointer-events: none; border-radius: 6px;
-  box-shadow: 0 0 0 9999px rgba(10,12,16,.42), 0 0 0 2px var(--text);
+  box-shadow: 0 0 0 9999px var(--dim), 0 0 0 2px var(--text);
   transition: left .18s, top .18s, width .18s, height .18s;
 }
 #tour-card, #tour-prompt {
@@ -1001,7 +1029,7 @@ body:has(#tour-prompt) .view.active > .content { padding-bottom: 140px; }
 .result-row.role-child { padding-left: 22px; }
 .result-row.role-sub { padding-left: 34px; }
 .result-row.role-mother .mono { font-weight: 600; }
-.tree-branch { color: var(--muted); font-family: var(--mono); }
+.result-row.role-sub .tree-branch { width: 16px; }
 .result-role { color: var(--muted); border-color: var(--border); }
 .result-mark { font-size: var(--fs-micro); white-space: nowrap; }
 .result-row.is-new .result-mark { color: var(--success); }
@@ -1039,3 +1067,245 @@ body:has(#tour-prompt) .view.active > .content { padding-bottom: 140px; }
    underneath (only its close button takes clicks). */
 #toast-container, .toast { pointer-events: none; }
 .toast-close { pointer-events: auto; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Refined drafting sheet (2026-10-18)
+   One line weight for outlines and thin lines for the rest, one corner radius,
+   lettering in two weights, colour only where it means something (categories,
+   edited/missing). Category tags are outlined stamps; text fields are fill-in
+   lines like a title block. File names use the UI typeface (code stays mono).
+   Later rules here refine the component rules above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* ── Base: 13 px body (was 15 px, which leaked into labels and prose) ── */
+body { font-size: var(--fs-base); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+a { color: inherit; text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* ── Chrome ── */
+.topbar { padding: 0 24px; height: 48px; border-bottom: 1px solid var(--text); }
+.topbar h1 { font-size: var(--fs-lg); font-weight: 600; }
+.detail-tabs { padding: 0 24px; border-bottom: 1px solid var(--border); }
+.detail-tab { font: 400 var(--fs-base) var(--sans); padding: 10px 2px; margin: 0 18px -1px 0; }
+.detail-tab.active { font-weight: 600; border-bottom-color: var(--text); }
+.content { padding: 24px 32px; }
+
+/* Sidebar: same structure, one quieter level of lettering */
+#activity-bar { background: var(--surface2); }
+.panel-head { height: 48px; border-bottom: 1px solid var(--text); }
+.ws-item { font-size: var(--fs-base); height: 28px; }
+.ws-item.active, .ws-item.active:hover { background: var(--surface2); box-shadow: inset 2px 0 0 var(--text); }
+.ws-file { height: 24px; font-size: var(--fs-micro); }
+.ws-file[aria-current="true"] { background: var(--surface2); }
+
+/* ── Buttons: one height, hover changes fill (not opacity) ── */
+.btn { height: 30px; padding: 0 12px; border-radius: var(--radius); font-weight: 600; transition: background .12s, border-color .12s; }
+.btn-sm { height: 26px; padding: 0 10px; font-size: var(--fs-sm); }
+.btn:hover { opacity: 1; }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 86%, var(--bg)); }
+.btn-ghost { border-color: var(--control); background: transparent; }
+.btn-ghost:hover { background: var(--surface2); border-color: var(--text); }
+.btn-danger { border-color: color-mix(in srgb, var(--danger) 70%, transparent); }
+
+/* ── Text fields become fill-in lines (title-block style) ── */
+input[type="text"] {
+  background: transparent; border: 0; border-bottom: 1px solid var(--control);
+  border-radius: 0; padding: 4px 2px;
+}
+input[type="text"]:focus { border-bottom: 2px solid var(--text); padding-bottom: 3px; }
+.split-row input[type="text"] { background: transparent; border-color: transparent; border-bottom-color: var(--control); }
+.split-row input[type="text"]:hover:not(:disabled) { border-color: transparent; border-bottom-color: var(--text); }
+.field input[type="text"] { font-size: var(--fs-base); padding: 6px 2px; }
+.header-find input { background: transparent; border: 0; border-bottom: 1px solid var(--control); border-radius: 0; }
+
+/* ── Labels: sentence case. UPPERCASE survives only in table headers and the sidebar title,
+      the two places a drawing's title block would letter it. ── */
+.section-title {
+  text-transform: none; letter-spacing: 0; font-size: var(--fs-base); font-weight: 600;
+  color: var(--text); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.section-sub { font-size: var(--fs-sm); }
+.field label { color: var(--text); font-size: var(--fs-base); }
+
+/* ── ONE tag component: outlined stamp, category colour, no fill ── */
+/* Each tag sets only --c (its category colour); without one it inherits the text colour. */
+.chip, .wsc-chip, .tree-cat {
+  color: var(--c);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  font: 600 var(--fs-micro)/16px var(--sans);
+  text-transform: none; letter-spacing: 0;
+  padding: 0 5px;
+}
+.result-role { color: var(--muted) !important; }
+.wsc-chips { gap: 6px; }
+
+/* Status: the normal case ("clean") is quiet text; only exceptions get a stamp. */
+.badge { border-radius: var(--radius); font-weight: 600; padding: 0 5px; line-height: 16px; background: transparent !important; }
+.badge-ok { color: var(--muted); border-color: transparent !important; font-weight: 400; padding: 0; }
+.badge-warn { color: var(--warn); border: 1px solid currentColor !important; }
+.badge-danger { color: var(--danger); border: 1px solid currentColor !important; }
+/* Role ("mother", "child", "sub-child", "extracted") is not a status: plain text. */
+.badge-muted, .badge-accent, .badge-sub { border: 0 !important; color: var(--muted); font-weight: 400; padding: 0; }
+.pending-mark { border-radius: var(--radius); font-weight: 600; }
+
+/* ── Workspace cards ── */
+.sheet-head { border-bottom: 1px solid var(--text); }
+.sheet-title { font-size: var(--fs-base); }
+.card-grid { gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.workspace-card { border-color: var(--border); border-radius: var(--radius); }
+.workspace-card:hover, .workspace-card:focus-within { border-color: var(--text); box-shadow: none; }
+.workspace-card.selected { box-shadow: inset 3px 0 0 var(--text); border-color: var(--text); }
+.wsc-body { padding: 14px 14px 12px; gap: 10px; }
+.wsc-name { font-size: var(--fs-lg); }
+.wsc-bar { height: 3px; border-radius: 0; }
+.wsc-meta b { font-weight: 600; }
+
+/* ── Split choices: thin outline; an extracted category gets a 3 px revision bar ── */
+.split-grid { gap: 8px; }
+.split-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
+.split-row.selected { border-color: var(--border); box-shadow: inset 3px 0 0 var(--text); }
+.split-row.sortable-row { padding-left: 8px; }
+.sub-options { padding-left: 26px; gap: 4px; }
+.sub-option-row { color: var(--text); font-size: var(--fs-sm); }
+.sub-option-row input[type="text"] { font-size: var(--fs-micro); padding: 2px 2px; }
+.split-master { padding: 0 2px 4px; }
+
+/* ── Drop zone (stays large after a file is loaded; tighten it) ── */
+.drop-zone { border: 1px dashed var(--control); padding: 22px 20px; border-radius: var(--radius); }
+.drop-zone .icon { font-size: 20px; margin-bottom: 4px; }
+
+/* ── Panels: inspector, result, file table ── */
+.inspector-tree, .result-panel, .card { border-color: var(--border); border-radius: var(--radius); }
+.tree-node-header { border-radius: 0; }
+.tree-kw { font-weight: 600; }
+.result-row { min-height: 26px; }
+.result-lines { font-size: var(--fs-sm); color: var(--muted); }
+
+.file-table th { font-size: var(--fs-micro); letter-spacing: .06em; padding: 8px 12px; border-bottom: 1px solid var(--text); }
+.file-table td { padding: 0 12px; height: 40px; border-bottom: 1px solid var(--hairline); }
+.file-table td:nth-child(5), .file-table th:nth-child(5) { text-align: right; font-variant-numeric: tabular-nums; padding-right: 28px; }
+.file-table .filename .filename-cell > span:last-child, .file-table .filename-text { border-bottom: 0; }
+.file-table .row-actions .btn { border-color: var(--border); }
+
+/* ── Splits: sticky bar ruled like a title block ── */
+.pending-bar { border: 0; border-top: 1px solid var(--text); border-radius: 0; box-shadow: none; background: var(--bg); padding: 10px 0; }
+
+/* ── Re-import ── */
+.reimp-item { border-color: var(--border); border-radius: var(--radius); padding: 10px 12px; }
+.reimp-item.is-conflict { border-color: var(--warn); box-shadow: inset 3px 0 0 var(--warn); }
+.reimp-group h3 { font-size: var(--fs-base); }
+.diff-side { border-color: var(--border); border-radius: 0; }
+.diff-head { font-size: var(--fs-micro); }
+
+
+/* ── Info page ── */
+.help-body h2 { font-size: var(--fs-lg); border-bottom: 1px solid var(--text); }
+.help-body p, .help-body li, .help-defs dd { font-size: var(--fs-base); }
+.help-lead { font-size: var(--fs-lg) !important; }
+.help-toc a { border-left-color: var(--border); }
+
+/* ── Overlays: one radius, an ink outline, one shadow ── */
+#tour-card, #tour-prompt, .sample-menu, .toast, #unsaved-dialog, #pending-dialog { border-radius: var(--radius); border-color: var(--text); box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+#tour-spot { border-radius: var(--radius); }
+.info-btn { width: 14px; height: 14px; font-size: 10px; }
+
+/* Re-import group labels are headings, not row statuses: all three keep a stamp. */
+.reimp-group h3 .badge { border: 1px solid currentColor !important; padding: 0 5px; font-weight: 600; }
+.reimp-group h3 .badge-ok { color: var(--success); }
+.reimp-group h3 .badge-muted { color: var(--muted); }
+
+/* ── File names: the UI typeface, one size, tabular figures. ── */
+.file-table .filename, .file-table .filename-text,
+.ws-file, .ws-file .lbl,
+.result-name .mono, .result-row .mono,
+.reimp-item .fname, .reimp-group .fname,
+#editor-filename, #reimp-file-label,
+.split-row input[type="text"], .sub-option-row input[type="text"], .field input[type="text"] {
+  font-family: var(--sans);
+  font-size: var(--fs-base);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.file-table .filename-text { font-weight: 400; }
+.file-table tr:first-child .filename-text, .ws-file.role-mother, .result-row.role-mother .mono { font-weight: 600; }
+.sub-option-row input[type="text"] { font-size: var(--fs-sm); }
+
+/* ── Reorder controls recede: a grip at control contrast; arrows show when the row is
+      hovered or focused (on devices with a mouse — touch screens always show them). ── */
+.grip { color: var(--control); font-size: 13px; }
+.grip:hover { color: var(--text); background: transparent; }
+.sort-handle.fixed .grip { opacity: .4; }
+.sort-btn { color: var(--muted); font-size: 11px; line-height: 11px; }
+.sort-btn:hover:not(:disabled) { background: transparent; color: var(--text); }
+.sort-btn:disabled { opacity: .18; }
+@media (hover: hover) {
+  .sort-arrows { opacity: 0; transition: opacity .12s; }
+  tr:hover .sort-arrows, tr:focus-within .sort-arrows,
+  .split-row:hover .sort-arrows, .split-row:focus-within .sort-arrows,
+  .sorting .sort-arrows { opacity: 1; }
+}
+
+/* ── Sidebar: the open workspace sits on a raised rounded tile, the open file on a soft
+      tinted pill. ── */
+.ws-item { margin: 1px 8px; padding: 0 8px; height: 28px; border-radius: 6px; }
+.ws-item:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.ws-item.active, .ws-item.active:hover {
+  background: var(--surface); box-shadow: var(--raise); color: var(--text); font-weight: 600;
+}
+.ws-file { margin: 0 8px; border-radius: 6px; height: 24px; padding-left: 30px; color: var(--muted); }
+.ws-file.role-mother { padding-left: 30px; color: var(--text); }
+.ws-file.role-child { padding-left: 40px; }
+.ws-file.role-grandchild { padding-left: 54px; }
+.ws-file:hover { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+.ws-file[aria-current="true"] {
+  background: color-mix(in srgb, var(--text) 10%, transparent); box-shadow: none; color: var(--text);
+}
+/* Dark: the surface is close to the panel ground, so the tile is lifted with a light tint. */
+:root[data-theme="dark"] .ws-item.active, :root[data-theme="dark"] .ws-item.active:hover {
+  background: color-mix(in srgb, var(--text) 13%, var(--surface));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ws-item.active, :root:not([data-theme="light"]) .ws-item.active:hover {
+    background: color-mix(in srgb, var(--text) 13%, var(--surface));
+  }
+}
+
+/* ── Editor: a calm code area with a hairline gutter; syntax colours come from --syn-*. ── */
+.editor-gutter { background: var(--surface); border-right: 1px solid var(--hairline); }
+.editor-gutter-inner { color: var(--muted); }
+.editor-code-area { background: var(--surface); }
+
+/* ── New workspace: once a file is loaded the drop zone is a one-line bar. ── */
+.drop-zone.loaded { display: flex; align-items: center; gap: 10px; padding: 10px 14px; text-align: left; border-style: solid; border-color: var(--border); }
+.drop-zone.loaded .loaded-check { color: var(--success); font-weight: 600; }
+.drop-zone.loaded .hint { color: var(--muted); margin: 0; }
+.drop-zone.loaded .loaded-change { margin-left: auto; color: var(--text); }
+
+/* ── New workspace: a category's checkbox sits on the same line as its tag and label
+      (it rode high when the checkbox was inline in the label). ── */
+.split-row > label, .split-master > label { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Splits tab: finer splits only under ticked categories (as on New workspace). ── */
+#ws-split-config .split-row:not(.selected) .sub-options { display: none; }
+
+/* ── Delete is set apart from the other header actions: red text after a divider. ── */
+.topbar .btn-danger { background: transparent; border-color: transparent; margin-left: 14px; position: relative; }
+.topbar .btn-danger::before { content: ""; position: absolute; left: -9px; top: 4px; bottom: 4px; border-left: 1px solid var(--border); }
+.topbar .btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+/* ── Files table: a row opens its file. Hover tints the row, underlines the name and shows
+      "Open"; one quiet download icon per row. ── */
+.file-table tr.openable { cursor: pointer; }
+.file-table tr.openable:hover td { background: color-mix(in srgb, var(--text) 7%, var(--bg)); }
+.filename-open { background: none; border: 0; padding: 0; color: var(--text); cursor: pointer; text-align: left; font: inherit; }
+.filename-open:disabled { color: var(--muted); cursor: default; }
+tr.openable:hover .filename-open, .filename-open:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.open-hint { margin-left: 10px; font-size: var(--fs-micro); color: var(--muted); opacity: 0; transition: opacity .12s; }
+tr.openable:hover .open-hint, tr.openable:focus-within .open-hint { opacity: 1; }
+.file-table .row-actions .btn { border-color: transparent; background: transparent; color: var(--muted); }
+.file-table tr:hover .row-actions .btn { color: var(--text); border-color: var(--border); }
+
+/* Motion: respect "reduce motion" everywhere. */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }

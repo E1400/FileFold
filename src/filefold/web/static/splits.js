@@ -128,7 +128,7 @@ function renderSplitsTab(data) {
         <input type="checkbox" id="ws-sel-${cat}" ${isExtracted ? "checked" : ""}
                onchange="wsToggleSplitRow('${cat}')">
         <label for="ws-sel-${cat}" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;user-select:none">
-          <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
+          <span class="chip" style="--c:${c}">${cat}</span>
           ${isExtracted ? `<span class="badge badge-accent">extracted</span>` : ""}
           <span class="pending-slot" id="ws-mark-${cat}"></span>
           ${oneWay ? `<span class="badge badge-warn"

@@ -193,7 +193,7 @@ function renderReimportPreview(data) {
         return `<div class="split-row" id="reimp-row-${cat}">
           <label>
             <input type="checkbox" id="reimp-sel-${cat}" onchange="toggleReimpNewCat('${cat}')">
-            <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
+            <span class="chip" style="--c:${c}">${cat}</span>
           </label>
           <input type="text" id="reimp-fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
           <span class="text-muted text-sm mono">new</span>

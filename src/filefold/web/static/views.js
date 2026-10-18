@@ -126,7 +126,7 @@ function _sidePref() {
   try { return JSON.parse(localStorage.getItem(_sideKey)) || {}; } catch { return {}; }
 }
 function _saveSidePref() {
-  try { localStorage.setItem(_sideKey, JSON.stringify({ panel: state.panel, collapsed: state.sideCollapsed, wsOpen: state.wsGroupOpen })); } catch { /* private mode */ }
+  try { localStorage.setItem(_sideKey, JSON.stringify({ panel: state.panel, collapsed: state.sideCollapsed })); } catch { /* private mode */ }
 }
 
 function applyPanel() {
@@ -146,16 +146,6 @@ function selectPanel(name) {
   if (name === "search" && !state.sideCollapsed) document.getElementById("search-input").focus();
 }
 
-function toggleWsGroup() {
-  state.wsGroupOpen = !state.wsGroupOpen;
-  applyWsGroup();
-  _saveSidePref();
-}
-function applyWsGroup() {
-  document.getElementById("ws-group-toggle").setAttribute("aria-expanded", String(state.wsGroupOpen));
-  document.getElementById("ws-list").hidden = !state.wsGroupOpen;
-}
-
 function renderSearch() {
   const out = document.getElementById("search-results");
   if (!out) return;
@@ -171,9 +161,7 @@ function renderSearch() {
   const p = _sidePref();
   state.panel = p.panel === "search" ? "search" : "workspaces";
   state.sideCollapsed = !!p.collapsed;
-  state.wsGroupOpen = p.wsOpen !== false;
   applyPanel();
-  applyWsGroup();
   document.getElementById("search-input").addEventListener("input", renderSearch);
   document.getElementById("search-input").addEventListener("keydown", e => {
     if (e.key === "Escape") { e.target.value = ""; renderSearch(); }
@@ -185,9 +173,12 @@ function renderHome() {
   if (!state.workspaces.length) {
     el.innerHTML = `
       <div class="empty" style="grid-column:1/-1">
-        <div class="icon">📁</div>
-        <p>No workspaces yet. Upload an Abaqus <code>.inp</code> file to get started.</p>
-        <button class="btn btn-primary" onclick="showView('new-workspace')">+ New workspace</button>
+        <h2 class="empty-title">No workspaces yet</h2>
+        <p>Split an Abaqus <code>.inp</code> file into a mother file and organized child files.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" onclick="showView('new-workspace')">New workspace</button>
+          <button class="btn btn-ghost" onclick="showView('new-workspace'); loadSample('Job-1')">Try a sample</button>
+        </div>
       </div>`;
     return;
   }
@@ -195,7 +186,7 @@ function renderHome() {
   const footR = document.getElementById("sheet-foot-right");
   if (footR) {
     const bytes = Object.values(state.wsSummary).reduce((a, s) => a + (s.bytes || 0), 0);
-    footR.textContent = `${n} ${n === 1 ? "deck" : "decks"} · ${fmtBytes(bytes)} on disk`;
+    footR.textContent = `${n} ${n === 1 ? "workspace" : "workspaces"} · ${fmtBytes(bytes)} on disk`;
   }
 
   el.innerHTML = state.workspaces.map(name => {
@@ -226,10 +217,9 @@ function renderHome() {
     const extra = s.categories.length - shown.length;
     const chips = shown.map(c => {
       const col = CAT_COLORS_var(c.category);
-      return `<span class="wsc-chip" style="background:color-mix(in srgb, ${col} 26%, transparent);` +
-             `border-color:color-mix(in srgb, ${col} 45%, transparent);color:${col}">${esc(c.category)}</span>`;
+      return `<span class="wsc-chip" style="--c:${col}">${esc(c.category)}</span>`;
     }).join("") + (extra > 0
-      ? `<span class="wsc-chip" style="background:color-mix(in srgb, var(--muted) 22%, transparent);border-color:color-mix(in srgb, var(--muted) 40%, transparent);color:var(--muted)"
+      ? `<span class="wsc-chip" style="--c:var(--muted)"
                title="${esc(s.categories.slice(SHOWN).map(c => c.category).join(", "))}">+${extra}</span>`
       : "");
 
@@ -267,6 +257,13 @@ function fmtBytes(n) {
 
 // Short date for the card meta line: "7 Aug", with the year only when it is not
 // the current one, so last year's decks are never ambiguous.
+// "18 Oct, 13:14": the card date plus the time, for the Files tab.
+function fmtDateTime(iso) {
+  const d = new Date(iso);
+  if (!iso || isNaN(d)) return "—";
+  return `${fmtCardDate(iso)}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function fmtCardDate(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -441,9 +438,15 @@ function orderedFiles(files, includeOrder = []) {
   return ordered;
 }
 
+// A click anywhere on a Files row opens that file, except on the row's own controls.
+function openFileRow(event, filename) {
+  if (event.target.closest("button, a, input, .sort-cell")) return;
+  viewFile(filename);
+}
+
 function renderDetail(data) {
   document.getElementById("detail-meta").innerHTML =
-    `Source: <span class="mono">${esc(data.source_name)}</span> &nbsp;·&nbsp; Updated: ${esc(data.updated_at)}`;
+    `Source: <span class="mono">${esc(data.source_name)}</span> &nbsp;·&nbsp; Updated ${esc(fmtDateTime(data.updated_at))}`;
 
   const ordered = orderedFiles(data.files, data.include_order);
   state.wsFiles[data.name] = data.files;     // the sidebar tree shows the same files, same order
@@ -484,20 +487,22 @@ function renderDetail(data) {
       : `<span class="text-muted">—</span>`;
 
     const indent = f.role === "grandchild"
-      ? `<span class="tree-indent">└</span>`
+      ? `<span class="tree-indent" aria-hidden="true"></span>`
       : "";
 
     const owner = f.role === "grandchild" ? f.parent : f.role === "mother" ? `mother:${f.filename}` : f.filename;
-    return `<tr data-sort-key="${esc(owner)}" data-role="${f.role}">
+    const fn = esc(f.filename).replace(/'/g,"\\'");
+    // The whole row opens the file (the name is the keyboard target); hover marks it.
+    return `<tr data-sort-key="${esc(owner)}" data-role="${f.role}"${f.exists ? ` class="openable" onclick="openFileRow(event, '${fn}')"` : ""}>
       <td class="sort-cell">${sortCell(f)}</td>
-      <td class="filename"><div class="filename-cell">${indent}<span class="filename-text">${esc(f.filename)}</span></div></td>
+      <td class="filename"><div class="filename-cell">${indent}<button type="button" class="filename-text filename-open" onclick="viewFile('${fn}')" ${f.exists ? "" : "disabled"}
+              title="Open ${esc(f.filename)} to view or edit">${esc(f.filename)}</button><span class="open-hint" aria-hidden="true">Open</span></div></td>
       <td>${roleBadge}</td>
       <td>${f.category ? catChip(f.category) : "—"}</td>
       <td>${lineCount}</td>
       <td>${statusBadge}</td>
       <td>
         <div class="row-actions">
-          <button class="btn btn-ghost btn-sm" onclick="viewFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}>View / Edit</button>
           <button class="btn btn-ghost btn-sm" onclick="downloadFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}
                   aria-label="Download ${esc(f.filename)}" title="Download ${esc(f.filename)}">⬇</button>
         </div>

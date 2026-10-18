@@ -70,7 +70,7 @@ def test_landing_follows_the_apps_type_rules():
     """The app uses weights 400 and 600 only, and the same system font stacks; so does the landing page."""
     weights = set(re.findall(r"font-weight\s*:\s*(\d+)", LANDING))
     assert weights <= {"400", "600"}, weights
-    assert "Helvetica Neue" in LANDING and "ui-monospace" in LANDING
+    assert "-apple-system" in LANDING and "ui-monospace" in LANDING
 
 
 def test_landing_is_self_contained_and_private():
