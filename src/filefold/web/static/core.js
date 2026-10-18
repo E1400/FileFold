@@ -42,8 +42,7 @@ const CAT_COLORS = new Proxy({}, { get: (_, k) => CAT_COLORS_var(String(k)) });
 
 function catChip(cat) {
   const c = CAT_COLORS_var(cat);
-  return `<span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);` +
-         `border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>`;
+  return `<span class="chip" style="--c:${c}">${cat}</span>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -403,7 +402,7 @@ function renderResultTree(el, rows) {
   const fmt = n => n == null ? "" : n.toLocaleString();
   el.innerHTML = `<ul class="result-tree">${rows.map(r => `
     <li class="result-row role-${r.role}${r.markKind ? " is-" + r.markKind : ""}" data-file="${esc(r.name)}">
-      <span class="result-name">${r.role === "sub" ? '<span class="tree-branch">└</span>' : ""}<span class="mono">${esc(r.name)}</span></span>
+      <span class="result-name">${r.role === "sub" ? '<span class="tree-branch" aria-hidden="true"></span>' : ""}<span class="mono">${esc(r.name)}</span></span>
       ${r.role === "mother" ? `<span class="chip result-role">mother</span>` : r.cat ? catChip(r.cat) : ""}
       ${r.mark ? `<span class="result-mark">${esc(r.mark)}</span>` : ""}
       <span class="result-lines">${r.markKind === "fold" ? "" : fmt(r.lines)}</span>

@@ -47,10 +47,10 @@ async function handleUpload(file) {
     const data = await api("POST", "/api/inspect", fd);
     state.inspectResult = data;
 
-    zone.innerHTML = `
-      <div class="icon">✓</div>
-      <p><strong>${esc(file.name)}</strong></p>
-      <div class="hint">${countBlocks(data.blocks)} blocks detected — <a href="#" onclick="document.getElementById('upload-input').click();return false">change file</a></div>`;
+    zone.classList.add("loaded");
+    zone.innerHTML = `<span class="loaded-check">✓</span><strong>${esc(file.name)}</strong>
+      <span class="hint">${countBlocks(data.blocks)} blocks detected</span>
+      <a href="#" class="loaded-change" onclick="event.stopPropagation(); document.getElementById('upload-input').click(); return false">Change file</a>`;
 
     document.getElementById("inspector-section").style.display = "";
     document.getElementById("result-section").style.display = "";
@@ -95,7 +95,7 @@ function treeNodeHTML(b, depth) {
     <div class="tree-node-header">
       <span class="tree-toggle">${hasChildren ? "▸" : " "}</span>
       <span class="tree-kw" style="color:${c}">*${esc(b.keyword)}</span>
-      <span class="tree-cat" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${esc(b.category)}</span>
+      <span class="tree-cat" style="--c:${c}">${esc(b.category)}</span>
       <span class="tree-lines">${b.line_start}–${b.line_end}</span>
     </div>
     ${hasChildren ? `<div class="tree-children">${b.children.map(ch => treeNodeHTML(ch, depth+1)).join("")}</div>` : ""}
@@ -158,7 +158,7 @@ function renderSplitConfig(blocks) {
     return `<div class="split-row" id="row-${cat}">
       <label>
         <input type="checkbox" id="${id}" onchange="toggleSplitRow('${cat}')">
-        <span class="chip" style="background:color-mix(in srgb, ${c} 26%, transparent);border-color:color-mix(in srgb, ${c} 45%, transparent);color:${c}">${cat}</span>
+        <span class="chip" style="--c:${c}">${cat}</span>
       </label>
       <input type="text" id="fn-${cat}" value="${cat}.inp" placeholder="filename.inp" style="opacity:.4" disabled>
       <span class="text-muted text-sm" style="font-family:var(--mono)">*.inp</span>
@@ -384,6 +384,7 @@ async function createWorkspace() {
 function resetNewWorkspace() {
   closeSampleMenu(false);
   clearFieldErrors(document.getElementById("view-new-workspace"));
+  document.getElementById("upload-zone").classList.remove("loaded");
   state.uploadedFile = null;
   state.inspectResult = null;
   document.getElementById("upload-zone").innerHTML = `

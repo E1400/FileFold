@@ -18,85 +18,85 @@
   --bg:        #D9DBD7;
   --surface:   #E8E9E5;
   --surface2:  #DFE1DC;
-  --border:    #BABDB7;
-  --hairline:  #CBCEC8;
+  --border:    #B4B8B1;
+  --hairline:  #CDD0CA;
   --text:      #212523;
-  --muted:     #636763;
+  --muted:     #585C58;
   --accent:    #2A2E2B;
   --accent-ink:#E8E9E5;
-  --warn:      #8A6A2A;
-  --success:   #3E6B4A;
+  --warn:      #765A1F;
+  --success:   #35603F;
   --danger:    #8C3A32;
 
-  --cat-mesh:     #4A6B84;
-  --cat-material: #8A5340;
-  --cat-step:     #6B5B85;
-  --cat-loads:    #4A7A55;
-  --cat-contact:  #8A4453;
-  --cat-output:   #3A6E75;
-  --cat-model:    #7A6A3A;
-  --cat-section:  #6E5580;
-  --cat-unknown:  #636763;
-  --cat-constraint: #6B7F2F;
-  --cat-initial:  #A06A2A;
+  --cat-mesh:     #3F5F78;
+  --cat-material: #80492F;
+  --cat-step:     #5F4F7A;
+  --cat-loads:    #3B6A46;
+  --cat-contact:  #80394A;
+  --cat-output:   #2F6168;
+  --cat-model:    #665828;
+  --cat-section:  #634A75;
+  --cat-unknown:  #585C58;
+  --cat-constraint: #4E621C;
+  --cat-initial:  #83561D;
 
   --radius:   2px;
   --mono:     ui-monospace, "SF Mono", Menlo, "JetBrains Mono", Consolas, monospace;
-  --sans:     "Helvetica Neue", Helvetica, "Segoe UI", Arial, system-ui, sans-serif;
+  --sans:     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Ubuntu, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg:        #1B1A18;
     --surface:   #232220;
     --surface2:  #1F1E1C;
-    --border:    #35322F;
-    --hairline:  #2B2926;
+    --border:    #3A3733;
+    --hairline:  #2D2B28;
     --text:      #E9E6E0;
-    --muted:     #9A9691;
+    --muted:     #ABA7A1;
     --accent:    #D8D4CD;
     --accent-ink:#1B1A18;
-    --warn:      #C7A768;
-    --success:   #85B394;
-    --danger:    #D98878;
+    --warn:      #D9B44A;
+    --success:   #73C991;
+    --danger:    #F48771;
 
-    --cat-mesh:     #7FA3C4;
-    --cat-material: #C4866B;
-    --cat-step:     #A294C4;
-    --cat-loads:    #87B397;
-    --cat-contact:  #C98596;
-    --cat-output:   #74AEB5;
-    --cat-model:    #BFAE79;
-    --cat-section:  #B39BC4;
-    --cat-unknown:  #9A9691;
-    --cat-constraint: #AFC278;
-    --cat-initial:  #D6A46A;
+    --cat-mesh:     #6FA8DC;
+    --cat-material: #E0875F;
+    --cat-step:     #B392F0;
+    --cat-loads:    #6CC48A;
+    --cat-contact:  #E57AA0;
+    --cat-output:   #4FC1C9;
+    --cat-model:    #D4B85A;
+    --cat-section:  #C792EA;
+    --cat-unknown:  #A6A29C;
+    --cat-constraint: #A8C95A;
+    --cat-initial:  #E8A65A;
   }
 }
 :root[data-theme="dark"] {
   --bg:        #1B1A18;
   --surface:   #232220;
   --surface2:  #1F1E1C;
-  --border:    #35322F;
-  --hairline:  #2B2926;
+  --border:    #3A3733;
+  --hairline:  #2D2B28;
   --text:      #E9E6E0;
-  --muted:     #9A9691;
+  --muted:     #ABA7A1;
   --accent:    #D8D4CD;
   --accent-ink:#1B1A18;
-  --warn:      #C7A768;
-  --success:   #85B394;
-  --danger:    #D98878;
+  --warn:      #D9B44A;
+  --success:   #73C991;
+  --danger:    #F48771;
 
-  --cat-mesh:     #7FA3C4;
-  --cat-material: #C4866B;
-  --cat-step:     #A294C4;
-  --cat-loads:    #87B397;
-  --cat-contact:  #C98596;
-  --cat-output:   #74AEB5;
-  --cat-model:    #BFAE79;
-  --cat-section:  #B39BC4;
-  --cat-unknown:  #9A9691;
-  --cat-constraint: #AFC278;
-  --cat-initial:  #D6A46A;
+  --cat-mesh:     #6FA8DC;
+  --cat-material: #E0875F;
+  --cat-step:     #B392F0;
+  --cat-loads:    #6CC48A;
+  --cat-contact:  #E57AA0;
+  --cat-output:   #4FC1C9;
+  --cat-model:    #D4B85A;
+  --cat-section:  #C792EA;
+  --cat-unknown:  #A6A29C;
+  --cat-constraint: #A8C95A;
+  --cat-initial:  #E8A65A;
 }
 
 html { scroll-behavior: smooth; scroll-padding-top: 16px; }
@@ -116,8 +116,8 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
 .btn-ghost:hover { background: var(--surface2); opacity: 1; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
-.chip { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: var(--radius); border: 1px solid transparent; line-height: 1.45; white-space: nowrap; }
-.chip[data-cat] { color: var(--c); background: color-mix(in srgb, var(--c) 26%, transparent); border-color: color-mix(in srgb, var(--c) 45%, transparent); }
+.chip { font-family: var(--sans); font-size: 11px; font-weight: 600; padding: 0 5px; border-radius: var(--radius); border: 1px solid currentColor; line-height: 16px; white-space: nowrap; }
+.chip[data-cat] { color: var(--c); }   /* outlined stamp, as in the app */
 [data-cat="mesh"] { --c: var(--cat-mesh); } [data-cat="material"] { --c: var(--cat-material); } [data-cat="step"] { --c: var(--cat-step); }
 [data-cat="constraint"] { --c: var(--cat-constraint); } [data-cat="contact"] { --c: var(--cat-contact); } [data-cat="loads"] { --c: var(--cat-loads); }
 [data-cat="output"] { --c: var(--cat-output); } [data-cat="section"] { --c: var(--cat-section); } [data-cat="model"] { --c: var(--cat-model); }

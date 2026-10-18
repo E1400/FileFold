@@ -92,7 +92,7 @@ def test_canceling_the_save_dialog_saves_nothing_and_shows_no_error(ws):
 
 
 def test_the_editor_download_uses_the_same_save_dialog(ws):
-    row(ws, "mesh.inp").get_by_role("button", name="View / Edit").click()
+    row(ws, "mesh.inp").locator(".filename-open").click()
     expect(ws.locator("#editor-body")).to_be_visible(timeout=30_000)
     ws.locator("#editor-download").click()
     toast(ws, "Saved mesh.inp")

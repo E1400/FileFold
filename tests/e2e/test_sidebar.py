@@ -37,13 +37,10 @@ def test_collapse_state_survives_reload(app):
     expect(app.locator("#side-panel")).to_be_visible()
 
 
-def test_workspace_group_collapses_and_counts(app):
+def test_workspaces_are_listed_directly_with_a_count(app):
+    """No extra group level: the list sits under the panel title, which carries the count."""
     make_workspace(app)
-    expect(app.locator("#ws-count")).to_have_text("1")
-    expect(app.locator("#ws-list .ws-item")).to_have_count(1)
-    app.locator("#ws-group-toggle").click()
-    expect(app.locator("#ws-list")).to_be_hidden()
-    app.locator("#ws-group-toggle").click()
+    expect(app.locator("#panel-workspaces .panel-head #ws-count")).to_have_text("1")
     expect(app.locator("#ws-list .ws-item")).to_be_visible()
     app.locator("#ws-list .ws-item").click()
     expect(app.locator("#view-detail")).to_be_visible()
@@ -79,8 +76,8 @@ def test_open_workspace_stands_out_from_hover_in_both_themes(app):
         app.evaluate("t => document.documentElement.setAttribute('data-theme', t)", theme)
         app.mouse.move(900, 500)
         style = active.evaluate("e => { const s = getComputedStyle(e); return [s.backgroundColor, s.fontWeight, s.boxShadow]; }")
-        hover_bg = app.evaluate("""() => { const d = document.createElement('div'); d.style.background = 'var(--hairline)';
+        hover_bg = app.evaluate("""() => { const d = document.createElement('div'); d.style.background = 'color-mix(in srgb, var(--text) 6%, transparent)';
             document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; }""")
         assert style[0] != hover_bg, theme             # not the hover grey
         assert style[1] == "600", theme                # semibold label
-        assert "3px" in style[2], theme                # thicker ink bar
+        assert style[2] != "none", theme               # sits on a raised tile

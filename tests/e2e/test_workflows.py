@@ -28,7 +28,7 @@ def row(page: Page, filename: str):
 
 
 def open_file(page: Page, filename: str) -> None:
-    row(page, filename).get_by_role("button", name="View / Edit").click()
+    row(page, filename).locator(".filename-open").click()
     expect(page.locator("#editor-body")).to_be_visible(timeout=30_000)
 
 
