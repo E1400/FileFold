@@ -203,6 +203,9 @@ dl.spec > div { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap:
 dl.spec dt { font-family: var(--mono); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 2px; }
 dl.spec dd { font-size: 14px; max-width: 46em; }
 dl.spec dd strong { font-weight: 600; }
+dl.team dd { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+dl.team dd a { color: var(--muted); }
+dl.team dd a:hover { color: var(--text); }
 
 .get { border: 1px solid var(--text); background: var(--surface); border-radius: var(--radius); }
 .get > div { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 14px 16px; border-top: 1px solid var(--hairline); }
@@ -263,6 +266,7 @@ footer.foot a:hover { text-decoration: underline; color: var(--text); }
       <a class="label" href="#features">Features</a>
       <a class="label" href="#supported">Supported</a>
       <a class="label" href="#get">Get it</a>
+      <a class="label" href="#about">About</a>
       <a class="label" href="https://github.com/E1400/FileFold" rel="noopener">GitHub</a>
     </nav>
     <button class="btn btn-ghost" id="theme-btn" type="button" aria-label="Toggle theme" title="Toggle theme">◑</button>
@@ -494,6 +498,13 @@ uv run filefold inspect model.inp --options</pre>
       </div>
     </div>
     <p class="fineprint" id="first-launch">The desktop app is not yet signed by Apple or Microsoft, so the first launch shows a warning. On a Mac, click Done, then open System Settings &gt; Privacy &amp; Security and click <strong>Open Anyway</strong>. On Windows, click <strong>More info</strong>, then <strong>Run anyway</strong>. <a href="https://github.com/E1400/FileFold/releases/latest" rel="noopener">All downloads and release notes</a>.</p>
+  </section>
+
+  <section class="sec" id="about" aria-labelledby="about-h">
+    <div class="sec-head"><span class="label">06</span><h2 id="about-h">About</h2><span class="sec-sub">The team behind FileFold.</span></div>
+    <dl class="spec team">
+      <div><dt>Lead software engineer</dt><dd><strong>Elvis Smith</strong> <a href="mailto:14elvissmith@gmail.com">14elvissmith@gmail.com</a></dd></div>
+    </dl>
   </section>
 
 </div>
