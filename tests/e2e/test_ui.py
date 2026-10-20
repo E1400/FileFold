@@ -389,6 +389,22 @@ def test_landing_page_opens_the_app(app, base_url):
     assert errors == []
 
 
+def test_the_app_credits_the_team_quietly_in_the_home_footer(app):
+    expect(app.locator(".sheet-foot a.credit")).to_have_text("Elvis Smith")
+    expect(app.locator(".sheet-foot a.credit")).to_have_attribute("href", "mailto:14elvissmith@gmail.com")
+
+
+@pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
+def test_the_landing_page_has_an_about_section_with_the_team(app, base_url):
+    app.goto(base_url + "../")
+    app.get_by_role("navigation", name="Page sections").get_by_role("link", name="About").click()
+    about = app.locator("#about")
+    expect(about).to_be_in_viewport()
+    expect(about).to_contain_text("Lead software engineer")
+    expect(about).to_contain_text("Elvis Smith")
+    expect(about.get_by_role("link", name="14elvissmith@gmail.com")).to_have_attribute("href", "mailto:14elvissmith@gmail.com")
+
+
 @pytest.mark.skipif(_os.environ.get("FILEFOLD_E2E_TARGET") != "static", reason="static build only")
 def test_landing_page_looks_right_and_works(app, base_url):
     errors = []

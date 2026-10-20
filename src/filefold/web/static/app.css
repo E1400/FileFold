@@ -316,6 +316,8 @@ body {
   display: flex; justify-content: space-between; gap: 16px;
   font-size: var(--fs-micro); color: var(--muted);
 }
+.sheet-foot .credit { color: inherit; text-decoration: none; }
+.sheet-foot .credit:hover { color: var(--text); text-decoration: underline; }
 
 .card-grid {
   display: grid;
