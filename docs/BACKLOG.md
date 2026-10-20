@@ -51,6 +51,12 @@ they happen so the final write-up is easy. Write it for a learner who has never 
 app: what hosting is, static vs server, containers/Docker, volumes, env vars, health checks,
 CI/CD, memory sizing, auth, costs, and what went wrong/right here.
 
+## With accounts
+
+- Account menu (dropdown) in the app holding About / Contact, so the team and contact details
+  live there instead of on the app's pages (user decision 2026-10-19: the name stays off the
+  app for now and appears only in the landing page's About section).
+
 ## Also open (not deployment-gated)
 
 - Apple Developer ID signing + notarization for the desktop app ($99/yr) — offered to the
