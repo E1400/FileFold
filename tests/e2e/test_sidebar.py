@@ -75,9 +75,10 @@ def test_open_workspace_stands_out_from_hover_in_both_themes(app):
     for theme in ("light", "dark"):
         app.evaluate("t => document.documentElement.setAttribute('data-theme', t)", theme)
         app.mouse.move(900, 500)
-        style = active.evaluate("e => { const s = getComputedStyle(e); return [s.backgroundColor, s.fontWeight, s.boxShadow]; }")
         hover_bg = app.evaluate("""() => { const d = document.createElement('div'); d.style.background = 'color-mix(in srgb, var(--text) 6%, transparent)';
             document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; }""")
-        assert style[0] != hover_bg, theme             # not the hover grey
-        assert style[1] == "600", theme                # semibold label
-        assert style[2] != "none", theme               # sits on a raised tile
+        # Retrying assertions: the sidebar redraws while its file list loads, and a style read
+        # from the replaced row comes back empty (flaked on CI 2026-10-20).
+        expect(active).not_to_have_css("background-color", hover_bg)   # not the hover grey
+        expect(active).to_have_css("font-weight", "600")                # semibold label
+        expect(active).not_to_have_css("box-shadow", "none")            # sits on a raised tile
