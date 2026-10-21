@@ -406,6 +406,7 @@ async function openWorkspace(name) {
   document.getElementById("detail-title").textContent = name;
   document.getElementById("detail-meta").textContent = "Loading…";
   document.getElementById("detail-files").innerHTML = "";
+  closeNewFileForm();
   // Clear stale splits content from any previously-opened workspace.
   document.getElementById("ws-split-config").innerHTML = "";
 
@@ -480,7 +481,9 @@ function renderDetail(data) {
       ? `<span class="badge badge-muted">mother</span>`
       : f.role === "grandchild"
         ? `<span class="badge badge-sub">sub-child</span>`
-        : `<span class="badge badge-accent">child</span>`;
+        : f.added
+          ? `<span class="badge badge-accent" title="A file you created, not one made by a split">added</span>`
+          : `<span class="badge badge-accent">child</span>`;
 
     const lineCount = f.line_count != null
       ? `<span style="font-variant-numeric:tabular-nums">${f.line_count.toLocaleString()}</span>`
@@ -503,6 +506,8 @@ function renderDetail(data) {
       <td>${statusBadge}</td>
       <td>
         <div class="row-actions">
+          ${f.added ? `<button class="btn btn-ghost btn-sm" onclick="foldAddedFile('${fn}')" ${f.exists ? "" : "disabled"}
+                  title="Put this file's lines into ${esc(data.source_name)} where its *INCLUDE is, and delete the file">Fold into mother</button>` : ""}
           <button class="btn btn-ghost btn-sm" onclick="downloadFile('${esc(f.filename).replace(/'/g,"\\'")}')" ${f.exists ? "" : "disabled"}
                   aria-label="Download ${esc(f.filename)}" title="Download ${esc(f.filename)}">⬇</button>
         </div>
@@ -543,16 +548,87 @@ async function _filesReordered(order) {
   } catch (e) {
     toastError("Couldn't change the file order", e);
   }
-  try {
-    const fresh = await api("GET", `/api/workspaces/${encodeURIComponent(ws)}`);
-    if (ws !== state.activeWs) return;
-    state.wsData = fresh;
-    renderDetail(fresh);
-    document.getElementById("ws-split-config").innerHTML = "";   // the Splits tab re-renders on its next visit
-  } catch (_) { /* the next open shows the real state */ }
+  try { await _refreshDetail(ws); } catch (_) { /* the next open shows the real state */ }
 }
 
 makeSortable(document.getElementById("detail-files"), { items: _fileItems, onMove: _filesReordered });
+
+// Re-read the open workspace after a change made from the Files tab.
+async function _refreshDetail(ws) {
+  const fresh = await api("GET", `/api/workspaces/${encodeURIComponent(ws)}`);
+  if (ws !== state.activeWs) return;
+  state.wsData = fresh;
+  renderDetail(fresh);
+  document.getElementById("ws-split-config").innerHTML = "";   // the Splits tab re-renders on its next visit
+}
+
+// New file: an empty file the mother *INCLUDEs before the first step; it opens in the editor.
+// The name box pops up from the small button under the table.
+function toggleNewFileForm() {
+  if (document.getElementById("new-file-form").hidden) openNewFileForm(); else closeNewFileForm();
+}
+
+function openNewFileForm() {
+  const form = document.getElementById("new-file-form");
+  form.hidden = false;
+  document.getElementById("new-file-btn").setAttribute("aria-expanded", "true");
+  const input = document.getElementById("new-file-name");
+  input.value = "";
+  clearFieldErrors(form);
+  input.focus();
+}
+
+function closeNewFileForm({ focusButton = false } = {}) {
+  const form = document.getElementById("new-file-form");
+  if (form.hidden) return;
+  form.hidden = true;
+  clearFieldErrors(form);
+  const btn = document.getElementById("new-file-btn");
+  btn.setAttribute("aria-expanded", "false");
+  if (focusButton) btn.focus();
+}
+
+async function createNewFile(event) {
+  event.preventDefault();
+  const form = document.getElementById("new-file-form");
+  const input = document.getElementById("new-file-name");
+  const filename = input.value.trim();
+  clearFieldErrors(form);
+  const problem = filenameProblem(filename);
+  if (problem) { showFieldError(input, problem); return; }
+  const ws = state.activeWs;
+  let added;
+  try {
+    ({ added } = await api("POST", `/api/workspaces/${encodeURIComponent(ws)}/new-file`, { filename }));
+  } catch (e) {
+    if (!showApiErrorOnField(e, { filename: input })) toastError("Couldn't create the file", e);
+    return;
+  }
+  closeNewFileForm();
+  toast(`Created ${added}, included by the mother`, "ok");
+  try { await _refreshDetail(ws); } catch (_) { /* the next open shows the real state */ }
+  if (ws === state.activeWs) viewFile(added);
+}
+
+document.getElementById("new-file-form").addEventListener("keydown", e => {
+  if (e.key === "Escape") closeNewFileForm({ focusButton: true });
+});
+// A click anywhere outside the pop-up (and its button) closes it, like a menu.
+document.addEventListener("mousedown", e => {
+  if (!e.target.closest("#new-file-form, #new-file-btn")) closeNewFileForm();
+});
+
+// An added file goes back the way a split does: its lines replace its *INCLUDE in the mother.
+async function foldAddedFile(filename) {
+  const ws = state.activeWs;
+  try {
+    await api("POST", `/api/workspaces/${encodeURIComponent(ws)}/recombine`, { filenames: [filename] });
+    toast(`Folded ${filename} into the mother file`, "ok");
+  } catch (e) {
+    toastError(`Couldn't fold ${filename} into the mother file`, e);
+  }
+  try { await _refreshDetail(ws); } catch (_) { /* the next open shows the real state */ }
+}
 
 async function exportWorkspace() {
   await saveWorkspaceFile(state.activeWs);

@@ -39,7 +39,7 @@ __all__ = ["ServiceError", "UnsafeName", "NON_EXTRACTABLE", "OPERATIONS"]
 OPERATIONS = (
     "inspect", "static_sub_options", "list_all_workspaces", "create_workspace", "get_workspace",
     "rename_workspace", "delete_workspace", "extract_splits", "resplit_child", "rename_file",
-    "recombine", "reorder_files", "reimport_preview", "reimport_apply", "export_zip", "read_file",
+    "recombine", "reorder_files", "add_file", "reimport_preview", "reimport_apply", "export_zip", "read_file",
     "write_file",
 )
 
@@ -327,6 +327,7 @@ def get_workspace(name: str) -> dict:
             "manually_edited": edited,
             "exists": fpath.exists(),
             "line_count": line_count,
+            "added": rec.role == "child" and rec.category is None,
         })
 
     # Categories that actually exist in this workspace:
@@ -565,6 +566,34 @@ def reorder_files(name: str, order: list[str]) -> dict:
     return {"order": ws.include_order(), "workspace": name}
 
 
+# Abaqus reads keyword lines without their blanks and splits parameters at commas, so a
+# name with either would not survive in *INCLUDE, INPUT=<name>.
+_INCLUDE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def add_file(name: str, filename: str) -> dict:
+    """Create an empty file in the workspace and *INCLUDE it from the mother.
+
+    ".inp" is added when the name has no extension. The *INCLUDE goes at the end of the
+    model data (before the first step); reorder_files moves it like any other child.
+    """
+    filename = safe_segment(filename, "filename")
+    if not _INCLUDE_NAME.fullmatch(filename):
+        raise ServiceError(400, f"Invalid file name for *INCLUDE: {filename!r}", "invalid_include_name",
+                           "filename", filename)
+    if "." not in filename:
+        filename += ".inp"
+    ws_dir, ws = _load(name)
+    if not (ws_dir / ws.source_name).exists():
+        raise ServiceError(404, f"Mother file '{ws.source_name}' not found", "mother_missing")
+    taken = {n.lower() for n in ws.file_records} | {p.name.lower() for p in ws_dir.iterdir()}
+    if filename.lower() in taken:
+        raise ServiceError(400, f"Target filename '{filename}' already exists",
+                           "filename_taken", "filename", filename)
+    ws.add_file(filename)
+    return {"added": filename, "order": ws.include_order(), "workspace": name}
+
+
 def recombine(name: str, filenames: list[str]) -> dict:
     """Fold listed child/sub-child files back into their parent (reverse of split)."""
     if not filenames:
@@ -576,7 +605,7 @@ def recombine(name: str, filenames: list[str]) -> dict:
     # report success while folding nothing back. Fail loudly instead.
     known = {s.filename for s in ws.selections} | {
         ss.filename for s in ws.selections for ss in s.sub_selections
-    }
+    } | set(ws.added_files())
     unknown = [f for f in filenames if f not in known]
     if unknown:
         raise ServiceError(400, f"Not an extracted file in this workspace: {unknown[0]!r}", "not_extracted")

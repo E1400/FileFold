@@ -1309,3 +1309,18 @@ tr.openable:hover .open-hint, tr.openable:focus-within .open-hint { opacity: 1; 
 
 /* Motion: respect "reduce motion" everywhere. */
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }
+
+/* ── Files tab: a small New file button under the table; the name box pops up below it. ── */
+.files-foot { position: relative; margin-top: 12px; }
+.new-file-pop {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 60;
+  width: 380px; max-width: calc(100vw - 32px);
+  display: grid; gap: 8px; padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--text); border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+}
+.new-file-pop[hidden] { display: none; }
+.new-file-pop label { font-weight: 600; }
+.new-file-pop input[type="text"] { width: 100%; font-family: var(--sans); font-size: var(--fs-base); }
+.new-file-pop p { margin: 0; }
+.new-file-actions { display: flex; justify-content: flex-end; gap: 8px; }
