@@ -35,7 +35,7 @@ def test_new_file_opens_empty_in_the_editor_and_the_mother_includes_it_before_th
     expect(added).to_contain_text("clean")
     expect(row(app, "Job-1.inp")).to_contain_text("clean")        # FileFold's change, not an edit
     expect(app.locator("#new-file-form")).to_be_hidden()
-    expect(app.get_by_role("button", name="+ New file")).to_be_visible()
+    expect(app.get_by_role("button", name="+ New file")).to_have_attribute("aria-expanded", "false")
     # the sidebar tree lists it too, in deck order
     tree = app.locator("#ws-list .ws-file").all_inner_texts()
     assert [t.strip() for t in tree].index("extra-loads.inp") < [t.strip() for t in tree].index("step.inp")
@@ -61,16 +61,31 @@ def test_written_new_file_folds_into_the_mother(app):
     assert text.index("*AMPLITUDE, NAME=RAMP") < text.index("INPUT=step.inp")
 
 
-def test_split_files_have_no_fold_button_and_the_form_cancels(app):
+def test_new_file_is_a_small_button_under_the_table_whose_box_pops_up(app):
     make_workspace(app, "Job-1.inp", cats=("mesh",))
     expect(row(app, "mesh.inp").get_by_role("button", name="Fold into mother")).to_have_count(0)
-    app.get_by_role("button", name="+ New file").click()
+    btn = app.get_by_role("button", name="+ New file")
+    form = app.locator("#new-file-form")
+    expect(form).to_be_hidden()                                   # nothing waits for input
+    table = app.locator(".file-table").bounding_box()
+    assert btn.bounding_box()["y"] >= table["y"] + table["height"], "the button sits under the table"
+    btn.click()
+    expect(form).to_be_visible()
+    expect(btn).to_have_attribute("aria-expanded", "true")
     expect(app.locator("#new-file-name")).to_be_focused()
     app.keyboard.press("Escape")
-    expect(app.locator("#new-file-form")).to_be_hidden()
-    app.get_by_role("button", name="+ New file").click()
-    app.locator("#new-file-form").get_by_role("button", name="Cancel").click()
-    expect(app.locator("#new-file-form")).to_be_hidden()
+    expect(form).to_be_hidden()
+    expect(btn).to_be_focused()
+    btn.click()
+    form.get_by_role("button", name="Cancel").click()
+    expect(form).to_be_hidden()
+    btn.click()
+    app.locator("#detail-meta").click()                            # a click outside closes it
+    expect(form).to_be_hidden()
+    expect(btn).to_have_attribute("aria-expanded", "false")
+    btn.click()
+    btn.click()                                                   # the button toggles it
+    expect(form).to_be_hidden()
 
 
 def test_a_name_that_breaks_an_include_or_is_taken_is_shown_on_the_field(app):

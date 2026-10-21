@@ -297,18 +297,7 @@
     </div>
     <!-- Files tab -->
     <div id="tab-content-files" class="content">
-      <div class="files-bar">
-        <div id="detail-meta" class="text-muted text-sm"></div>
-        <button class="btn btn-ghost btn-sm" id="new-file-btn" type="button" onclick="openNewFileForm()">+ New file</button>
-      </div>
-      <form id="new-file-form" class="new-file-form" hidden onsubmit="createNewFile(event)" novalidate>
-        <label for="new-file-name">New file</label>
-        <input type="text" id="new-file-name" placeholder="extra-loads.inp" autocomplete="off" spellcheck="false"
-               aria-describedby="new-file-hint">
-        <button class="btn btn-primary btn-sm" type="submit">Create</button>
-        <button class="btn btn-ghost btn-sm" type="button" onclick="closeNewFileForm()">Cancel</button>
-        <p id="new-file-hint" class="text-muted text-sm">An empty file the mother reads with <code>*INCLUDE</code>, placed before the first step. .inp is added if you leave out the extension.</p>
-      </form>
+      <div id="detail-meta" class="text-muted text-sm" style="margin-bottom:20px"></div>
       <div class="card" style="padding:0;overflow:hidden">
         <table class="file-table">
           <thead>
@@ -324,6 +313,21 @@
           </thead>
           <tbody id="detail-files"></tbody>
         </table>
+      </div>
+      <!-- New file: a small button under the table; its name box pops up when pressed. -->
+      <div class="files-foot">
+        <button class="btn btn-ghost btn-sm" id="new-file-btn" type="button" onclick="toggleNewFileForm()"
+                aria-haspopup="dialog" aria-expanded="false" aria-controls="new-file-form">+ New file</button>
+        <form id="new-file-form" class="new-file-pop" role="dialog" aria-label="New file" hidden onsubmit="createNewFile(event)" novalidate>
+          <label for="new-file-name">New file</label>
+          <input type="text" id="new-file-name" placeholder="extra-loads.inp" autocomplete="off" spellcheck="false"
+                 aria-describedby="new-file-hint">
+          <p id="new-file-hint" class="text-muted text-sm">An empty file the mother reads with <code>*INCLUDE</code>, placed before the first step. .inp is added if you leave out the extension.</p>
+          <div class="new-file-actions">
+            <button class="btn btn-ghost btn-sm" type="button" onclick="closeNewFileForm()">Cancel</button>
+            <button class="btn btn-primary btn-sm" type="submit">Create</button>
+          </div>
+        </form>
       </div>
     </div>
     <!-- Splits tab -->

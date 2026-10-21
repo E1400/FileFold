@@ -563,21 +563,29 @@ async function _refreshDetail(ws) {
 }
 
 // New file: an empty file the mother *INCLUDEs before the first step; it opens in the editor.
+// The name box pops up from the small button under the table.
+function toggleNewFileForm() {
+  if (document.getElementById("new-file-form").hidden) openNewFileForm(); else closeNewFileForm();
+}
+
 function openNewFileForm() {
   const form = document.getElementById("new-file-form");
   form.hidden = false;
-  document.getElementById("new-file-btn").hidden = true;
+  document.getElementById("new-file-btn").setAttribute("aria-expanded", "true");
   const input = document.getElementById("new-file-name");
   input.value = "";
   clearFieldErrors(form);
   input.focus();
 }
 
-function closeNewFileForm() {
+function closeNewFileForm({ focusButton = false } = {}) {
   const form = document.getElementById("new-file-form");
+  if (form.hidden) return;
   form.hidden = true;
   clearFieldErrors(form);
-  document.getElementById("new-file-btn").hidden = false;
+  const btn = document.getElementById("new-file-btn");
+  btn.setAttribute("aria-expanded", "false");
+  if (focusButton) btn.focus();
 }
 
 async function createNewFile(event) {
@@ -603,7 +611,11 @@ async function createNewFile(event) {
 }
 
 document.getElementById("new-file-form").addEventListener("keydown", e => {
-  if (e.key === "Escape") closeNewFileForm();
+  if (e.key === "Escape") closeNewFileForm({ focusButton: true });
+});
+// A click anywhere outside the pop-up (and its button) closes it, like a menu.
+document.addEventListener("mousedown", e => {
+  if (!e.target.closest("#new-file-form, #new-file-btn")) closeNewFileForm();
 });
 
 // An added file goes back the way a split does: its lines replace its *INCLUDE in the mother.
