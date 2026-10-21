@@ -117,6 +117,16 @@ def test_extract_options_resplit_and_recombine(ws):
     assert "material-steel.inp" not in files_of(ws, "demo")
 
 
+def test_new_file_creates_an_included_empty_file_and_explains_a_bad_name(ws):
+    ws("workspace", "create", "demo", JOB1, "-e", "mesh", "-e", "step")
+    out = ws("workspace", "new-file", "demo", "extra-loads").output
+    assert "extra-loads.inp" in out
+    assert files_of(ws, "demo")["extra-loads.inp"]["added"]
+    assert service.get_workspace("demo")["include_order"] == ["mesh.inp", "extra-loads.inp", "step.inp"]
+    bad = ws("workspace", "new-file", "demo", "my file.inp", ok=False)
+    assert bad.exit_code != 0 and "my file.inp" in bad.output
+
+
 def test_rename_file_rename_workspace_cat_put_and_export(ws, tmp_path):
     ws("workspace", "create", "demo", JOB1, "-e", "mesh")
     ws("workspace", "rename-file", "demo", "mesh.inp", "geometry.inp")

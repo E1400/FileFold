@@ -404,7 +404,7 @@ function renderWsResult(data = state.wsData) {
     if (!cb.checked) {
       if (!existing) return;
       mother += categoryLines(nodes) - 1;                 // folds back, its *INCLUDE goes
-      rows.push({ name: existing.filename, role: "child", cat, mark: `folds back into ${data.source_name}`, markKind: "fold" });
+      rows.push({ name: existing.filename, orig: existing.filename, role: "child", cat, mark: `folds back into ${data.source_name}`, markKind: "fold" });
       oldSubs.forEach(ss => rows.push({ name: ss.filename, role: "sub", cat, mark: "folds back", markKind: "fold" }));
       return;
     }
@@ -422,7 +422,7 @@ function renderWsResult(data = state.wsData) {
     const lines = splitCategoryLines(nodes, filename, subs);
     if (!existing) mother -= categoryLines(nodes) - 1;     // newly extracted
     const childMark = !existing ? ["new", "new"] : filename !== existing.filename ? [`renamed from ${existing.filename}`, "rename"] : [];
-    rows.push({ name: filename, role: "child", cat, lines: lines[filename], mark: childMark[0], markKind: childMark[1] });
+    rows.push({ name: filename, orig: existing?.filename, role: "child", cat, lines: lines[filename], mark: childMark[0], markKind: childMark[1] });
     Object.entries(subs).forEach(([key, fn]) => {
       if (!lines[fn]) return;
       const old = oldSubs.find(ss => ss.sub_category === key);
@@ -432,6 +432,18 @@ function renderWsResult(data = state.wsData) {
     oldSubs.filter(ss => !(ss.sub_category in subs)).forEach(ss =>
       rows.push({ name: ss.filename, role: "sub", cat, mark: `folds back into ${filename}`, markKind: "fold" }));
   });
+  // Files the person added are not categories: Apply leaves them as they are, in their place
+  // in the deck (after the file they follow).
+  const order = data.include_order || [];
+  files.filter(f => f.added && order.includes(f.filename))
+    .sort((a, b) => order.indexOf(a.filename) - order.indexOf(b.filename))
+    .forEach(f => {
+      const before = order.slice(0, order.indexOf(f.filename)).reverse();
+      const prev = before.map(n => rows.findIndex(r => r.role === "child" && (r.orig || r.name) === n)).find(k => k >= 0);
+      let at = 0;
+      if (prev !== undefined) { at = prev + 1; while (rows[at]?.role === "sub") at++; }
+      rows.splice(at, 0, { name: f.filename, orig: f.filename, role: "child", lines: f.line_count, mark: "added" });
+    });
   rows.unshift({ name: data.source_name, role: "mother", lines: mother });
   renderResultTree(el, rows);
   const n = rows.filter(r => r.markKind !== "fold").length;

@@ -1309,3 +1309,15 @@ tr.openable:hover .open-hint, tr.openable:focus-within .open-hint { opacity: 1; 
 
 /* Motion: respect "reduce motion" everywhere. */
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }
+
+/* ── Files tab: meta line + New file; the inline form for the new file's name. ── */
+.files-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; min-height: 30px; }
+.new-file-form {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  padding: 10px 14px; margin-bottom: 14px;
+}
+.new-file-form label { font-weight: 600; }
+.new-file-form input[type="text"] { width: 260px; max-width: 100%; }
+.new-file-form p { flex-basis: 100%; margin: 0; }
+.new-file-form[hidden], .files-bar .btn[hidden] { display: none; }

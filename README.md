@@ -33,6 +33,7 @@ Abaqus `.inp` files grow large and hard to manage: mesh, materials, boundary con
 - **Container-aware parsing**: `*PART`, `*ASSEMBLY`, `*INSTANCE` and `*STEP` own the blocks inside them; options such as `*ELASTIC` always stay with their `*MATERIAL`
 - **SHA-256 change detection**: reimport knows whether a file changed in the new source, was edited by you, or both
 - **Built-in editor**: find, line-range selection, comment toggling, Cmd/Ctrl+S to save, unsaved-changes guard
+- **New files**: create an empty file from the Files tab; the mother gets its `*INCLUDE` before the first step, and re-import keeps it
 
 New users get a skippable one-minute tour, small (i) reminders, and an Info page that describes every function.
 
@@ -119,6 +120,7 @@ uv run filefold workspace resplit demo mesh        # no -s: fold the sub-files b
 uv run filefold workspace recombine demo mesh-nodes.inp
 uv run filefold workspace rename-file demo mesh.inp geometry.inp
 uv run filefold workspace reorder demo loads.inp geometry.inp   # loads now included before the mesh
+uv run filefold workspace new-file demo extra-loads   # empty extra-loads.inp, *INCLUDEd before the first step
 uv run filefold workspace cat demo geometry.inp > copy.inp
 uv run filefold workspace put demo geometry.inp edited.inp
 uv run filefold workspace reimport demo updated_model.inp [--force] [-e newcategory]

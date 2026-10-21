@@ -97,6 +97,7 @@ function errorText({ code, field, value, status }) {
     case "workspace_exists":    return `You already have a workspace called ${v}. Choose a different name.`;
     case "required":            return field === "filename" ? "Enter a file name." : field === "name" ? "Give the workspace a name." : "Something required was missing. Reload the page and try again.";
     case "invalid_name":        return field === "filename" ? `${v || "That"} isn't a valid file name. ${NAME_RULE}` : `${v || "That"} can't be used as a workspace name. ${NAME_RULE}`;
+    case "invalid_include_name": return `${v || "That"} can't be used in an *INCLUDE. Use letters, numbers, dots, dashes and underscores (no spaces or commas), starting with a letter or number.`;
     case "filename_taken":      return `Another file in this workspace is already called ${v}. Choose a different name.`;
     case "duplicate_filename":  return `Two files would both be called ${v}. Give each one its own name.`;
     case "workspace_not_found": return "This workspace no longer exists. It may have been renamed or deleted in another window.";

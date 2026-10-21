@@ -172,6 +172,7 @@
           <section id="help-editing">
             <h2>Editing files</h2>
             <p>Click any file, in the Files tab or the sidebar, to open it in the editor. <kbd>Ctrl/Cmd+S</kbd> saves, <kbd>Ctrl/Cmd+F</kbd> finds, <kbd>Ctrl/Cmd+G</kbd> selects a line range, <kbd>Ctrl/Cmd+/</kbd> comments or uncomments the selected lines. Leaving with unsaved changes asks whether to save, discard or keep editing. Saving changes only what you edited: even the invisible end-of-line characters, which differ between files made on Windows and on Mac or Linux, stay as they were.</p>
+            <p><b>+ New file</b> on the Files tab creates an empty file and adds <code>*INCLUDE, INPUT=</code><i>name</i> to the mother, at the end of the model data (just before the first step). It opens in the editor so you can start writing, and it is marked <b>added</b>. Move it like any other file; re-importing keeps it and its place. <b>Fold into mother</b> puts its lines back into the mother where its <code>*INCLUDE</code> was and deletes the file.</p>
           </section>
 
           <section id="help-splits">
@@ -296,7 +297,18 @@
     </div>
     <!-- Files tab -->
     <div id="tab-content-files" class="content">
-      <div id="detail-meta" class="text-muted text-sm" style="margin-bottom:20px"></div>
+      <div class="files-bar">
+        <div id="detail-meta" class="text-muted text-sm"></div>
+        <button class="btn btn-ghost btn-sm" id="new-file-btn" type="button" onclick="openNewFileForm()">+ New file</button>
+      </div>
+      <form id="new-file-form" class="new-file-form" hidden onsubmit="createNewFile(event)" novalidate>
+        <label for="new-file-name">New file</label>
+        <input type="text" id="new-file-name" placeholder="extra-loads.inp" autocomplete="off" spellcheck="false"
+               aria-describedby="new-file-hint">
+        <button class="btn btn-primary btn-sm" type="submit">Create</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="closeNewFileForm()">Cancel</button>
+        <p id="new-file-hint" class="text-muted text-sm">An empty file the mother reads with <code>*INCLUDE</code>, placed before the first step. .inp is added if you leave out the extension.</p>
+      </form>
       <div class="card" style="padding:0;overflow:hidden">
         <table class="file-table">
           <thead>

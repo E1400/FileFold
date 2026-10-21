@@ -44,6 +44,7 @@ OPERATION_COMMANDS = {
     "rename_file": "workspace rename-file",
     "recombine": "workspace recombine",
     "reorder_files": "workspace reorder",
+    "add_file": "workspace new-file",
     "reimport_preview": "workspace reimport",
     "reimport_apply": "workspace reimport",
     "export_zip": "workspace export",
@@ -368,6 +369,16 @@ def workspace_reorder(
     """
     result = _call(service.reorder_files, _workspace_name(name), files)
     console.print(f"[bold green]Order[/bold green]: {' → '.join(result['order'])}")
+
+
+@ws_app.command("new-file")
+def workspace_new_file(
+    name: str = typer.Argument(..., help="Workspace name (or folder path)"),
+    filename: str = typer.Argument(..., help="Name of the new file (.inp is added if it has no extension)"),
+) -> None:
+    """Create an empty file and *INCLUDE it from the mother, before the first step."""
+    result = _call(service.add_file, _workspace_name(name), filename)
+    console.print(f"[bold green]Created[/bold green] {result['added']} (included by the mother)")
 
 
 @ws_app.command("rename")

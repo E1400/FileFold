@@ -36,6 +36,13 @@ async def reorder_files(name: str, request: Request):
     return service.reorder_files(name, body.get("order", []))
 
 
+@router.post("/api/workspaces/{name}/new-file")
+async def add_file(name: str, request: Request):
+    """Create an empty file and *INCLUDE it from the mother."""
+    body = await request.json()
+    return service.add_file(name, body.get("filename", ""))
+
+
 @router.post("/api/workspaces/{name}/recombine")
 async def recombine_files(name: str, request: Request):
     """Fold listed child/sub-child files back into their parent (reverse of split)."""

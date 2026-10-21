@@ -57,6 +57,7 @@ ROUTES: list[tuple[str, str, callable]] = [
     ("POST", "/api/workspaces/{name}/rename-file", lambda r: service.rename_file(
         r.params["name"], r.json_body.get("old_filename", ""), r.json_body.get("new_filename", ""))),
     ("POST", "/api/workspaces/{name}/reorder", lambda r: service.reorder_files(r.params["name"], r.json_body.get("order", []))),
+    ("POST", "/api/workspaces/{name}/new-file", lambda r: service.add_file(r.params["name"], r.json_body.get("filename", ""))),
     ("POST", "/api/workspaces/{name}/recombine", lambda r: service.recombine(r.params["name"], r.json_body.get("filenames", []))),
     ("POST", "/api/workspaces/{name}/reimport/preview", lambda r: service.reimport_preview(
         r.params["name"], r.file_name or "upload.inp", r.file_bytes)),
